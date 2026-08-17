@@ -1,0 +1,3807 @@
+✓ Running next.config.mjs took 29ms
+▲ ready on http://localhost:3000 (bound to 0.0.0.0)
+⚠ Slow filesystem detected. The benchmark took 226ms. If \\?\D:\Projects\tankgame\multiplayer-room-starter\.next\dev is a network drive, consider moving it to a local folder.
+See more: https://nextjs.org/docs/app/guides/local-development
+[room tcheck159] created
+[room tcheck159] probe joined (1 players)
+[room tcheck159] 🎮 game started (1 players)
+[room tcheck159] empty — deleted
+ GET /room/9tgjdt?solo=1 200 in 566ms (next.js: 506ms, application-code: 60ms)
+ GET / 200 in 143ms (next.js: 20ms, application-code: 123ms)
+ GET / 200 in 34ms (next.js: 3ms, application-code: 31ms)
+ GET /room/cnjb8f?solo=1 200 in 30ms (next.js: 7ms, application-code: 23ms)
+[room cnjb8f] created
+[room cnjb8f] sayem joined (1 players)
+[room cnjb8f] 🎮 game started (1 players)
+[room cnjb8f] 🎲 terrain re-rolled (05454b10)
+[room cnjb8f] 🎲 terrain re-rolled (3c1c6939)
+[room cnjb8f] 🎲 terrain re-rolled (580a09c8)
+[room cnjb8f] 🎲 terrain re-rolled (f5beae7d)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+ GET /room/cnjb8f?solo=1 200 in 39ms (next.js: 13ms, application-code: 25ms)
+ GET /room/cnjb8f?solo=1 200 in 64ms (next.js: 7ms, application-code: 57ms)
+[room cnjb8f] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/cnjb8f" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room cnjb8f] created
+[room cnjb8f] sayem joined (1 players)
+[room cnjb8f] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+✓ Compiled in 22ms
+ GET /room/cnjb8f?solo=1 200 in 33ms (next.js: 12ms, application-code: 21ms)
+✓ Compiled in 31ms
+ GET /room/cnjb8f?solo=1 200 in 33ms (next.js: 11ms, application-code: 22ms)
+✓ Compiled in 5ms
+ GET /room/cnjb8f?solo=1 200 in 36ms (next.js: 12ms, application-code: 24ms)
+✓ Compiled in 15ms
+ GET /room/cnjb8f?solo=1 200 in 51ms (next.js: 16ms, application-code: 34ms)
+✓ Compiled in 14ms
+ GET /room/cnjb8f?solo=1 200 in 34ms (next.js: 11ms, application-code: 23ms)
+✓ Compiled in 16ms
+ GET /room/cnjb8f?solo=1 200 in 38ms (next.js: 13ms, application-code: 25ms)
+ GET / 200 in 15ms (next.js: 3ms, application-code: 12ms)
+[room cnjb8f] empty — deleted
+ GET /room/7pju2x?solo=1 200 in 26ms (next.js: 6ms, application-code: 20ms)
+[room 7pju2x] created
+[room 7pju2x] sayem joined (1 players)
+[room 7pju2x] 🎮 game started (1 players)
+✓ Compiled in 10ms
+ GET /room/7pju2x?solo=1 200 in 33ms (next.js: 10ms, application-code: 23ms)
+✓ Compiled in 13ms
+ GET /room/7pju2x?solo=1 200 in 32ms (next.js: 10ms, application-code: 22ms)
+ GET / 200 in 18ms (next.js: 3ms, application-code: 14ms)
+[room 7pju2x] empty — deleted
+ GET / 200 in 31ms (next.js: 3ms, application-code: 28ms)
+ GET /room/engfn7?solo=1 200 in 23ms (next.js: 7ms, application-code: 16ms)
+[room engfn7] created
+[room engfn7] sayem joined (1 players)
+[room engfn7] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+ GET /room/engfn7?solo=1 200 in 34ms (next.js: 10ms, application-code: 24ms)
+[room engfn7] 🎲 terrain re-rolled (a0c28faf)
+ GET /room/engfn7?solo=1 200 in 48ms (next.js: 6ms, application-code: 42ms)
+[room engfn7] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/engfn7" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room engfn7] created
+[room engfn7] sayem joined (1 players)
+[room engfn7] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+✓ Compiled in 13ms
+ GET /room/engfn7?solo=1 200 in 33ms (next.js: 11ms, application-code: 22ms)
+[room engfn7] 🏁 game ended
+ GET / 200 in 14ms (next.js: 3ms, application-code: 12ms)
+[room engfn7] empty — deleted
+ GET /room/refp2k?solo=1 200 in 24ms (next.js: 6ms, application-code: 18ms)
+[room refp2k] created
+[room refp2k] sayem joined (1 players)
+[room refp2k] 🎮 game started (1 players)
+✓ Compiled in 33ms
+[browser] ./components/Game.jsx:5:1
+Error: Export reflowSky doesn't exist in target module
+  3 | ... useEffect, useRef, useState } from 'react';
+  4 | ...from '@/lib/socket';
+> 5 | ...ain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, reflowSky, isSolid } fro...
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | ...NK_PALETTES, TANK } from '@/lib/tank.mjs';
+  7 | .../lib/fx.mjs';
+  8 | ...
+
+The export reflowSky was not found in module [project]/lib/terrain.mjs [app-client] (ecmascript).
+Did you mean to import destroyCircle?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:5:1
+Error: Export reflowSky doesn't exist in target module
+  3 | ... useEffect, useRef, useState } from 'react';
+  4 | ...from '@/lib/socket';
+> 5 | ...ain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, reflowSky, isSolid } fro...
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | ...NK_PALETTES, TANK } from '@/lib/tank.mjs';
+  7 | .../lib/fx.mjs';
+  8 | ...
+
+The export reflowSky was not found in module [project]/lib/terrain.mjs [app-ssr] (ecmascript).
+Did you mean to import destroyCircle?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:5:1
+Error: Export reflowSky doesn't exist in target module
+  3 | ... useEffect, useRef, useState } from 'react';
+  4 | ...from '@/lib/socket';
+> 5 | ...ain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, reflowSky, isSolid } fro...
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | ...NK_PALETTES, TANK } from '@/lib/tank.mjs';
+  7 | .../lib/fx.mjs';
+  8 | ...
+
+The export reflowSky was not found in module [project]/lib/terrain.mjs [app-client] (ecmascript).
+Did you mean to import destroyCircle?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:5:1
+Error: Export reflowSky doesn't exist in target module
+  3 | ... useEffect, useRef, useState } from 'react';
+  4 | ...from '@/lib/socket';
+> 5 | ...ain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, reflowSky, isSolid } fro...
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | ...NK_PALETTES, TANK } from '@/lib/tank.mjs';
+  7 | .../lib/fx.mjs';
+  8 | ...
+
+The export reflowSky was not found in module [project]/lib/terrain.mjs [app-ssr] (ecmascript).
+Did you mean to import destroyCircle?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+ GET /room/refp2k?solo=1 200 in 37ms (next.js: 16ms, application-code: 21ms)
+[room refp2k] 🎲 terrain re-rolled (b85ebba3)
+✓ Compiled in 23ms
+ GET /room/refp2k?solo=1 200 in 34ms (next.js: 13ms, application-code: 21ms)
+[room refp2k] 🎲 terrain re-rolled (da2b2b23)
+✓ Compiled in 12ms
+ GET /room/refp2k?solo=1 200 in 32ms (next.js: 10ms, application-code: 21ms)
+✓ Compiled in 8ms
+ GET /room/refp2k?solo=1 200 in 40ms (next.js: 14ms, application-code: 25ms)
+[room refp2k] 🎲 terrain re-rolled (b74b8b67)
+✓ Compiled in 5ms
+ GET /room/refp2k?solo=1 200 in 30ms (next.js: 10ms, application-code: 20ms)
+✓ Compiled in 20ms
+ GET /room/refp2k?solo=1 200 in 48ms (next.js: 11ms, application-code: 37ms)
+✓ Compiled in 17ms
+ GET /room/refp2k?solo=1 200 in 30ms (next.js: 9ms, application-code: 20ms)
+✓ Compiled in 20ms
+ GET /room/refp2k?solo=1 200 in 43ms (next.js: 12ms, application-code: 32ms)
+[room refp2k] 🎲 terrain re-rolled (b2c20812)
+ GET /room/refp2k?solo=1 200 in 40ms (next.js: 6ms, application-code: 35ms)
+[room refp2k] empty — deleted
+[room refp2k] created
+[room refp2k] sayem joined (1 players)
+[room refp2k] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+✓ Compiled in 15ms
+ GET /room/refp2k?solo=1 200 in 37ms (next.js: 12ms, application-code: 25ms)
+ GET /room/refp2k?solo=1 200 in 36ms (next.js: 6ms, application-code: 30ms)
+[room refp2k] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/refp2k" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room refp2k] created
+[room refp2k] sayem joined (1 players)
+[room refp2k] 🎮 game started (1 players)
+[room refp2k] 🎲 terrain re-rolled (135d1c0f)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+ GET /room/refp2k?solo=1 200 in 47ms (next.js: 8ms, application-code: 39ms)
+[room refp2k] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/refp2k" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room refp2k] created
+[room refp2k] sayem joined (1 players)
+[room refp2k] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+ GET / 200 in 19ms (next.js: 3ms, application-code: 17ms)
+[room refp2k] empty — deleted
+ GET /room/x9abpr?solo=1 200 in 25ms (next.js: 8ms, application-code: 17ms)
+[room x9abpr] created
+[room x9abpr] sayem joined (1 players)
+[room x9abpr] 🎮 game started (1 players)
+✓ Compiled in 19ms
+ GET /room/x9abpr?solo=1 200 in 35ms (next.js: 11ms, application-code: 24ms)
+ GET /room/x9abpr?solo=1 200 in 41ms (next.js: 6ms, application-code: 36ms)
+[room x9abpr] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/x9abpr" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room x9abpr] created
+[room x9abpr] sayem joined (1 players)
+[room x9abpr] 🎮 game started (1 players)
+✓ Compiled in 21ms
+ GET /room/x9abpr?solo=1 200 in 47ms (next.js: 14ms, application-code: 33ms)
+[room x9abpr] empty — deleted
+[room x9abpr] created
+[room x9abpr] sayem joined (1 players)
+[room x9abpr] 🎮 game started (1 players)
+✓ Compiled in 23ms
+ GET /room/x9abpr?solo=1 200 in 34ms (next.js: 12ms, application-code: 22ms)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+[room x9abpr] 🏁 game ended
+ GET /room/x9abpr?solo=1 200 in 47ms (next.js: 5ms, application-code: 42ms)
+[room x9abpr] empty — deleted
+[room x9abpr] created
+[room x9abpr] sayem joined (1 players)
+[room x9abpr] 🎮 game started (1 players)
+[room x9abpr] 🏁 game ended
+ GET / 200 in 19ms (next.js: 7ms, application-code: 11ms)
+[room x9abpr] empty — deleted
+ GET /room/388fpy?solo=1&local=2 200 in 23ms (next.js: 6ms, application-code: 17ms)
+[room 388fpy] created
+[room 388fpy] sayem joined (1 players)
+[room 388fpy] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+✓ Compiled in 29ms
+ GET /room/388fpy?solo=1&local=2 200 in 51ms (next.js: 13ms, application-code: 39ms)
+[room 388fpy] 🎲 terrain re-rolled (a48be7dd)
+✓ Compiled in 21ms
+ GET /room/388fpy?solo=1&local=2 200 in 36ms (next.js: 10ms, application-code: 26ms)
+[room 388fpy] 🏁 game ended
+ GET / 200 in 16ms (next.js: 2ms, application-code: 14ms)
+[room 388fpy] empty — deleted
+ GET /room/yarwju?solo=1&local=2 200 in 25ms (next.js: 6ms, application-code: 19ms)
+[room yarwju] created
+[room yarwju] sayem joined (1 players)
+[room yarwju] 🎮 game started (1 players)
+✓ Compiled in 14ms
+ GET /room/yarwju?solo=1&local=2 200 in 33ms (next.js: 10ms, application-code: 23ms)
+✓ Compiled in 15ms
+ GET /room/yarwju?solo=1&local=2 200 in 32ms (next.js: 10ms, application-code: 22ms)
+[room yarwju] 🎲 terrain re-rolled (a8f21cc6)
+✓ Compiled in 19ms
+ GET /room/yarwju?solo=1&local=2 200 in 53ms (next.js: 14ms, application-code: 39ms)
+✓ Compiled in 23ms
+ GET /room/yarwju?solo=1&local=2 200 in 38ms (next.js: 12ms, application-code: 26ms)
+✓ Compiled in 15ms
+ GET /room/yarwju?solo=1&local=2 200 in 35ms (next.js: 11ms, application-code: 25ms)
+[room yarwju] 🎲 terrain re-rolled (42eb60e8)
+✓ Compiled in 19ms
+ GET /room/yarwju?solo=1&local=2 200 in 40ms (next.js: 11ms, application-code: 30ms)
+✓ Compiled in 8ms
+ GET /room/yarwju?solo=1&local=2 200 in 35ms (next.js: 12ms, application-code: 24ms)
+[room yarwju] empty — deleted
+✓ Compiled in 37ms
+[room yarwju] created
+[room yarwju] sayem joined (1 players)
+ GET / 200 in 15ms (next.js: 2ms, application-code: 12ms)
+[room yarwju] empty — deleted
+ GET /room/aa5hac?solo=1 200 in 30ms (next.js: 11ms, application-code: 19ms)
+ GET / 200 in 27ms (next.js: 2ms, application-code: 25ms)
+ GET /room/cbuya9?solo=1 200 in 22ms (next.js: 6ms, application-code: 16ms)
+[room cbuya9] created
+[room cbuya9] sayem joined (1 players)
+[room cbuya9] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+ GET /room/cbuya9?solo=1 200 in 29ms (next.js: 10ms, application-code: 20ms)
+ GET /room/cbuya9?solo=1 200 in 46ms (next.js: 6ms, application-code: 40ms)
+[room cbuya9] empty — deleted
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/room/cbuya9" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.jsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <RootLayout>
+                        <html
+                          lang="en"
+-                         foxified-bridged=""
+-                         foxified=""
+-                         webcrx-bridged=""
+-                         webcrx=""
+                        >
+                  ...
+ 
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+    at d (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96462)
+    at f (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96563) (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:96352)
+[room cbuya9] created
+[room cbuya9] sayem joined (1 players)
+[room cbuya9] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+[room cbuya9] 🎲 terrain re-rolled (3fb7a1af)
+✓ Compiled in 14ms
+ GET /room/cbuya9?solo=1 200 in 33ms (next.js: 12ms, application-code: 21ms)
+[browser] ./components/Game.jsx:8:1
+Error: Export bonusBuried doesn't exist in target module
+   6 | import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
+   7 | import { FX } from '@/lib/fx.mjs';
+>  8 | import { generateBonuses, bonusBuried, BONUS_DEFS } from '@/lib/bonus.mjs';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | /**
+  11 |  * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
+
+The export bonusBuried was not found in module [project]/lib/bonus.mjs [app-client] (ecmascript).
+Did you mean to import pickDropType?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:8:1
+Error: Export bonusBuried doesn't exist in target module
+   6 | import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
+   7 | import { FX } from '@/lib/fx.mjs';
+>  8 | import { generateBonuses, bonusBuried, BONUS_DEFS } from '@/lib/bonus.mjs';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | /**
+  11 |  * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
+
+The export bonusBuried was not found in module [project]/lib/bonus.mjs [app-ssr] (ecmascript).
+Did you mean to import pickDropType?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:8:1
+Error: Export generateBonuses doesn't exist in target module
+   6 | import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
+   7 | import { FX } from '@/lib/fx.mjs';
+>  8 | import { generateBonuses, bonusBuried, BONUS_DEFS } from '@/lib/bonus.mjs';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | /**
+  11 |  * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
+
+The export generateBonuses was not found in module [project]/lib/bonus.mjs [app-client] (ecmascript).
+Did you mean to import pickDropType?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+[browser] ./components/Game.jsx:8:1
+Error: Export generateBonuses doesn't exist in target module
+   6 | import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
+   7 | import { FX } from '@/lib/fx.mjs';
+>  8 | import { generateBonuses, bonusBuried, BONUS_DEFS } from '@/lib/bonus.mjs';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | /**
+  11 |  * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
+
+The export generateBonuses was not found in module [project]/lib/bonus.mjs [app-ssr] (ecmascript).
+Did you mean to import pickDropType?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component] 
+ GET /room/cbuya9?solo=1 200 in 37ms (next.js: 5ms, application-code: 31ms)
+[room cbuya9] empty — deleted
+[room cbuya9] created
+[room cbuya9] sayem joined (1 players)
+[room cbuya9] 🎮 game started (1 players)
+[browser] ⨯ unhandledRejection: Error: Window message "chrome: call method" timed out.
+    at <unknown> (chrome-extension://cldmemdnllncchfahbcnjijheaolemfk/assets/js/ff-content.js:13:102451)
+[room cbuya9] 🏁 game ended
+ GET / 200 in 16ms (next.js: 4ms, application-code: 12ms)
+[room cbuya9] empty — deleted
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:8:1
+Error: Module not found: Can't resolve '@/lib/bonus.mjs'
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+[31m[1m>[0m [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m
+  [90m10 |[0m /**
+  [90m11 |[0m  * 🛡️ [33mTANK[0m [33mBATTLE[0m — [33mWorms[0m-style, side-view destructible terrain, zero sprites.
+
+Import map: aliased to relative './lib/bonus.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:7:1
+Error: Module not found: Can't resolve '@/lib/fx.mjs'
+  [90m 5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, clean...
+  [90m 6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+[31m[1m>[0m [90m 7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m 9 |[0m
+  [90m10 |[0m /**
+
+Import map: aliased to relative './lib/fx.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:6:1
+Error: Module not found: Can't resolve '@/lib/tank.mjs'
+  [90m4 |[0m [36mimport[0m { getSocket } [36mfrom[0m [32m'@/lib/socket'[0m;
+  [90m5 |[0m [36mimport[0m { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanD...
+[31m[1m>[0m [90m6 |[0m [36mimport[0m { drawTank, [33mTANK_PALETTES[0m, [33mTANK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m [36mimport[0m { [33mFX[0m } [36mfrom[0m [32m'@/lib/fx.mjs'[0m;
+  [90m8 |[0m [36mimport[0m { [33mBONUS_DEFS[0m, pickDropType } [36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+  [90m9 |[0m
+
+Import map: aliased to relative './lib/tank.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./components/Game.jsx:5:1
+Error: Module not found: Can't resolve '@/lib/terrain.mjs'
+  [90m3 |[0m ...Ref, useState } [36mfrom[0m [32m'react'[0m;
+  [90m4 |[0m ...[32mket'[0m;
+[31m[1m>[0m [90m5 |[0m ...ainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky,...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m ...[33mNK[0m } [36mfrom[0m [32m'@/lib/tank.mjs'[0m;
+  [90m7 |[0m ...
+  [90m8 |[0m ...[36mfrom[0m [32m'@/lib/bonus.mjs'[0m;
+
+Import map: aliased to relative './lib/terrain.mjs' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/Game.jsx [Client Component Browser]
+    ./components/Room.jsx [Client Component Browser]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./components/Game.jsx [Client Component SSR]
+    ./components/Room.jsx [Client Component SSR]
+    ./components/Room.jsx [Server Component]
+    ./app/room/[id]/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+✓ Compiled in 23ms
+ GET / 200 in 22ms (next.js: 7ms, application-code: 15ms)
+✓ Compiled in 15ms
+ GET / 200 in 35ms (next.js: 8ms, application-code: 27ms)
