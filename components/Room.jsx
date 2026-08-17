@@ -18,6 +18,33 @@ export default function Room({ roomId }) {
   const [gs, setGs] = useState(null); // game-state (null = lobby)
   const nameRef = useRef('');
 
+  // ── SOLO DEV BYPASS: ?solo=1 skips the name prompt and auto-starts the
+  //    game (server allows it via {dev:true} despite MIN_PLAYERS=2).
+  //    Remove this block to restore pure multiplayer.
+  const soloRef = useRef(false);
+  const autoStartedRef = useRef(false);
+  const [localCount, setLocalCount] = useState(0); // hot-seat: ?local=N (2-4) on one screen
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('solo') === '1') {
+      soloRef.current = true;
+      const name = sessionStorage.getItem('player-name') || 'dev';
+      nameRef.current = name;
+      sessionStorage.setItem('player-name', name);
+      const n = parseInt(new URLSearchParams(window.location.search).get('local') || '0', 10);
+      setLocalCount(Number.isFinite(n) ? Math.min(4, Math.max(0, n)) : 0);
+      setJoined(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (soloRef.current && joined && myId && gs === null && !autoStartedRef.current) {
+      autoStartedRef.current = true; // once per mount — don't restart after end-game
+      getSocket()?.emit('start-game', { dev: true });
+    }
+  }, [joined, myId, gs]);
+  // ── END SOLO DEV BYPASS ──
+
   useEffect(() => {
     const saved = sessionStorage.getItem('player-name');
     if (saved && inputRef.current) inputRef.current.value = saved;
@@ -116,7 +143,7 @@ export default function Room({ roomId }) {
 
   // ---------- game (your component takes over) ----------
   if (gs && gs.phase && gs.phase !== 'lobby') {
-    return <Game gs={gs} myId={myId} />;
+    return <Game gs={gs} myId={myId} local={localCount} />;
   }
 
   // ---------- lobby ----------

@@ -12,6 +12,16 @@ export default function Home() {
     router.push(`/room/${newRoomId()}`);
   };
 
+  // ── SOLO DEV BYPASS — skip lobby, straight into a practice game ──
+  const soloDev = () => {
+    router.push(`/room/${newRoomId()}?solo=1`);
+  };
+
+  // ── HOT-SEAT (one-screen turn-based): 2-4 local players share this screen ──
+  const hotSeat = (n) => {
+    router.push(`/room/${newRoomId()}?solo=1&local=${n}`);
+  };
+
   const joinByCode = (e) => {
     e.preventDefault();
     const raw = code.trim().toLowerCase();
@@ -25,7 +35,7 @@ export default function Home() {
       <div className="card hero">
         <h1 className="logo">🛡️ tank battle</h1>
         <p className="tagline">
-          Worms-style artillery on destructible terrain — supply drops, wind, special shells.
+          Worms-style artillery on destructible terrain — wind, supply drops, special shells.
           <br />
           Online rooms or one-screen hot-seat. No accounts.
         </p>
@@ -33,6 +43,20 @@ export default function Home() {
         <button className="btn btn-primary btn-lg" onClick={createRoom}>
           🎲 Create a room
         </button>
+
+        <button className="btn btn-lg" onClick={soloDev} style={{ marginTop: '0.75rem' }}>
+          🛠️ Solo practice
+        </button>
+        <p className="hint" style={{ marginTop: '0.25rem' }}>dev shortcut — skips the lobby</p>
+
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+          {[2, 3, 4].map((n) => (
+            <button key={n} className="btn" onClick={() => hotSeat(n)}>
+              🛋️ {n}P
+            </button>
+          ))}
+        </div>
+        <p className="hint" style={{ marginTop: '0.25rem' }}>hot-seat — one screen, take turns</p>
 
         <div className="divider">
           <span>or join with a link / code</span>
