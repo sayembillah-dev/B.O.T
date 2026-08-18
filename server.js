@@ -121,7 +121,9 @@ async function createGame(room) {
     placed.push(x);
     return {
       id: p.id, name: p.name, emoji: p.emoji,
-      x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
+      x, y: mode === 'chaos' ? -60 : surfOf(T, x), // 🪂 chaos drops in by parachute
+      para: mode === 'chaos',
+      aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
       hp: 100, fuel: 100, power: 0.5, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
       cdAt: 0,   // ⚡ chaos reload bookkeeping
       dmg: 0,    // ⚡ chaos scoreboard — total damage dealt to OTHERS (the win metric)
@@ -264,7 +266,7 @@ function tickRoom(room) {
       if (!t.dead || !t.deadAt || now - t.deadAt < CHAOS_RESPAWN_MS) continue;
       const placed = g.tanks.filter((o) => o !== t && !o.dead).map((o) => o.x);
       const x = findSpawn(T, 60 + Math.floor(Math.random() * (T.width - 120)), placed, T.width / 2);
-      t.x = x; t.y = surfOf(T, x);
+      t.x = x; t.y = -60; t.para = true; // 🪂 ride the chute down to the fresh spot
       t.aim = x < T.width / 2 ? -0.6 : -2.54;
       t.hp = 100; t.fuel = 100; t.dead = false; t.deadAt = 0; t.cdAt = 0;
       io.to(room.id).emit('game-event', { kind: 'respawn', id: t.id, x: t.x, y: t.y });
@@ -587,9 +589,10 @@ app.prepare().then(async () => {
       // 👀 shared intel: everyone sees everyone's fuel gauge + the active player's aim power
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
       if (typeof p?.p === 'number' && isFinite(p.p)) t.power = Math.max(0, Math.min(1, p.p));
+      if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
-        fuel: t.fuel, p: t.power ?? 0.5,
+        fuel: t.fuel, p: t.power ?? 0.5, para: t.para === true,
       });
     });
     // 🌀 teleport: spend a pending teleport to land at x (classic: this turn

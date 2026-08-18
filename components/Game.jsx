@@ -15,6 +15,8 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * 🔁 TURNS + FUEL — a turn is OPEN (act) → shot → settle → next player.
  * Power carries across the turn (scroll to adjust any time); firing only
  * requires being parked (grounded, near-zero speed) at the moment you click.
+ * (⚡ chaos: run-and-gun — fire while driving AND mid-jump; spawns/respawns
+ * parachute in from the sky, and YOUR tank wears a pulsing halo + beacon.)
  * Firing ends the turn; Enter passes. Fuel burns while driving/jumping and
  * regenerates slowly; empty tank = engine dead.
  *
@@ -66,6 +68,7 @@ const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell — flies far slower than a nor
 const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
 const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload — seconds between shots (server enforces too)
 const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn — seconds dead before you're back
+const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) — gentle drop-in
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
 // ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
@@ -257,7 +260,8 @@ export default function Game({ gs, myId, local = 0 }) {
           placed.push(x);
           return {
             ...p, x, y, s: 0, rot: 0, susOff: 0, susVel: 0,
-            wheelRot: 0, grounded: true, airVy: 0, dustT: 0,
+            wheelRot: 0, grounded: !st?.para, airVy: 0, dustT: 0, // 🪂 chute drops start airborne
+            para: !!st?.para,
             hp: st?.hp ?? 100, fuel: 100,
             driving: false, dead: !!st?.dead,
             inv: st?.inv ? { ...st.inv } : { cluster: 0, guided: 0, tomahawk: 0 }, // special shells in stock
@@ -325,6 +329,7 @@ export default function Game({ gs, myId, local = 0 }) {
       t.inv = { ...st.inv };
       t.buff = st.buff;
       t.dmg = st.dmg | 0; // ⚡ chaos scoreboard — damage dealt
+      if (st.para) t.para = true; // 🪂 one-way: touchdown clears it locally
       t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
       if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
         teleRef.current = null; setTeleUi(null);
@@ -332,7 +337,8 @@ export default function Game({ gs, myId, local = 0 }) {
       if (st.dead && !t.dead) { t.dead = true; t.driving = false; t.deadAtMs = performance.now(); } // 💀 chaos: respawn countdown starts
       else if (!st.dead && t.dead) { // ⚡ chaos respawn — server revived this tank at a fresh spot
         t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
-        t.s = 0; t.airVy = 0; t.grounded = true; t.fuel = 100; t.aim = st.aim ?? t.aim;
+        t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100; t.aim = st.aim ?? t.aim;
+        t.para = !!st.para; // 🪂 ride the chute down again
         fxRef.current.text(st.x, st.y - 56, 'RESPAWN', '#8fd0ff');
         fxRef.current.add({ t: 'ring', x: st.x, y: st.y - 18, size: 8, grow: 320, life: 0.5, color: 'rgba(143,208,255,0.9)' });
         if (st.id === myIdRef.current) { aimRef.current = t.aim; chargeRef.current.power = 0.5; sfx('turn'); }
@@ -571,7 +577,7 @@ export default function Game({ gs, myId, local = 0 }) {
   // ── fire the (possibly special) shell ──
   const fire = useCallback(() => {
     const me = controlTank();
-    if (!me || me.dead) return;
+    if (!me || me.dead || me.para) return; // 🪂 guns stay packed until touchdown
     const chaosNow = chaosRef.current;
     if (chaosNow) { // ⚡ real-time: reload gate, no turns, shells keep flying
       if (turnRef.current.phase === 'over' || countdownRef.current > 0) return;
@@ -672,6 +678,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (typeof m.s === 'number') t.netS = m.s;
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
       if (typeof m.p === 'number') t.netPower = m.p;        // 👀 rival aim power is public
+      if (typeof m.para === 'boolean') t.para = m.para;     // 🪂 touchdown signal from the owner
     };
     const onFire = (m) => { // another player fired — spawn the same shell visually
       if (!m || m.id === myIdRef.current) return;
@@ -781,6 +788,21 @@ export default function Game({ gs, myId, local = 0 }) {
       //    the active one — and online, only when it's YOUR tank ──
       for (const me of tanksRef.current) {
         if (me.dead) continue;
+
+        // 🪂 parachute descent (⚡ chaos spawns/respawns): gentle fixed-rate
+        //    drop with no steering — you land, THEN you fight (brief spawn cover)
+        if (me.para) {
+          me.grounded = false; me.driving = false; me.s = 0; me.airVy = 0;
+          me.y = (me.y ?? -60) + PARA_FALL * dt;
+          const gyP = surf(me.x);
+          if (me.y >= gyP) { // touchdown — stow the chute, kick up dust
+            me.y = gyP; me.para = false; me.grounded = true;
+            me.susVel += 10;
+            fxRef.current.add({ t: 'dirt', x: me.x - 10, y: me.y - 2, vx: -40, vy: -30, size: 2.2, life: 0.5 });
+            fxRef.current.add({ t: 'dirt', x: me.x + 10, y: me.y - 2, vx: 40, vy: -30, size: 2.2, life: 0.5 });
+          }
+          continue;
+        }
 
         // 🌐 remote tank: follow the owner's stream; still falls if the
         // ground vanishes under it (everyone sees consistent craters)
@@ -946,6 +968,7 @@ export default function Game({ gs, myId, local = 0 }) {
               s: Math.round(me.s || 0),
               fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
               p: Math.round(chargeRef.current.power * 100) / 100,     // 👀 rivals see your aim
+              para: me.para === true,                                 // 🪂 chute stowed = touchdown
             });
           }
         }
@@ -1466,15 +1489,31 @@ export default function Game({ gs, myId, local = 0 }) {
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
         const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
-        if (spot && !t.dead && turn.phase !== 'over') { // soft team-color ground glow — whose turn (⚡: you) reads instantly
+        if (spot && !t.dead && turn.phase !== 'over') { // ground glow — whose turn (⚡ chaos: YOU, extra loud)
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
-          const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
-          gg.addColorStop(0, `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60% / 0.30)`);
-          gg.addColorStop(1, `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60% / 0)`);
-          ctx.fillStyle = gg;
-          ctx.beginPath(); ctx.arc(t.x, gy, 36, 0, Math.PI * 2); ctx.fill();
+          const hue = `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60%`;
+          if (chaosR && onlineRef.current) { // ⚡ "which one am I?" — sky beacon + big pulsing halo
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+            const beam = ctx.createLinearGradient(t.x, gy - 190, t.x, gy);
+            beam.addColorStop(0, `${hue} / 0)`);
+            beam.addColorStop(1, `${hue} / ${0.16 + 0.10 * pulse})`);
+            ctx.fillStyle = beam;
+            ctx.fillRect(t.x - 13, gy - 190, 26, 190);
+            const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 54);
+            gg.addColorStop(0, `${hue} / ${0.36 + 0.16 * pulse})`);
+            gg.addColorStop(1, `${hue} / 0)`);
+            ctx.fillStyle = gg;
+            ctx.beginPath(); ctx.arc(t.x, gy, 54, 0, Math.PI * 2); ctx.fill();
+          } else {
+            const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
+            gg.addColorStop(0, `${hue} / 0.30)`);
+            gg.addColorStop(1, `${hue} / 0)`);
+            ctx.fillStyle = gg;
+            ctx.beginPath(); ctx.arc(t.x, gy, 36, 0, Math.PI * 2); ctx.fill();
+          }
         }
-        drawTank(ctx, t.x + dx, gy + dy, {
+        const swayX = t.para ? Math.sin(now * 0.003 + t.x) * 5 : 0; // 🪂 chute sway
+        drawTank(ctx, t.x + dx + swayX, gy + dy, {
           aim: isActive && mineT ? aimRef.current : (t.aim ?? -0.6), // remote barrel follows THEIR stream
           palette: t.palette ?? 0,
           rot: (t.rot || 0) + (Math.random() - 0.5) * 0.022 * rf,
@@ -1482,15 +1521,53 @@ export default function Game({ gs, myId, local = 0 }) {
           wheelRot: t.wheelRot || 0,
         });
 
+        if (t.para && !t.dead) { // 🪂 canopy + cords over the descending tank
+          const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
+          ctx.save();
+          ctx.translate(t.x + dx + swayX, gy + dy);
+          ctx.rotate(Math.sin(now * 0.003 + t.x) * 0.09); // pendulum swing
+          ctx.strokeStyle = 'rgba(232,236,228,0.75)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(-17, -40); ctx.lineTo(-7, -6);
+          ctx.moveTo(17, -40); ctx.lineTo(7, -6);
+          ctx.moveTo(0, -44); ctx.lineTo(0, -6);
+          ctx.stroke();
+          ctx.fillStyle = `hsl(${pal.h} 72% 55%)`; // team-color dome
+          ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.75)'; // white gore stripes
+          ctx.beginPath(); ctx.ellipse(-9.5, -44, 4.5, 14, 0.12, Math.PI, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(9.5, -44, 4.5, 14, -0.12, Math.PI, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(10,14,10,0.35)';
+          ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+
+        // ⚡ chaos: pulsing dashed ring around YOUR tank — impossible to lose yourself
+        if (spot && chaosR && onlineRef.current && !t.dead && turn.phase !== 'over') {
+          const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
+          const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+          ctx.save();
+          ctx.strokeStyle = `hsla(${pal.h} 95% 70% / ${0.55 + 0.35 * pulse})`;
+          ctx.lineWidth = 2.4;
+          ctx.setLineDash([7, 6]);
+          ctx.lineDashOffset = -now * 0.03; // marching ants — reads as "live"
+          ctx.beginPath(); ctx.arc(t.x + dx + swayX, gy - 18 + dy, 33 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+
         // active-tank marker: bobbing ▼ (whose turn — ⚡ chaos: which one is you)
         if (spot && tanksRef.current.length > 1 && turn.phase !== 'over') {
           const bob = Math.sin(now * 0.006) * 3;
+          ctx.save();
+          if (chaosR && onlineRef.current) { ctx.shadowColor = '#ffd75e'; ctx.shadowBlur = 14; } // ⚡ glowing YOU marker
           ctx.fillStyle = '#ffd75e';
           ctx.beginPath();
           ctx.moveTo(t.x, gy - 64 + bob);
           ctx.lineTo(t.x - 6.5, gy - 75 + bob);
           ctx.lineTo(t.x + 6.5, gy - 75 + bob);
           ctx.closePath(); ctx.fill();
+          ctx.restore();
         }
 
         drawNameTag(ctx, t.x + dx, gy - 82 + dy, t);
@@ -1861,8 +1938,17 @@ export default function Game({ gs, myId, local = 0 }) {
         doTeleport(toWorld(e).x);
         return;
       }
-      // no shooting on the move: must be parked on the ground to fire
-      if (!me.grounded || Math.abs(me.s) > 12) {
+      if (me.para) { // 🪂 still descending — stow the chute first
+        if ((me.stopT || 0) <= 0) {
+          me.stopT = 1.5;
+          fxRef.current.text(me.x, (me.y ?? 0) - 62, '🪂 LAND FIRST', '#8fd0ff');
+          sfx('deny');
+        }
+        return;
+      }
+      // classic: parked on the ground to fire. ⚡ chaos: run-and-gun —
+      // shoot while driving, while jumping, whenever the reload allows
+      if (!chaosNow && (!me.grounded || Math.abs(me.s) > 12)) {
         if ((me.stopT || 0) <= 0) {
           me.stopT = 1.5;
           fxRef.current.text(me.x, (me.y ?? 0) - 62, 'STOP TO SHOOT', '#ffd75e');
@@ -1870,7 +1956,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return;
       }
-      // ⚡ chaos reload — infinite shells, but the gun needs its 3 seconds
+      // ⚡ chaos reload — infinite shells, but the gun needs its 1 second
       if (chaosNow && (me.cd || 0) > 0) {
         if ((me.cdDenyT || 0) <= 0) {
           me.cdDenyT = 1;

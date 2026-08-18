@@ -70,6 +70,8 @@ const skew = g1.endsAt - (Date.now() + 12000 + 8000); // dur + 8s gen/countdown 
 if (Math.abs(skew) > 2500) fail(`endsAt skew ${skew}ms too large`);
 if (g1.turn.phase !== 'open') fail(`turn.phase should be open, got ${g1.turn.phase}`);
 if (!g1.tanks.every((t) => (t.dmg | 0) === 0)) fail('chaos tanks should start at 0 damage dealt');
+if (!g1.tanks.every((t) => t.para === true && t.y < 0)) fail(`chaos tanks should drop in by parachute (y<0, para=true), got ${JSON.stringify(g1.tanks.map((t) => ({ y: t.y, para: t.para })))}`);
+else ok('all tanks parachute in from the sky at spawn 🪂');
 ok(`chaos game started — mode=${g1.mode}, dur=${g1.dur / 1000}s, ${g1.tanks.length} tanks, all live at once`);
 
 // both players drive simultaneously — no turn gate on tank-move
@@ -140,7 +142,8 @@ const re = await respawnEvt;
 const gRe = await waitEvent(a, 'game-state', (g) => g.tanks.some((t) => t.id === bId && !t.dead), 'B alive again');
 const bRe = gRe.tanks.find((t) => t.id === bId);
 if (bRe.hp !== 100) fail(`respawned B should have 100 HP, got ${bRe.hp}`);
-else ok(`B respawned at (${Math.round(re.x)},${Math.round(re.y)}) with full HP — death is a timeout, not the end`);
+else if (!bRe.para) fail('respawned B should ride the chute down (para=true)');
+else ok(`B respawned at x=${Math.round(re.x)} with full HP + parachute — death is a timeout, not the end`);
 a.close(); b.close();
 
 // ═══ Room 2 — most DAMAGE dealt when the clock hits 0:00 ═══
