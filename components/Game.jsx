@@ -1563,7 +1563,7 @@ export default function Game({ gs, myId, local = 0 }) {
           {ctl(['W'], 'jump')}
           {ctl(['⇅'], 'power')}
           {ctl(['🖱️'], 'fire')}
-          {ctl(['1–4'], 'shell')}
+          {ctl(['1–4'], 'weapon')}
           {ctl(['⏎'], 'pass')}
         </span>
         <span style={{ flex: 1 }} />
