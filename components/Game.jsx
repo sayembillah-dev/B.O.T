@@ -98,11 +98,12 @@ const drawNameTag = (ctx, x, y, t) => {
   if (!label) return;
   ctx.font = 'bold 10px system-ui';
   ctx.textAlign = 'center';
-  ctx.lineWidth = 2.4;
-  ctx.strokeStyle = 'rgba(8,11,7,0.85)';
-  ctx.strokeText(label, x, y);
-  ctx.fillStyle = 'rgba(232,236,228,0.92)';
-  ctx.fillText(label, x, y);
+  const w = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill behind the name
+  ctx.beginPath(); ctx.roundRect(x - w / 2 - 6, y - 9.5, w + 12, 13, 6.5); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 0.8; ctx.stroke();
+  ctx.fillStyle = 'rgba(238,242,234,0.95)';
+  ctx.fillText(label, x, y + 0.5);
 };
 
 export default function Game({ gs, myId, local = 0 }) {
@@ -1252,6 +1253,18 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.translate(ox, oy);
       ctx.scale(scale, scale);
 
+      // ☀️ living sun — a soft halo that breathes over the baked disc
+      {
+        const sx = terrain.width * 0.78, sy = terrain.height * 0.15;
+        const pr = terrain.height * 0.30 * (1 + Math.sin(now * 0.0006) * 0.045);
+        const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr);
+        grd.addColorStop(0, 'rgba(255,244,200,0.17)');
+        grd.addColorStop(0.55, 'rgba(255,236,180,0.07)');
+        grd.addColorStop(1, 'rgba(255,236,180,0)');
+        ctx.fillStyle = grd;
+        ctx.fillRect(sx - pr, sy - pr, pr * 2, pr * 2);
+      }
+
       // 🌬️ wind streaks — faint speed-lines drifting across the sky; you read
       //    direction, strength and gusts at a glance while aiming
       {
@@ -1273,6 +1286,24 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
 
+      // 🌊 animated waterline glints riding the baked waves (open water only)
+      {
+        const wy = terrain.waterY;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        for (let x = 24; x < terrain.width - 24; x += 34) {
+          if (groundY(x) <= wy + 2) continue; // land sits above the waterline here
+          const ph = now * 0.0016 + x * 0.045;
+          const a = 0.09 + 0.11 * (0.5 + 0.5 * Math.sin(ph * 1.7));
+          ctx.strokeStyle = `rgba(190,230,255,${a.toFixed(3)})`;
+          const dxs = Math.sin(ph) * 4;
+          ctx.beginPath();
+          ctx.moveTo(x - 9 + dxs, wy + 2 + Math.sin(ph * 0.9) * 1.2);
+          ctx.lineTo(x + 9 + dxs, wy + 2 + Math.cos(ph * 0.8) * 1.2);
+          ctx.stroke();
+        }
+      }
+
       fxRef.current.draw(ctx, 'back'); // smoke behind tanks
 
       const active = activeTank();
@@ -1291,8 +1322,18 @@ export default function Game({ gs, myId, local = 0 }) {
           : (b.landed && (b.expire ?? -1) >= 0 ? b.expire : Infinity);
         const blink = b.landed && expIn < 5 ? (Math.sin(now * 0.02 + b.bob) > 0 ? 1 : 0.25) : 1;
         if (!b.landed) {
-          ctx.fillStyle = 'rgba(200,90,70,0.9)'; // parachute canopy
+          // striped parachute canopy (cream panels on red)
+          ctx.fillStyle = 'rgba(214,84,64,0.95)';
           ctx.beginPath(); ctx.arc(b.x, b.y - 26, 16, Math.PI, 0); ctx.fill();
+          ctx.save();
+          ctx.beginPath(); ctx.arc(b.x, b.y - 26, 16, Math.PI, 0); ctx.clip();
+          ctx.fillStyle = 'rgba(240,236,224,0.95)';
+          ctx.fillRect(b.x - 11, b.y - 42, 4, 16);
+          ctx.fillRect(b.x - 2, b.y - 42, 4, 16);
+          ctx.fillRect(b.x + 7, b.y - 42, 4, 16);
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(120,40,30,0.7)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(b.x, b.y - 26, 16, Math.PI, 0); ctx.stroke();
           ctx.strokeStyle = 'rgba(230,235,225,0.85)';
           ctx.lineWidth = 1.4;
           ctx.beginPath();
@@ -1308,15 +1349,26 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         const cy = b.landed ? b.y - 14 : b.y;
         ctx.globalAlpha = blink;
-        ctx.fillStyle = 'rgba(10,13,9,0.9)';
-        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 6); ctx.fill();
-        ctx.strokeStyle = MC;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 6); ctx.stroke();
-        ctx.fillStyle = MC;
-        ctx.font = 'bold 14px system-ui';
+        // wooden crate: warm planks, dark frame, diagonal strap, gold '?' badge
+        const wg = ctx.createLinearGradient(b.x, cy - 12, b.x, cy + 12);
+        wg.addColorStop(0, '#a9713a'); wg.addColorStop(0.5, '#8d5a2c'); wg.addColorStop(1, '#6f4520');
+        ctx.fillStyle = wg;
+        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.fill();
+        ctx.strokeStyle = 'rgba(46,28,12,0.9)'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.stroke();
+        ctx.strokeStyle = 'rgba(46,28,12,0.55)'; ctx.lineWidth = 1; // plank seams + strap
+        ctx.beginPath();
+        ctx.moveTo(b.x - 12, cy - 4); ctx.lineTo(b.x + 12, cy - 4);
+        ctx.moveTo(b.x - 12, cy + 4); ctx.lineTo(b.x + 12, cy + 4);
+        ctx.moveTo(b.x - 10, cy + 10); ctx.lineTo(b.x + 10, cy - 10);
+        ctx.stroke();
+        ctx.fillStyle = MC; // gold badge
+        ctx.beginPath(); ctx.arc(b.x, cy, 6.4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(46,28,12,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.fillStyle = '#3a2410';
+        ctx.font = 'bold 10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('?', b.x, cy + 5);
+        ctx.fillText('?', b.x, cy + 3.5);
         ctx.globalAlpha = 1;
       }
 
@@ -1341,6 +1393,14 @@ export default function Game({ gs, myId, local = 0 }) {
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
         const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
+        if (isActive && !t.dead && turn.phase !== 'over') { // soft team-color ground glow — whose turn reads instantly
+          const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
+          const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
+          gg.addColorStop(0, `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60% / 0.30)`);
+          gg.addColorStop(1, `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60% / 0)`);
+          ctx.fillStyle = gg;
+          ctx.beginPath(); ctx.arc(t.x, gy, 36, 0, Math.PI * 2); ctx.fill();
+        }
         drawTank(ctx, t.x + dx, gy + dy, {
           aim: isActive && mineT ? aimRef.current : (t.aim ?? -0.6), // remote barrel follows THEIR stream
           palette: t.palette ?? 0,
@@ -1443,6 +1503,16 @@ export default function Game({ gs, myId, local = 0 }) {
         if (proj.kind === 'sub') ctx.scale(0.78, 0.78);       // cluster children are smaller
         if (proj.kind === 'tomahawk') ctx.scale(1.35, 1.35);  // ☢️ big boy
         const fl = 10 + flick * 6;
+        // additive glow halo — shells read as hot tracers at any zoom
+        ctx.globalCompositeOperation = 'lighter';
+        const glowR = proj.kind === 'tomahawk' ? 24 : 16;
+        const gc = proj.kind === 'guided' ? '255,90,208' : '255,170,70';
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
+        grd.addColorStop(0, `rgba(${gc},0.5)`);
+        grd.addColorStop(1, `rgba(${gc},0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = proj.kind === 'guided' ? 'rgb(255,90,208)' : 'rgb(255,140,50)'; // 🎯 pink thrust
         ctx.beginPath(); ctx.ellipse(-7 - fl / 2, 0, fl / 2, 3.2 + flick, 0, 0, Math.PI * 2); ctx.fill();
@@ -1507,31 +1577,39 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(0, 0, cw, chh);
       }
 
-      // ⏱ big turn timer — top-left, green→yellow→red, shakes in the red zone
+      // ⏱ turn timer — glass pill: big seconds + a draining time-track,
+      //    green → amber → red, shakes in the red zone
       if (turn.phase === 'open') {
         const tSec = Math.max(0, turn.time);
         const tShow = Math.ceil(tSec);
+        const frac = Math.max(0, Math.min(1, tSec / TURN_TIME));
         const tCol = tSec > 12 ? '#7fe066' : tSec > 7 ? '#ffd75e' : '#ff4d4d';
         const inRed = tSec <= 7;
-        const shakeX = inRed ? (Math.random() - 0.5) * 6 : 0;
-        const shakeY = inRed ? (Math.random() - 0.5) * 6 : 0;
-        const tx = 16 + shakeX, ty = 54 + shakeY;
-        const tw = 84, th = 68;
+        const shakeX = inRed ? (Math.random() - 0.5) * 5 : 0;
+        const shakeY = inRed ? (Math.random() - 0.5) * 5 : 0;
+        const tx = 16 + shakeX, ty = 62 + shakeY; // below the frosted header
+        const tw = 98, th = 46;
         ctx.save();
-        ctx.fillStyle = 'rgba(6,10,6,0.72)';
-        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 14); ctx.fill();
-        ctx.strokeStyle = tCol + (inRed ? 'cc' : '66');
-        ctx.lineWidth = inRed ? 2.5 : 1.5;
-        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 14); ctx.stroke();
-        ctx.fillStyle = tCol;
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 40px system-ui';
-        ctx.fillText(String(tShow), tx + tw / 2, ty + 48);
-        ctx.font = 'bold 10px system-ui';
-        ctx.globalAlpha = 0.8;
-        ctx.fillText('SEC LEFT', tx + tw / 2, ty + 61);
-        ctx.globalAlpha = 1;
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+        ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill
+        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.fill();
         ctx.restore();
+        ctx.strokeStyle = inRed ? tCol + 'aa' : 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = inRed ? 1.8 : 1;
+        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.stroke();
+        ctx.textAlign = 'left'; // seconds
+        ctx.font = 'bold 23px system-ui';
+        ctx.fillStyle = tCol;
+        ctx.fillText(String(tShow), tx + 13, ty + 30);
+        ctx.font = '600 9.5px system-ui'; // label
+        ctx.globalAlpha = 0.72;
+        ctx.fillStyle = '#e8ece4';
+        ctx.fillText('⏱ SEC', tx + 46, ty + 28);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(255,255,255,0.10)'; // time-track
+        ctx.beginPath(); ctx.roundRect(tx + 12, ty + th - 10, tw - 24, 4, 2); ctx.fill();
+        const pw = (tw - 24) * frac;
+        if (pw > 1) { ctx.fillStyle = tCol; ctx.beginPath(); ctx.roundRect(tx + 12, ty + th - 10, pw, 4, 2); ctx.fill(); }
       }
 
       // turn banner (screen space, just below the top bar)
@@ -1566,15 +1644,19 @@ export default function Game({ gs, myId, local = 0 }) {
         bCol = '#8fd0ff';
       }
       ctx.font = 'bold 13px system-ui';
-      const bw = ctx.measureText(banner).width + 26;
-      ctx.fillStyle = 'rgba(6,10,6,0.72)';
-      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 46, bw, 24, 12); ctx.fill();
-      ctx.strokeStyle = bCol + '66';
+      const bw = ctx.measureText(banner).width + 42;
+      ctx.save(); // glass pill with a soft drop shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+      ctx.fillStyle = 'rgba(8,12,8,0.58)';
+      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 60, bw, 26, 13); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.13)';
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 46, bw, 24, 12); ctx.stroke();
-      ctx.fillStyle = bCol;
+      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 60, bw, 26, 13); ctx.stroke();
+      ctx.fillStyle = bCol; // accent dot anchors the state color
+      ctx.beginPath(); ctx.arc(cw / 2 - bw / 2 + 16, 73, 3.4, 0, Math.PI * 2); ctx.fill();
       ctx.textAlign = 'center';
-      ctx.fillText(banner, cw / 2, 62);
+      ctx.fillText(banner, cw / 2 + 4, 77.5);
 
       // ⏳ pre-round countdown — "3, 2, 1, FIGHT!" dead centre, on top of everything
       const cd = countdownRef.current;
@@ -1730,8 +1812,8 @@ export default function Game({ gs, myId, local = 0 }) {
   })();
 
   // ⌨️ little keyboard-key cap for the controls hint
-  const kbd = (label) => (
-    <kbd style={{
+  const kbd = (label, key) => (
+    <kbd key={key ?? label} style={{
       background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.25)',
       borderBottomWidth: 2, borderRadius: 4, padding: '0 4px', marginRight: 2,
       fontSize: '0.66rem', fontFamily: 'inherit', fontWeight: 700, lineHeight: 1.6,
@@ -1739,7 +1821,7 @@ export default function Game({ gs, myId, local = 0 }) {
   );
   const ctl = (keys, verb) => ( // key cap(s) + tiny verb, e.g. [A][D] drive
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-      {keys.map((k) => kbd(k))}<span style={{ marginLeft: 2 }}>{verb}</span>
+      {keys.map((k, i) => kbd(k, `${verb}-${i}`))}<span style={{ marginLeft: 2 }}>{verb}</span>
     </span>
   );
 
@@ -1756,7 +1838,10 @@ export default function Game({ gs, myId, local = 0 }) {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
         alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
-        background: 'linear-gradient(rgba(5,8,5,0.75), transparent)',
+        background: 'rgba(8,12,8,0.55)', // frosted glass strip
+        backdropFilter: 'blur(14px) saturate(1.25)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.25)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
         <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
@@ -1844,6 +1929,7 @@ export default function Game({ gs, myId, local = 0 }) {
               color: '#e8ece4', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.8rem',
               opacity: dead ? 0.35 : 1, textDecoration: dead ? 'line-through' : 'none',
               transition: 'all 0.25s',
+              backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', // frosted pill
             }}>
               {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{showMatch ? ` · ${match.wins?.[p.id] | 0}W` : ''}{p.id === myId ? ' (you)' : ''}
             </span>
@@ -1865,6 +1951,9 @@ export default function Game({ gs, myId, local = 0 }) {
           <div style={{
             position: 'absolute', right: '1rem', bottom: '1rem', display: 'flex',
             gap: '0.35rem', alignItems: 'center', fontFamily: 'system-ui, sans-serif',
+            background: 'rgba(8,12,8,0.42)', border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 14, padding: '0.3rem 0.4rem',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', // frosted dock
           }}>
             {teleUi && ( // 🌀 pending teleport — only on the owner's screen; click or press T to aim
               <span
