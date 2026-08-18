@@ -1499,18 +1499,20 @@ export default function Game({ gs, myId, local = 0 }) {
         if (spot && !t.dead && turn.phase !== 'over') { // ground glow — whose turn (⚡ chaos: YOU, extra loud)
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
           const hue = `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60%`;
-          if (chaosR && onlineRef.current) { // ⚡ "which one am I?" — sky beacon + big pulsing halo
-            const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
-            const beam = ctx.createLinearGradient(t.x, gy - 190, t.x, gy);
-            beam.addColorStop(0, `${hue} / 0)`);
-            beam.addColorStop(1, `${hue} / ${0.16 + 0.10 * pulse})`);
+          if (chaosR && onlineRef.current) { // ⚡ "which one am I?" — BRIGHT + STEADY beacon (no flicker)
+            const hot = `hsla(${pal.h} ${Math.min(100, pal.s + 55)}% 68%`; // extra vivid for the beacon
+            const beam = ctx.createLinearGradient(t.x, gy - 210, t.x, gy);
+            beam.addColorStop(0, `${hot} / 0)`);
+            beam.addColorStop(0.7, `${hot} / 0.22)`);
+            beam.addColorStop(1, `${hot} / 0.45)`);
             ctx.fillStyle = beam;
-            ctx.fillRect(t.x - 13, gy - 190, 26, 190);
-            const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 54);
-            gg.addColorStop(0, `${hue} / ${0.36 + 0.16 * pulse})`);
-            gg.addColorStop(1, `${hue} / 0)`);
+            ctx.fillRect(t.x - 11, gy - 210, 22, 210);
+            const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 52);
+            gg.addColorStop(0, `${hot} / 0.55)`);
+            gg.addColorStop(0.6, `${hot} / 0.26)`);
+            gg.addColorStop(1, `${hot} / 0)`);
             ctx.fillStyle = gg;
-            ctx.beginPath(); ctx.arc(t.x, gy, 54, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(t.x, gy, 52, 0, Math.PI * 2); ctx.fill();
           } else {
             const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
             gg.addColorStop(0, `${hue} / 0.30)`);
@@ -1550,30 +1552,44 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.restore();
         }
 
-        // ⚡ chaos: pulsing dashed ring around YOUR tank — impossible to lose yourself
+        // ⚡ chaos: bright STEADY double ring around YOUR tank — no flicker, no marching ants
         if (spot && chaosR && onlineRef.current && !t.dead && turn.phase !== 'over') {
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
-          const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+          const cx0 = t.x + dx + swayX, cy0 = gy - 18 + dy;
           ctx.save();
-          ctx.strokeStyle = `hsla(${pal.h} 95% 70% / ${0.55 + 0.35 * pulse})`;
-          ctx.lineWidth = 2.4;
-          ctx.setLineDash([7, 6]);
-          ctx.lineDashOffset = -now * 0.03; // marching ants — reads as "live"
-          ctx.beginPath(); ctx.arc(t.x + dx + swayX, gy - 18 + dy, 33 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = `hsla(${pal.h} 100% 76% / 0.30)`; // soft outer bloom (fake glow, no shadowBlur)
+          ctx.lineWidth = 8;
+          ctx.beginPath(); ctx.arc(cx0, cy0, 31, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = `hsla(${pal.h} 100% 74% / 0.95)`; // crisp bright core ring
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(cx0, cy0, 31, 0, Math.PI * 2); ctx.stroke();
           ctx.restore();
         }
 
-        // active-tank marker: bobbing ▼ (whose turn — ⚡ chaos: which one is you)
+        // active-tank marker: bobbing ▼ (whose turn) — ⚡ chaos: steady gold "▼ YOU" tag
         if (spot && tanksRef.current.length > 1 && turn.phase !== 'over') {
-          const bob = Math.sin(now * 0.006) * 3;
           ctx.save();
-          if (chaosR && onlineRef.current) { ctx.shadowColor = '#ffd75e'; ctx.shadowBlur = 14; } // ⚡ glowing YOU marker
-          ctx.fillStyle = '#ffd75e';
-          ctx.beginPath();
-          ctx.moveTo(t.x, gy - 64 + bob);
-          ctx.lineTo(t.x - 6.5, gy - 75 + bob);
-          ctx.lineTo(t.x + 6.5, gy - 75 + bob);
-          ctx.closePath(); ctx.fill();
+          if (chaosR && onlineRef.current) { // ⚡ bright, readable, ZERO flicker — sits above the name tag
+            ctx.font = 'bold 11px system-ui';
+            const youLabel = '▼ YOU';
+            const yw = ctx.measureText(youLabel).width;
+            const yx = t.x - yw / 2 - 9, yy = gy - 112, yh = 17;
+            ctx.fillStyle = 'rgba(6,8,6,0.6)'; // dark offset backplate → crisp contrast edge
+            ctx.beginPath(); ctx.roundRect(yx + 1.5, yy + 1.5, yw + 18, yh, 8.5); ctx.fill();
+            ctx.fillStyle = '#ffd75e'; // solid bright gold — steady on purpose
+            ctx.beginPath(); ctx.roundRect(yx, yy, yw + 18, yh, 8.5); ctx.fill();
+            ctx.fillStyle = '#241a05';
+            ctx.textAlign = 'center';
+            ctx.fillText(youLabel, t.x, yy + 12.5);
+          } else {
+            const bob = Math.sin(now * 0.006) * 3;
+            ctx.fillStyle = '#ffd75e';
+            ctx.beginPath();
+            ctx.moveTo(t.x, gy - 64 + bob);
+            ctx.lineTo(t.x - 6.5, gy - 75 + bob);
+            ctx.lineTo(t.x + 6.5, gy - 75 + bob);
+            ctx.closePath(); ctx.fill();
+          }
           ctx.restore();
         }
 
@@ -1860,6 +1876,65 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.beginPath(); ctx.arc(cw / 2 - bw / 2 + 16, 73, 3.4, 0, Math.PI * 2); ctx.fill();
       ctx.textAlign = 'center';
       ctx.fillText(banner, cw / 2 + 4, 77.5);
+
+      // 🏆 realtime leaderboard — top-right glass panel, redrawn live every frame.
+      // ⚡ chaos ranks by DAMAGE DEALT (self-splash excluded, dead tanks keep their
+      // score — they can still win at 0:00); classic ranks the living by HP.
+      {
+        const board = tanksRef.current;
+        if (board.length > 1) {
+          const chaosB = chaosRef.current;
+          const mt = gsRef.current?.match;
+          const ranked = [...board].sort((a, b) => chaosB
+            ? ((b.dmg | 0) - (a.dmg | 0)) || ((b.hp | 0) - (a.hp | 0))
+            : ((a.dead ? 1 : 0) - (b.dead ? 1 : 0)) || ((b.hp | 0) - (a.hp | 0)));
+          const panelW = 150, rowH = 17;
+          const panelH = 24 + ranked.length * rowH + 6;
+          const bx = cw - 16 - panelW, by = 76; // just under the frosted header, top-right
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+          ctx.fillStyle = 'rgba(8,12,8,0.55)'; // same glass as the timer pill
+          ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.stroke();
+          ctx.textAlign = 'left'; // header — metric + round chip
+          ctx.font = '600 9.5px system-ui';
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = '#e8ece4';
+          ctx.fillText(chaosB ? '🏆 💥 DAMAGE' : '🏆 ❤ STANDINGS', bx + 10, by + 15);
+          if (mt && mt.roundsTotal > 1) {
+            ctx.textAlign = 'right';
+            ctx.fillText(`R${mt.round}/${mt.roundsTotal}`, bx + panelW - 10, by + 15);
+          }
+          ctx.globalAlpha = 1;
+          const medal = ['#ffd75e', '#cfd8dc', '#d8a05d']; // gold / silver / bronze ranks
+          ctx.font = '11px system-ui';
+          ranked.forEach((tk, i) => {
+            const ry = by + 24 + i * rowH;
+            const mineRow = tk.id === myIdRef.current;
+            if (mineRow) { // YOU — gold wash + gold name
+              ctx.fillStyle = 'rgba(255,215,94,0.16)';
+              ctx.beginPath(); ctx.roundRect(bx + 4, ry + 1.5, panelW - 8, rowH - 1, 6); ctx.fill();
+            }
+            ctx.globalAlpha = tk.dead ? (chaosB ? 0.62 : 0.45) : 1; // dead rows dim (still ranked in chaos)
+            ctx.textAlign = 'left';
+            ctx.fillStyle = medal[i] ?? '#e8ece4';
+            ctx.fillText(`${i + 1}`, bx + 10, ry + 12);
+            const rawNm = tk.name ?? '?';
+            const nm = rawNm.length > 8 ? rawNm.slice(0, 7) + '…' : rawNm;
+            ctx.fillStyle = mineRow ? '#ffd75e' : '#e8ece4';
+            ctx.fillText(`${tk.emoji ?? ''} ${nm}`.trim(), bx + 22, ry + 12);
+            ctx.textAlign = 'right';
+            const leads = i === 0 && (chaosB ? (tk.dmg | 0) > 0 : !tk.dead);
+            ctx.fillStyle = leads ? '#ffd75e' : '#e8ece4';
+            ctx.fillText(chaosB ? `${tk.dmg | 0}💥` : tk.dead ? '💀' : `${tk.hp | 0}❤`, bx + panelW - 9, ry + 12);
+            ctx.globalAlpha = 1;
+          });
+          ctx.textAlign = 'left';
+        }
+      }
 
       // ⏳ pre-round countdown — "3, 2, 1, FIGHT!" dead centre, on top of everything
       const cd = countdownRef.current;
