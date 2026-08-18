@@ -236,7 +236,7 @@ export default function Game({ gs, myId, local = 0 }) {
             buff: st?.buff ?? 0,                                     // ×2-damage hits remaining
             palette: st?.palette ?? (i % TANK_PALETTES.length),
             aim: st?.aim ?? (x < terrain.width / 2 ? -0.6 : -2.54), // face the enemy side
-            netX: null, netY: null, netAim: null, netS: 0,          // online: streamed targets
+            netX: null, netY: null, netAim: null, netS: 0, netPower: null, // online: streamed targets
           };
         });
         aimRef.current = tanksRef.current[0]?.aim ?? -0.6;
@@ -553,6 +553,8 @@ export default function Game({ gs, myId, local = 0 }) {
       if (typeof m.y === 'number') t.netY = m.y;
       if (typeof m.aim === 'number') t.netAim = m.aim;
       if (typeof m.s === 'number') t.netS = m.s;
+      if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
+      if (typeof m.p === 'number') t.netPower = m.p;        // 👀 rival aim power is public
     };
     const onFire = (m) => { // another player fired — spawn the same shell visually
       if (!m || m.id === myIdRef.current) return;
@@ -792,6 +794,8 @@ export default function Game({ gs, myId, local = 0 }) {
               y: Math.round((me.y ?? 0) * 10) / 10,
               aim: me === active ? aimRef.current : me.aim,
               s: Math.round(me.s || 0),
+              fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
+              p: Math.round(chargeRef.current.power * 100) / 100,     // 👀 rivals see your aim
             });
           }
         }
@@ -1165,8 +1169,9 @@ export default function Game({ gs, myId, local = 0 }) {
         const rf = isActive && t.grounded ? Math.min(1, Math.abs(t.s || 0) / 150) : 0; // rumble ∝ speed
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
+        const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
         drawTank(ctx, t.x + dx, gy + dy, {
-          aim: isActive ? aimRef.current : (t.aim ?? -0.6),
+          aim: isActive && mineT ? aimRef.current : (t.aim ?? -0.6), // remote barrel follows THEIR stream
           palette: t.palette ?? 0,
           rot: (t.rot || 0) + (Math.random() - 0.5) * 0.022 * rf,
           sus: t.susOff || 0,
@@ -1186,10 +1191,10 @@ export default function Game({ gs, myId, local = 0 }) {
 
         drawNameTag(ctx, t.x + dx, gy - 82 + dy, t);
 
-        // power ring + dotted aim guide — always visible on your turn (power is set by scroll)
-        if (isActive && turn.phase === 'open' && countdownRef.current <= 0
-          && (!onlineRef.current || t.id === myIdRef.current)) {
-          const p = chargeRef.current.power;
+        // power ring + dotted aim guide — visible on EVERY active tank, so rivals
+        // can read each other's aim + power in real time (power is set by scroll)
+        if (isActive && turn.phase === 'open' && countdownRef.current <= 0) {
+          const p = mineT ? chargeRef.current.power : (t.netPower ?? 0.5);
           const pv = pivotOf(t);
           ctx.lineWidth = 5;
           ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1201,11 +1206,11 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.textAlign = 'center';
           ctx.fillText(`${Math.round(p * 100)}%`, pv.x + dx, pv.y + dy - 40);
           // short dotted arc hint — just 4 dots tracing the start of the parabola
-          const a = aimRef.current;
+          const a = mineT ? aimRef.current : (t.aim ?? -0.6); // remote: streamed barrel angle
           const tip = muzzleOf(t, a);
           const v = SPEED(Math.max(0.06, p));
           const vx = Math.cos(a) * v, vy0 = Math.sin(a) * v;
-          ctx.fillStyle = 'rgba(255,255,255,0.55)';
+          ctx.fillStyle = mineT ? 'rgba(255,255,255,0.55)' : 'rgba(255,120,90,0.6)'; // enemy aim = red tint
           for (let i = 1; i <= 4; i++) {
             const dt2 = i * 0.11;
             const dx2 = vx * dt2;

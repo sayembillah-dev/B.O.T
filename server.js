@@ -104,7 +104,7 @@ async function createGame(room) {
     return {
       id: p.id, name: p.name, emoji: p.emoji,
       x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
-      hp: 100, fuel: 100, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
+      hp: 100, fuel: 100, power: 0.5, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
     };
   });
   return {
@@ -484,7 +484,13 @@ app.prepare().then(async () => {
       if (typeof p?.x === 'number' && isFinite(p.x)) t.x = Math.max(0, Math.min(g.terrain.width, p.x));
       if (typeof p?.y === 'number' && isFinite(p.y)) t.y = Math.max(-60, Math.min(g.terrain.height + 80, p.y));
       if (typeof p?.aim === 'number' && isFinite(p.aim)) t.aim = p.aim;
-      socket.to(room.id).volatile.emit('tank-move', { id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0 });
+      // 👀 shared intel: everyone sees everyone's fuel gauge + the active player's aim power
+      if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
+      if (typeof p?.p === 'number' && isFinite(p.p)) t.power = Math.max(0, Math.min(1, p.p));
+      socket.to(room.id).volatile.emit('tank-move', {
+        id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
+        fuel: t.fuel, p: t.power ?? 0.5,
+      });
     });
     // active player fires — validate turn/phase/stock, consume, relay the shot
     socket.on('fire', (p) => {
