@@ -9,7 +9,7 @@ import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
 import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
 
 /**
- * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
+ * 🛡️ B.O.T — battle of tanks. Worms-style, side-view destructible terrain, zero sprites.
  * mouse aims (free, live), scroll to set power, click to fire.
  *
  * 🔁 TURNS + FUEL — a turn is OPEN (act) → shot → settle → next player.
@@ -28,10 +28,11 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * player streams their tank and reports shot impacts; everyone else watches
  * the same sim. Late joiners replay the blast log and spectate until rematch.
  *
- * 🎁 SUPPLY DROPS — crates parachute in every 24–40s (max 3, never within
- * 220px of a tank). ×2/×3 = double damage for the next 2/3 hits; 💥 cluster
- * splits into 3; ❤ repairs; 🎯 guided homes onto the closest opponent;
- * 🪓 tomahawk = huge blast + mushroom cloud + white flash + mega shake.
+ * 🎁 SUPPLY DROPS — crates parachute in every 24–40s (max 3) at the spot most
+ * equally distant from every tank, and vanish 60s after landing. ×2/×3 = double
+ * damage for the next 2/3 hits; 💥 cluster lands, THEN bursts into 3 bomblets;
+ * ❤ repairs; 🎯 guided locks the nearest opponent, hugs the terrain and cannot
+ * miss; 🪓 tomahawk = slow heavy shell → MASSIVE blast + mushroom + white flash.
  * Keys 1–4 pick the shell for the next shot (1 = normal).
  *
  * 🔊 SFX — procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
@@ -45,27 +46,44 @@ const FUEL_REGEN = 1.8;  // per-second while not driving
 const FUEL_JUMP = 14;    // one-off jump cost (hefty — hopping is expensive)
 const TURN_TIME = 20;    // seconds per turn, then it auto-passes
 const WIND_MAX = 95;     // px/s² sideways push on shells at full strength
-// 🎯 guided missile — a powered cruise missile, not a lobbed shell. It climbs
-// over intervening terrain and only dives once it has a clear look at the target.
+// 🎯 guided missile — a powered cruise missile, not a lobbed shell. It locks the
+// nearest opponent, hugs the terrain to clear ridges, then dives straight onto
+// them with a proximity fuse and doubled endgame pitch authority: it ALWAYS hits.
 const GUIDED_SPEED = 900;  // constant motor speed (px/s) — charge power is irrelevant
-const GUIDED_TURN = 9;     // rad/s pitch authority (≈100px turn radius at cruise)
+const GUIDED_TURN = 10;    // rad/s pitch authority at cruise (×2.2 in the terminal dive)
 const GUIDED_CLEAR = 95;   // px it tries to stay above the ridgeline ahead
-const GUIDED_LOOK = 320;   // px of terrain look-ahead when picking a cruise altitude
-const GUIDED_FUEL = 6;     // s of motor burn — then it goes ballistic and drops
-// 🎥 shell cam — world-space widths the camera tries to frame (px). Smaller =
-// tighter zoom. It never zooms out past the whole-map fit, so small maps are safe.
-const CAM_SHELL_W = 1200;  // riding a shell in flight
-const CAM_BOOM_W = 950;    // holding on an ordinary crater
-const CAM_BIG_W = 1500;    // holding on a tomahawk — wide enough for the mushroom
-const CAM_BOOM_HOLD = 0.8; // s to linger on an ordinary blast
-const CAM_BIG_HOLD = 1.6;  // s to linger on a tomahawk
+const GUIDED_LOOK = 420;   // px of terrain look-ahead when picking a cruise altitude
+const GUIDED_FUEL = 12;    // s of motor burn — far more than any map crossing needs
+const GUIDED_FUSE = 28;    // px proximity fuse — this close already counts as a direct hit
+const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell — flies far slower than a normal shot
+const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
 // ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
 const NET_HZ = 12;       // own-tank position stream rate (online)
 
 const LOCAL_EMOJI = ['🐯', '🦊', '🐸', '🐵'];
 const LOCAL_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
-const SPAWN_AT = [0.15, 0.85, 0.35, 0.65]; // spread across the map
+// ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
+// centre: nobody starts with more map (or fewer neighbours) than anyone else
+const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
+  n === 1 ? 0.5 : 0.12 + (i * 0.76) / (n - 1));
+
+/** Find a parking spot near the ideal slot: walk outward BOTH ways for ground
+ *  that is reasonably flat, dry, and ≥90px from every already-placed tank.
+ *  Moderate slopes are fine (tanks tilt + handbrake); an overlap never is.
+ *  Last resort: the ideal slot itself, clamped in-bounds. */
+const findSpawn = (surf, terrain, ideal, placed, maxR) => {
+  const ok = (x) =>
+    x >= 40 && x <= terrain.width - 40 &&
+    Math.abs(surf(x + 8) - surf(x - 8)) <= 20 &&   // ~51° max — tanks handle slopes
+    surf(x) <= terrain.waterY - 40 &&              // dry
+    placed.every((px) => Math.abs(px - x) >= 90);  // never on top of a teammate
+  for (let d = 0; d <= maxR; d += 12) {
+    if (ok(ideal + d)) return ideal + d;
+    if (d && ok(ideal - d)) return ideal - d;
+  }
+  return Math.max(40, Math.min(terrain.width - 40, ideal));
+};
 const WEAPON_KEYS = { 1: 'normal', 2: 'cluster', 3: 'guided', 4: 'tomahawk' };
 
 /** Worms wind ∈ [-1,1], biased toward useful strengths. */
@@ -92,8 +110,6 @@ export default function Game({ gs, myId, local = 0 }) {
   const terrainCanvasRef = useRef(null);
   const terrainRef = useRef(null);
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 });
-  // 🎥 shell cam — smoothed camera that rides the shell and holds on the impact
-  const camRef = useRef({ x: 0, y: 0, scale: 0, init: false, hold: 0, hx: 0, hy: 0, hw: 0, hbig: false });
   // ⏳ pre-round "3, 2, 1, FIGHT!" — remaining seconds; input/turn-timer freeze while > 0
   const countdownRef = useRef(0);
   const cdLabelRef = useRef(null); // last shown label, so the tick/FIGHT sfx fires once per beat
@@ -197,6 +213,8 @@ export default function Game({ gs, myId, local = 0 }) {
         terrainCanvasRef.current = off;
         const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
         const srvTanks = local > 0 ? null : (gsRef.current?.tanks ?? null);
+        const placed = []; // ⚖️ fairness: each new spawn keeps its distance from these
+        const slotGap = roster.length > 1 ? terrain.width * 0.76 / (roster.length - 1) : terrain.width;
         tanksRef.current = roster.map((p, i) => {
           const st = srvTanks ? (srvTanks.find((s) => s.id === p.id) ?? srvTanks[i]) : null;
           let x, y;
@@ -204,12 +222,11 @@ export default function Game({ gs, myId, local = 0 }) {
             x = st.x;
             y = st.y ?? surf(st.x);
           } else {
-            x = Math.round(terrain.width * SPAWN_AT[i % SPAWN_AT.length]);
-            let guard = 0;
-            while (x < terrain.width - 60 && guard++ < 400 && // find flat, dry parking spot
-              (surf(x) > terrain.waterY - 40 || Math.abs(surf(x + 8) - surf(x - 8)) > 7)) x += 12;
+            const ideal = Math.round(terrain.width * spawnSlots(roster.length)[i]);
+            x = findSpawn(surf, terrain, ideal, placed, Math.max(0, slotGap / 2 - 100));
             y = surf(x);
           }
+          placed.push(x);
           return {
             ...p, x, y, s: 0, rot: 0, susOff: 0, susVel: 0,
             wheelRot: 0, grounded: true, airVy: 0, dustT: 0,
@@ -352,21 +369,19 @@ export default function Game({ gs, myId, local = 0 }) {
     reflowSky(terrain, x, y, r + 16); // craters are open to the sky — no black
     const reg = renderTerrainRegion(terrain, x - r - 16, y - r - 16, (r + 16) * 2, (r + 16) * 2);
     off.getContext('2d').putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
-    // 🎥 hold the shell cam on the impact so the blast is actually watched.
-    // A big blast outranks an ordinary one (cluster bomblets can't steal focus).
-    const cam = camRef.current;
-    if (opts.big || !(cam.hbig && cam.hold > 0)) {
-      cam.hold = opts.big ? CAM_BIG_HOLD : CAM_BOOM_HOLD;
-      cam.hw = opts.big ? CAM_BIG_W : CAM_BOOM_W;
-      cam.hx = x;
-      cam.hy = opts.big ? y - 120 : y; // bias up so the mushroom is framed
-      cam.hbig = !!opts.big;
-    }
-    if (opts.big) { // ☢️ tomahawk: mushroom cloud + white screen + mega shake + huge ring
+    if (opts.big) { // ☢️ tomahawk: SLOW mega-blast — huge mushroom, rolling shock rings, long white flash, lingering ground fire, mega shake
       fxRef.current.mushroom(x, y);
-      fxRef.current.add({ t: 'ring', x, y, size: 14, grow: 1500, life: 0.9, color: 'rgba(255,250,235,0.9)' });
-      whiteRef.current = 1;
-      shakeRef.current = Math.max(shakeRef.current, 2.2);
+      fxRef.current.add({ t: 'ring', x, y, size: 26, grow: 1400, life: 0.8, color: 'rgba(255,255,255,0.95)' });
+      fxRef.current.add({ t: 'ring', x, y, size: 14, grow: 900, life: 1.4, color: 'rgba(255,250,235,0.9)' });
+      fxRef.current.add({ t: 'ring', x, y, size: 8, grow: 520, life: 1.9, color: 'rgba(255,190,120,0.8)' });
+      // lingering ground fire — the crater keeps burning long after the hit
+      for (let i = 0; i < 10; i++) {
+        fxRef.current.add({ t: 'fire', x: x + (Math.random() - 0.5) * 260, y: y - Math.random() * 10,
+          vx: (Math.random() - 0.5) * 20, vy: -30 - Math.random() * 50,
+          size: 7 + Math.random() * 9, life: 2.2 + Math.random() * 1.6 });
+      }
+      whiteRef.current = 1.35; // >1 = a beat of full-white hold before the fade even starts
+      shakeRef.current = Math.max(shakeRef.current, 3.4);
       sfx('bigboom');
     } else {
       fxRef.current.boom(x, y);
@@ -496,7 +511,6 @@ export default function Game({ gs, myId, local = 0 }) {
     const a = aimRef.current;
     const p = Math.max(0.06, chargeRef.current.power);
     const tip = muzzleOf(me, a);
-    const v = SPEED(p);
     // consume the selected special shell (keys 1–4), fall back to normal if empty
     let kind = 'normal';
     const sel = selRef.current;
@@ -506,13 +520,14 @@ export default function Game({ gs, myId, local = 0 }) {
       selRef.current = 'normal';
       setSelUi('normal');
     }
+    const v = SPEED(p) * (kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell — slow, hangs in the air
     // ×2 / ×3 pickup: double damage for the next N hits
     let dmgScale = 1;
     if ((me.buff | 0) > 0) { me.buff--; dmgScale = 2; }
     if (kind !== 'normal' || dmgScale > 1) setInvUi((n) => n + 1);
     projRef.current = {
       x: tip.x, y: tip.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
-      src: me, armed: 0, kind, dmgScale, splitT: kind === 'cluster' ? 0.72 : -1, mine: true,
+      src: me, armed: 0, kind, dmgScale, mine: true,
     };
     if (kind === 'tomahawk') fxRef.current.text(tip.x, tip.y - 22, '☢ TOMAHAWK AWAY', '#ff5a4e');
     fxRef.current.muzzle(tip.x, tip.y, a);
@@ -546,11 +561,10 @@ export default function Game({ gs, myId, local = 0 }) {
       lastShotMineRef.current = false;
       t.aim = m.a;
       const tip = muzzleOf(t, m.a);
-      const v = SPEED(m.p);
+      const v = SPEED(m.p) * (m.kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell — slow
       projRef.current = {
         x: tip.x, y: tip.y, vx: Math.cos(m.a) * v, vy: Math.sin(m.a) * v,
-        src: t, armed: 0, kind: m.kind, dmgScale: m.dmgScale || 1,
-        splitT: m.kind === 'cluster' ? 0.72 : -1, mine: false,
+        src: t, armed: 0, kind: m.kind, dmgScale: m.dmgScale || 1, mine: false,
       };
       fxRef.current.muzzle(tip.x, tip.y, m.a);
       if (m.kind === 'tomahawk') fxRef.current.text(tip.x, tip.y - 22, '☢ TOMAHAWK AWAY', '#ff5a4e');
@@ -568,6 +582,13 @@ export default function Game({ gs, myId, local = 0 }) {
       } else if (e.kind === 'crate-boom') {
         fxRef.current.text(e.x, e.y - 16, '📦 destroyed', '#ffb45e');
         sfx('crunch');
+      } else if (e.kind === 'crate-expire') { // ⏳ sat on the ground for 60s
+        fxRef.current.text(e.x, e.y - 16, '📦 expired', '#9fb08f');
+        for (let i = 0; i < 7; i++) {
+          fxRef.current.smoke(e.x + (Math.random() - 0.5) * 18, e.y - 12,
+            (Math.random() - 0.5) * 30, -25 - Math.random() * 30, 4 + Math.random() * 4, 0.7 + Math.random() * 0.4);
+        }
+        sfx('thud');
       } else if (e.kind === 'crate-land') {
         sfx('thud');
       } else if (e.kind === 'drop') {
@@ -783,16 +804,24 @@ export default function Game({ gs, myId, local = 0 }) {
         if (dropTRef.current <= 0) {
           dropTRef.current = 24 + Math.random() * 16; // not frequent
           if (bonusRef.current.filter((b) => !b.taken).length < 3) {
-            for (let k = 0; k < 40; k++) { // find a drop spot away from everyone
+            // ⚖️ fair drop: sample candidate spots and keep the one that maximizes
+            // the distance to the NEAREST living tank — equally far from everyone
+            let bx = null, bScore = -1;
+            const aliveTanks = tanksRef.current.filter((t) => !t.dead);
+            for (let k = 0; k < 28; k++) {
               const x = 80 + Math.random() * (terrain.width - 160);
-              if (tanksRef.current.some((t) => !t.dead && Math.abs(t.x - x) < 220)) continue;
+              const nearest = aliveTanks.length ? Math.min(...aliveTanks.map((t) => Math.abs(t.x - x))) : Infinity;
+              const score = Math.min(nearest, 400); // past ~400px, extra distance stops mattering
+              if (score > bScore) { bScore = score; bx = x; }
+            }
+            if (bx != null) {
               bonusRef.current.push({
                 id: crateIdRef.current++, type: pickDropType(),
-                x, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28,
+                x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28,
+                expire: -1, // s left once landed (-1 = still falling) — crates despawn after CRATE_TTL
               });
-              fxRef.current.text(x, 26, '📦 supply drop inbound', '#cfd8c3');
+              fxRef.current.text(bx, 26, '📦 supply drop inbound', '#cfd8c3');
               sfx('drop');
-              break;
             }
           }
         }
@@ -801,7 +830,22 @@ export default function Game({ gs, myId, local = 0 }) {
         for (const b of bonusRef.current) {
           if (b.taken) continue;
           if (b.landed && surf(b.x) > b.y + 8) { b.landed = false; b.vy = 0; }
-          if (b.landed) { b.y = surf(b.x); continue; }
+          if (b.landed) {
+            b.y = surf(b.x);
+            // ⏳ landed crates don't wait forever — gone after CRATE_TTL seconds
+            if (b.expire < 0) b.expire = CRATE_TTL;
+            b.expire -= dt;
+            if (b.expire <= 0) {
+              b.taken = true;
+              fxRef.current.text(b.x, b.y - 30, '📦 expired', '#9fb08f');
+              for (let i = 0; i < 7; i++) {
+                fxRef.current.smoke(b.x + (Math.random() - 0.5) * 18, b.y - 12,
+                  (Math.random() - 0.5) * 30, -25 - Math.random() * 30, 4 + Math.random() * 4, 0.7 + Math.random() * 0.4);
+              }
+              sfx('thud');
+            }
+            continue;
+          }
           b.sway += dt;
           b.vy = Math.min(150, b.vy + GRAV * 0.35 * dt); // parachute drag
           b.x = Math.max(40, Math.min(terrain.width - 40, b.x + Math.sin(b.sway * 2 + b.bob) * 14 * dt + windRef.current * 30 * dt));
@@ -810,6 +854,7 @@ export default function Game({ gs, myId, local = 0 }) {
           if (b.y >= gyB) {
             b.y = gyB;
             b.landed = true;
+            b.expire = CRATE_TTL; // ⏳ 60s on the ground, then it disappears
             sfx('thud');
             fxRef.current.add({ t: 'dirt', x: b.x - 6, y: b.y - 2, vx: -25, vy: -30, size: 1.6, life: 0.4 });
             fxRef.current.add({ t: 'dirt', x: b.x + 6, y: b.y - 2, vx: 25, vy: -30, size: 1.6, life: 0.4 });
@@ -858,7 +903,7 @@ export default function Game({ gs, myId, local = 0 }) {
       // ── projectiles (main shell + cluster sub-munitions) ──
       const explodeProj = (p) => {
         const ds = p.dmgScale || 1;
-        const spec = p.kind === 'tomahawk' ? { r: 170, scale: 2.6 * ds, big: true } // ☢️
+        const spec = p.kind === 'tomahawk' ? { r: 200, scale: 3.2 * ds, big: true } // ☢️ MASSIVE (server clamps r at 200)
           : p.kind === 'sub' ? { r: 40, scale: 0.75 * ds }
           : p.kind === 'guided' ? { r: BLAST_R, scale: 1.25 * ds }
           : { r: BLAST_R, scale: ds };
@@ -872,10 +917,31 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         // remote shell: visual only — the server's 'blast' event makes the boom
       };
+      // 💥 cluster: the shell never explodes itself — ON IMPACT it bursts into
+      // 3 independent bomblets that pop up and out, then each explodes on landing
+      const splitCluster = (p) => {
+        const gy = surf(p.x);
+        const fan = [ // up-left, straight up (hardest), up-right
+          [-2.19, 300], [-Math.PI / 2, 390], [-0.95, 300],
+        ];
+        for (const [ang, spd] of fan) {
+          subsRef.current.push({
+            x: p.x, y: Math.min(p.y - 4, gy - 4),
+            vx: Math.cos(ang) * spd + p.vx * 0.2, vy: Math.sin(ang) * spd,
+            src: p.src, armed: p.armed, kind: 'sub', dmgScale: p.dmgScale, mine: p.mine,
+          });
+        }
+        fxRef.current.muzzle(p.x, Math.min(p.y, gy - 4), -Math.PI / 2);
+        fxRef.current.add({ t: 'ring', x: p.x, y: Math.min(p.y, gy - 4), size: 4, grow: 300, life: 0.35, color: 'rgba(143,208,255,0.9)' });
+        fxRef.current.text(p.x, Math.min(p.y, gy - 4) - 18, 'SPLIT!', '#8fd0ff');
+        sfx('split');
+      };
       const stepProj = (p) => { // advance one shell; returns false when it's gone
-        // 🎯 guided: powered cruise missile. Aiming straight at a ground-level
-        // tank just flies it into the dirt, so it climbs to clear the ridgeline
-        // ahead and holds that altitude until it has line of sight — then dives.
+        // 🎯 guided: powered cruise missile that CANNOT miss. It locks the nearest
+        // living opponent every frame; with a clear line it homes straight in
+        // (doubled pitch authority in the endgame + a proximity fuse), otherwise
+        // it hugs the terrain — riding GUIDED_CLEAR above the ridgeline between
+        // it and the target — until the line opens. Gravity and wind don't apply.
         let powered = false;
         if (p.kind === 'guided' && (p.armed || 0) < GUIDED_FUEL) {
           let best = null, bd = Infinity;
@@ -887,28 +953,30 @@ export default function Game({ gs, myId, local = 0 }) {
           if (best) {
             powered = true;
             const tgx = best.x, tgy = (best.y ?? 0) - 14;
-            const dx = tgx - p.x;
-            const dir = Math.sign(dx) || 1;
+            const dx = tgx - p.x, dy = tgy - p.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            if (dist < GUIDED_FUSE) { explodeProj(p); return false; } // proximity fuse — dead on
             // clear shot at the target? sample the straight line for solid ground
             let los = true;
-            for (let i = 1; i < 24; i++) {
-              const f = i / 24;
-              const sx = p.x + dx * f, sy = p.y + (tgy - p.y) * f;
+            for (let i = 1; i < 32; i++) {
+              const f = i / 32;
+              const sx = p.x + dx * f, sy = p.y + dy * f;
               if (sx >= 0 && sx < terrain.width && sy >= 0 && isSolid(terrain, sx, sy)) { los = false; break; }
             }
             let want;
-            if (los || Math.abs(dx) < 60) {
-              want = Math.atan2(tgy - p.y, dx); // terminal dive — straight at them
+            if (los) {
+              want = Math.atan2(dy, dx); // clear line — home straight onto them
             } else {
-              // cruise: ride GUIDED_CLEAR above the highest ground in the corridor ahead
+              // blocked — follow the terrain: cruise above the highest ground in
+              // the corridor toward the target until the line of sight opens up
+              const dir = Math.sign(dx) || 1;
               let crest = Infinity;
-              for (let s = 0; s <= GUIDED_LOOK; s += 16) {
+              const reach = Math.min(Math.abs(dx), GUIDED_LOOK);
+              for (let s = 0; s <= reach; s += 12) {
                 const sx = Math.max(0, Math.min(terrain.width - 1, Math.round(p.x + dir * s)));
                 crest = Math.min(crest, terrain.surface[sx]);
               }
               const cruiseY = Math.min(crest, tgy) - GUIDED_CLEAR;
-              // steep climb when low, gentle settle when high — never a shallow
-              // beeline at a distant target (that's what used to bury it in a hill)
               const v = Math.max(-2.4, Math.min(2.4, (cruiseY - p.y) / 90));
               want = Math.atan2(v, dir);
             }
@@ -916,8 +984,13 @@ export default function Game({ gs, myId, local = 0 }) {
             let dAng = want - cur;
             while (dAng > Math.PI) dAng -= Math.PI * 2;
             while (dAng < -Math.PI) dAng += Math.PI * 2;
-            const maxTurn = GUIDED_TURN * dt;
+            // pitch authority doubles in the endgame — the dive cannot overshoot
+            const maxTurn = GUIDED_TURN * (dist < 260 ? 2.2 : 1) * dt;
             cur += Math.max(-maxTurn, Math.min(maxTurn, dAng));
+            if (!los) { // emergency pull-up while cruising — never plow into a ridge
+              const ex = p.x + Math.cos(cur) * 46, ey = p.y + Math.sin(cur) * 46;
+              if (ex >= 0 && ex < terrain.width && ey >= 0 && isSolid(terrain, ex, ey)) cur = -Math.PI / 2;
+            }
             p.vx = Math.cos(cur) * GUIDED_SPEED; // motor holds speed — no stall, no drop
             p.vy = Math.sin(cur) * GUIDED_SPEED;
           }
@@ -927,42 +1000,6 @@ export default function Game({ gs, myId, local = 0 }) {
           p.vx += windRef.current * WIND_MAX * dt;
         }
         p.armed = (p.armed || 0) + dt;
-        // 💥 cluster: always cracks open IN THE AIR into 3 independently-falling
-        // bomblets. Fuse burns down, but apex or an imminent impact splits it
-        // early — it must never reach the ground as a single shell.
-        if (p.kind === 'cluster') {
-          p.splitT -= dt;
-          const apex = p.vy >= 0 && p.armed > 0.15;         // tipped over the top
-          let imminent = false;                             // about to hit something
-          if (p.splitT > 0 && !apex) {
-            const sp = Math.hypot(p.vx, p.vy) || 1;
-            const nx = p.x + (p.vx / sp) * 110, ny = p.y + (p.vy / sp) * 110; // ~110px ahead
-            if (nx >= 0 && nx < terrain.width && ny >= 0 && isSolid(terrain, nx, ny)) imminent = true;
-            if (!imminent) {
-              for (const t of tanksRef.current) {
-                if (t.dead || (t === p.src && p.armed < 0.15)) continue;
-                if (Math.hypot(t.x - p.x, (t.y - 14) - p.y) < 120) { imminent = true; break; }
-              }
-            }
-          }
-          if (p.splitT <= 0 || apex || imminent) {
-            const ang = Math.atan2(p.vy, p.vx);
-            const base = Math.hypot(p.vx, p.vy);
-            // fan of 3: outer two slower so all three land well apart
-            for (const [off, mul] of [[-0.40, 0.78], [0, 1.0], [0.40, 0.78]]) {
-              subsRef.current.push({
-                x: p.x, y: p.y,
-                vx: Math.cos(ang + off) * base * mul, vy: Math.sin(ang + off) * base * mul,
-                src: p.src, armed: p.armed, kind: 'sub', dmgScale: p.dmgScale, mine: p.mine,
-              });
-            }
-            fxRef.current.muzzle(p.x, p.y, ang);
-            fxRef.current.add({ t: 'ring', x: p.x, y: p.y, size: 4, grow: 300, life: 0.35, color: 'rgba(143,208,255,0.9)' });
-            fxRef.current.text(p.x, p.y - 16, 'SPLIT!', '#8fd0ff');
-            sfx('split');
-            return false;
-          }
-        }
         const dist = Math.hypot(p.vx, p.vy) * dt;
         const steps = Math.max(1, Math.ceil(dist / 4));
         for (let s = 0; s < steps; s++) {
@@ -978,8 +1015,11 @@ export default function Game({ gs, myId, local = 0 }) {
                 Math.hypot(p.x - t.x, p.y - ty) < 17) { hitTank = t; break; }
           }
           const inX = p.x >= 0 && p.x < terrain.width;
-          if (hitTank) { explodeProj(p); return false; }
-          if (inX && p.y >= 0 && isSolid(terrain, p.x, p.y)) { explodeProj(p); return false; }
+          if (hitTank || (inX && p.y >= 0 && isSolid(terrain, p.x, p.y))) {
+            // 💥 cluster falls from the sky, lands, and only THEN becomes 3 bombs
+            if (p.kind === 'cluster') { splitCluster(p); return false; }
+            explodeProj(p); return false;
+          }
           if (!inX || p.y > terrain.height + 60) return false; // flew off the world
         }
         return true;
@@ -1018,7 +1058,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
       fxRef.current.update(dt);
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 1.6);
-      if (whiteRef.current > 0) whiteRef.current = Math.max(0, whiteRef.current - dt * 1.5); // ☢️ flash fades
+      if (whiteRef.current > 0) whiteRef.current = Math.max(0, whiteRef.current - dt * 0.7); // ☢️ flash fades slowly
     };
 
     const frame = (now) => {
@@ -1045,48 +1085,11 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#0a0d09';
       ctx.fillRect(0, 0, cw, chh);
-      // ── 🎥 shell cam ─────────────────────────────────────────────────
-      // Idle it frames the whole map (identical to the old fixed view, so
-      // aiming is untouched). While a shell is up it rides along zoomed in,
-      // then lingers on the crater before easing back out.
-      const cam = camRef.current;
-      const fitScale = Math.min(cw / off.width, chh / off.height) * 0.985;
-      if (turnRef.current.phase === 'open') cam.hold = 0; // never pan while aiming
-      else if (cam.hold > 0) cam.hold = Math.max(0, cam.hold - dt);
-
-      let lead = projRef.current;
-      if (!lead && subsRef.current.length) { // cluster: frame the bomblets together
-        let sx = 0, sy = 0;
-        for (const s of subsRef.current) { sx += s.x; sy += s.y; }
-        lead = { x: sx / subsRef.current.length, y: sy / subsRef.current.length };
-      }
-      // target: whole map by default, else frame a world-width around the action.
-      // Math.max keeps it from ever zooming out past the map fit.
-      let tx, ty, tScale;
-      if (lead) {
-        tx = lead.x; ty = lead.y; tScale = Math.max(fitScale, cw / CAM_SHELL_W);
-      } else if (cam.hold > 0) {
-        tx = cam.hx; ty = cam.hy; tScale = Math.max(fitScale, cw / cam.hw);
-      } else { // idle — exactly the old fixed fit view, so aiming is unchanged
-        tx = off.width / 2; ty = off.height / 2; tScale = fitScale;
-      }
-      if (!cam.init) { cam.x = tx; cam.y = ty; cam.scale = tScale; cam.init = true; }
-      // exponential smoothing — framerate-independent, snappier while chasing
-      const kPos = 1 - Math.exp(-(lead ? 10 : 5) * dt);
-      const kZoom = 1 - Math.exp(-(lead ? 4.5 : 4) * dt);
-      cam.x += (tx - cam.x) * kPos;
-      cam.y += (ty - cam.y) * kPos;
-      cam.scale += (tScale - cam.scale) * kZoom;
-
-      const scale = cam.scale;
-      // keep the viewport inside the map; centre any axis the map can't fill
-      const halfW = cw / (2 * scale), halfH = chh / (2 * scale);
-      const cx = off.width <= halfW * 2 ? off.width / 2
-        : Math.max(halfW, Math.min(off.width - halfW, cam.x));
-      const cy = off.height <= halfH * 2 ? off.height / 2
-        : Math.max(halfH, Math.min(off.height - halfH, cam.y));
-      const ox = cw / 2 - cx * scale;
-      const oy = chh / 2 - cy * scale;
+      // ── fixed whole-map view — no zoom, no follow cam; the entire
+      //    battlefield is always fully visible ──
+      const scale = Math.min(cw / off.width, chh / off.height) * 0.985;
+      const ox = cw / 2 - (off.width / 2) * scale;
+      const oy = chh / 2 - (off.height / 2) * scale;
       viewRef.current = { scale, ox, oy };
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -1107,6 +1110,11 @@ export default function Game({ gs, myId, local = 0 }) {
         if (b.taken) continue;
         const def = BONUS_DEFS[b.type];
         const pulse = 0.6 + 0.4 * Math.sin(now * 0.006 + b.bob);
+        // ⏳ expiry blink — landed crates flash during their last 5s (local crates
+        // count down b.expire; online crates carry the server's expiresAt stamp)
+        const expIn = b.expiresAt ? (b.expiresAt - Date.now()) / 1000
+          : (b.landed && (b.expire ?? -1) >= 0 ? b.expire : Infinity);
+        const blink = b.landed && expIn < 5 ? (Math.sin(now * 0.02 + b.bob) > 0 ? 1 : 0.25) : 1;
         if (!b.landed) {
           ctx.fillStyle = 'rgba(200,90,70,0.9)'; // parachute canopy
           ctx.beginPath(); ctx.arc(b.x, b.y - 26, 16, Math.PI, 0); ctx.fill();
@@ -1118,12 +1126,13 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.moveTo(b.x, b.y - 26); ctx.lineTo(b.x, b.y - 6);
           ctx.stroke();
         } else {
-          ctx.globalAlpha = 0.3 * pulse; // landed glow halo
+          ctx.globalAlpha = 0.3 * pulse * blink; // landed glow halo
           ctx.fillStyle = def.color;
           ctx.beginPath(); ctx.arc(b.x, b.y - 14, 18, 0, Math.PI * 2); ctx.fill();
           ctx.globalAlpha = 1;
         }
         const cy = b.landed ? b.y - 14 : b.y;
+        ctx.globalAlpha = blink;
         ctx.fillStyle = 'rgba(10,13,9,0.9)';
         ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 6); ctx.fill();
         ctx.strokeStyle = def.color;
@@ -1133,6 +1142,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.font = 'bold 12px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText(def.label, b.x, cy + 4);
+        ctx.globalAlpha = 1;
       }
 
       // tanks (active one shakes while firing/explosions)
@@ -1190,17 +1200,17 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.font = 'bold 13px system-ui';
           ctx.textAlign = 'center';
           ctx.fillText(`${Math.round(p * 100)}%`, pv.x + dx, pv.y + dy - 40);
-          // dotted arc actually traces the shot's parabola, so it bends flatter/steeper as power changes
+          // short dotted arc hint — just 4 dots tracing the start of the parabola
           const a = aimRef.current;
           const tip = muzzleOf(t, a);
           const v = SPEED(Math.max(0.06, p));
           const vx = Math.cos(a) * v, vy0 = Math.sin(a) * v;
           ctx.fillStyle = 'rgba(255,255,255,0.55)';
-          for (let i = 1; i <= 9; i++) {
-            const dt2 = i * 0.09;
+          for (let i = 1; i <= 4; i++) {
+            const dt2 = i * 0.11;
             const dx2 = vx * dt2;
             const dy2 = vy0 * dt2 + 0.5 * GRAV * dt2 * dt2;
-            ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, 1.6, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, 1.7, 0, Math.PI * 2); ctx.fill();
           }
         }
 
@@ -1509,7 +1519,7 @@ export default function Game({ gs, myId, local = 0 }) {
         background: 'linear-gradient(rgba(5,8,5,0.75), transparent)',
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
-        <strong style={{ fontSize: '1.05rem' }}>🛡️ tank battle</strong>
+        <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
         <code style={{
           background: 'rgba(255,255,255,0.1)', borderRadius: 6,
           padding: '0.15rem 0.5rem', fontSize: '0.8rem',

@@ -33,7 +33,7 @@ export default function Home() {
   return (
     <main className="container">
       <div className="card hero">
-        <h1 className="logo">🛡️ tank battle</h1>
+        <h1 className="logo">🛡️ B.O.T - battle of tanks</h1>
         <p className="tagline">
           Worms-style artillery on destructible terrain — wind, supply drops, special shells.
           <br />

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  🛡️ TANK BATTLE — server (Next.js + Socket.IO in one process)
+//  🛡️ B.O.T — battle of tanks · server (Next.js + Socket.IO in one process)
 //  Room state lives in memory. The server is AUTHORITATIVE for online
 //  games: terrain seed + bitmap, tank spawns, HP/inventory/buffs, turn
 //  rotation + 20s timer, wind, supply-drop schedule + crate physics,
@@ -47,7 +47,7 @@ function pickEmoji(room) {
   return (pool.length ? pool : EMOJIS)[Math.floor(Math.random() * (pool.length ? pool.length : EMOJIS.length))];
 }
 
-// ════════════════════════ GAME HOOK — 🛡️ tank battle ═════════════════
+// ═════════════════ GAME HOOK — 🛡️ B.O.T - battle of tanks ═════════════════
 // Server-authoritative online state. Clients render + simulate locally;
 // discrete events (fire/blast/pass/collect) flow through here.
 // ─────────────────────────────────────────────────────────────────────
@@ -56,7 +56,11 @@ const SETTLE_MS = 1300;       // beat after a shot resolves before next turn
 const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
 const GRAV = 850;
 const BLAST_R = 58;
-const SPAWN_AT = [0.15, 0.85, 0.35, 0.65, 0.25, 0.75, 0.5, 0.1];
+const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
+// ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
+// centre: nobody starts with more map (or fewer neighbours) than anyone else
+const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
+  n === 1 ? 0.5 : 0.12 + (i * 0.76) / (n - 1));
 
 let TERR = null;  // lib/terrain.mjs (ESM, imported dynamically below)
 let BONUS = null; // lib/bonus.mjs
@@ -69,16 +73,34 @@ function rollWind() {
 function surfOf(T, x) {
   return T.surface[Math.max(0, Math.min(T.width - 1, Math.round(x)))];
 }
+/** Find a parking spot near the ideal slot: walk outward BOTH ways for ground
+ *  that is reasonably flat, dry, and ≥90px from every already-placed tank.
+ *  Moderate slopes are fine (tanks tilt + handbrake); an overlap never is.
+ *  Last resort: the ideal slot itself, clamped in-bounds. */
+function findSpawn(T, ideal, placed, maxR) {
+  const ok = (x) =>
+    x >= 40 && x <= T.width - 40 &&
+    Math.abs(surfOf(T, x + 8) - surfOf(T, x - 8)) <= 20 && // ~51° max — tanks handle slopes
+    surfOf(T, x) <= T.waterY - 40 &&                       // dry
+    placed.every((px) => Math.abs(px - x) >= 90);          // never on top of a teammate
+  for (let d = 0; d <= maxR; d += 12) {
+    if (ok(ideal + d)) return ideal + d;
+    if (d && ok(ideal - d)) return ideal - d;
+  }
+  return Math.max(40, Math.min(T.width - 40, ideal));
+}
 
 async function createGame(room) {
   const seed = randomBytes(4).toString('hex');
   const T = await TERR.generateTerrain(seed, 1920, 1080);
   room.sim = { T }; // server-side bitmap: crate physics + destroyCircle + damage
   const players = [...room.players.values()];
+  const slots = spawnSlots(players.length); // ⚖️ equal, symmetric positions for all
+  const placed = [];
+  const slotGap = players.length > 1 ? T.width * 0.76 / (players.length - 1) : T.width;
   const tanks = players.map((p, i) => {
-    let x = Math.round(T.width * SPAWN_AT[i % SPAWN_AT.length]);
-    let guard = 0;
-    while (x < T.width - 60 && guard++ < 400 && Math.abs(surfOf(T, x + 8) - surfOf(T, x - 8)) > 7) x += 12;
+    const x = findSpawn(T, Math.round(T.width * slots[i]), placed, Math.max(0, slotGap / 2 - 100));
+    placed.push(x);
     return {
       id: p.id, name: p.name, emoji: p.emoji,
       x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
@@ -167,19 +189,26 @@ function tickRoom(room) {
   const T = room.sim?.T;
   let dirty = false;
 
-  // supply drops: every 24–40s, max 3 live, never within 220px of a live tank
+  // supply drops: every 24–40s, max 3 live, placed FAIRLY (equidistant-ish from all)
   if (tn.phase !== 'over' && T) {
     g.dropT -= 100;
     if (g.dropT <= 0) {
       g.dropT = 24000 + Math.random() * 16000;
       if (g.crates.filter((c) => !c.taken).length < 3) {
-        for (let k = 0; k < 40; k++) {
+        // ⚖️ fair drop: sample candidate spots, keep the one that maximizes the
+        // distance to the NEAREST live tank — equal opportunity for everyone
+        const aliveTanks = g.tanks.filter((t) => !t.dead);
+        let bx = null, bScore = -1;
+        for (let k = 0; k < 28; k++) {
           const x = 80 + Math.random() * (T.width - 160);
-          if (g.tanks.some((t) => !t.dead && Math.abs(t.x - x) < 220)) continue;
-          g.crates.push({ id: g.crateId++, type: BONUS.pickDropType(), x, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28 });
-          io.to(room.id).emit('game-event', { kind: 'drop', x });
+          const nearest = aliveTanks.length ? Math.min(...aliveTanks.map((t) => Math.abs(t.x - x))) : Infinity;
+          const score = Math.min(nearest, 400); // past ~400px, extra distance stops mattering
+          if (score > bScore) { bScore = score; bx = x; }
+        }
+        if (bx != null) {
+          g.crates.push({ id: g.crateId++, type: BONUS.pickDropType(), x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28, expiresAt: 0 });
+          io.to(room.id).emit('game-event', { kind: 'drop', x: bx });
           dirty = true;
-          break;
         }
       }
     }
@@ -192,6 +221,12 @@ function tickRoom(room) {
       if (c.landed && surfOf(T, c.x) > c.y + 8) { c.landed = false; c.vy = 0; } // ground blown away
       if (c.landed) {
         c.y = surfOf(T, c.x);
+        if (!c.expiresAt) c.expiresAt = now + CRATE_TTL_MS; // ⏳ 1 minute on the ground, then gone
+        if (now > c.expiresAt) {
+          c.taken = true;
+          io.to(room.id).emit('game-event', { kind: 'crate-expire', x: c.x, y: c.y - 14 });
+          continue;
+        }
       } else {
         c.sway += 0.1;
         c.vy = Math.min(150, c.vy + GRAV * 0.35 * 0.1);
@@ -200,6 +235,7 @@ function tickRoom(room) {
         if (c.y >= surfOf(T, c.x)) {
           c.y = surfOf(T, c.x);
           c.landed = true;
+          c.expiresAt = now + CRATE_TTL_MS;
           io.to(room.id).emit('game-event', { kind: 'crate-land', x: c.x, y: c.y });
         }
       }
