@@ -35,6 +35,12 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * miss; 🪓 tomahawk = slow heavy shell → MASSIVE blast + mushroom + white flash.
  * Keys 1–4 pick the shell for the next shot (1 = normal).
  *
+ * ⚡ CHAOS MODE (online) — real-time free-for-all: no turns, everyone drives
+ * and shoots at once. Infinite normal shells behind a 3s reload (specials still
+ * come from crates), same fuel rules, wind re-rolls on a wall-clock timer, one
+ * 3:00 sudden-death clock: last tank standing, else most HP at 0:00 wins.
+ * Shells from every tank fly simultaneously (projsRef array).
+ *
  * 🔊 SFX — procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
  */
 const GRAV = 850;
@@ -57,6 +63,8 @@ const GUIDED_FUEL = 12;    // s of motor burn — far more than any map crossing
 const GUIDED_FUSE = 28;    // px proximity fuse — this close already counts as a direct hit
 const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell — flies far slower than a normal shot
 const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
+const CHAOS_COOLDOWN = 3;  // ⚡ chaos reload — seconds between shots (server enforces too)
+const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
 // ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
 const NET_HZ = 12;       // own-tank position stream rate (online)
@@ -120,7 +128,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const chargeRef = useRef({ power: 0.5 });
   const teleRef = useRef(null);              // 🌀 null | { targeting: bool } — pending teleport (owner only)
   const [teleUi, setTeleUi] = useState(null); // null | 'pending' | 'targeting' — React mirror for UI chips
-  const projRef = useRef(null);
+  const projsRef = useRef([]);       // shells in flight — classic: at most 1; chaos: everyone's at once
   const subsRef = useRef([]);        // cluster sub-munitions
   const bonusRef = useRef([]);       // supply-drop crates (falling + landed)
   const streaksRef = useRef([]);     // 🌬️ ambient wind streaks in the sky
@@ -135,6 +143,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' — mirrored from server online
   const gsRef = useRef(null);        // latest game-state prop (read inside effects)
   const onlineRef = useRef(false);   // online multiplayer mode flag
+  const chaosRef = useRef(false);    // ⚡ chaos mode flag (online only)
   const myIdRef = useRef(null);
   const netAccRef = useRef(0);       // own-tank stream accumulator
   const blastsDoneRef = useRef([]);  // recent self-reported blasts (dedupe server echo)
@@ -167,8 +176,10 @@ export default function Game({ gs, myId, local = 0 }) {
   // 🌐 online = real multiplayer (server game with 2+ tanks); solo dev and
   // hot-seat stay fully client-side
   const online = local === 0 && (gs?.tanks?.length ?? 0) > 1;
+  const chaos = online && gs?.mode === 'chaos'; // ⚡ real-time free-for-all
   gsRef.current = gs;
   onlineRef.current = online;
+  chaosRef.current = chaos;
   myIdRef.current = myId;
   const spectating = online && !!myId && !(gs?.tanks ?? []).some((t) => t.id === myId);
   // 👑 room master gates game control (server enforces it too); local modes = the only screen is host
@@ -182,7 +193,7 @@ export default function Game({ gs, myId, local = 0 }) {
     let cancelled = false;
     setProgress(0.0001);
     setError('');
-    projRef.current = null;
+    projsRef.current = [];
     subsRef.current = [];
     bonusRef.current = [];
     dropTRef.current = 10;
@@ -223,6 +234,13 @@ export default function Game({ gs, myId, local = 0 }) {
         const srvTanks = local > 0 ? null : (gsRef.current?.tanks ?? null);
         const placed = []; // ⚖️ fairness: each new spawn keeps its distance from these
         const slotGap = roster.length > 1 ? terrain.width * 0.76 / (roster.length - 1) : terrain.width;
+        // 🎲 shuffled assignment — spawn slot per player is re-rolled every
+        //    game, so position never follows the join/roster order
+        const slotList = spawnSlots(roster.length);
+        for (let i = slotList.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [slotList[i], slotList[j]] = [slotList[j], slotList[i]];
+        }
         tanksRef.current = roster.map((p, i) => {
           const st = srvTanks ? (srvTanks.find((s) => s.id === p.id) ?? srvTanks[i]) : null;
           let x, y;
@@ -230,7 +248,7 @@ export default function Game({ gs, myId, local = 0 }) {
             x = st.x;
             y = st.y ?? surf(st.x);
           } else {
-            const ideal = Math.round(terrain.width * spawnSlots(roster.length)[i]);
+            const ideal = Math.round(terrain.width * slotList[i]);
             x = findSpawn(surf, terrain, ideal, placed, Math.max(0, slotGap / 2 - 100));
             y = surf(x);
           }
@@ -248,7 +266,11 @@ export default function Game({ gs, myId, local = 0 }) {
             netX: null, netY: null, netAim: null, netS: 0, netPower: null, // online: streamed targets
           };
         });
-        aimRef.current = tanksRef.current[0]?.aim ?? -0.6;
+        // ⚡ chaos: start looking down MY barrel, not tank #0's
+        const firstTank = (gsRef.current?.mode === 'chaos'
+          ? tanksRef.current.find((t) => t.id === myIdRef.current)
+          : null) ?? tanksRef.current[0];
+        aimRef.current = firstTank?.aim ?? -0.6;
         // online: mirror crates + wind from the very first game-state
         const gsNow = gsRef.current;
         if (local === 0 && (gsNow?.tanks?.length ?? 0) > 1) {
@@ -290,7 +312,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (gs.turn.num !== numRef.current) { numRef.current = gs.turn.num; sfx('turn'); }
       if (wasPhase !== 'over' && tn.phase === 'over') sfx('win');
       const at = tanksRef.current[tn.activeIdx];
-      if (at) aimRef.current = at.aim ?? aimRef.current;
+      if (at && !chaosRef.current) aimRef.current = at.aim ?? aimRef.current; // ⚡ chaos: my aim is my own
     }
     if (typeof gs.wind === 'number') { windRef.current = gs.wind; setWindUi(gs.wind); }
     // authoritative tank fields (positions are owner-streamed, not mirrored)
@@ -317,6 +339,10 @@ export default function Game({ gs, myId, local = 0 }) {
   }, [gs, online]);
 
   const activeTank = () => tanksRef.current[turnRef.current.activeIdx] ?? null;
+  // the tank THIS screen steers — ⚡ chaos: always mine; classic: whose turn it is
+  const controlTank = () => chaosRef.current
+    ? (tanksRef.current.find((t) => t.id === myIdRef.current) ?? null)
+    : activeTank();
   const groundY = (x) => {
     const t = terrainRef.current;
     return t.surface[Math.max(0, Math.min(t.width - 1, Math.round(x)))];
@@ -478,8 +504,19 @@ export default function Game({ gs, myId, local = 0 }) {
 
   // ── 🌐 online: apply the server's authoritative blast report ──
   const applyServerBlast = useCallback((m) => {
-    // clear any visual remote shells — the server boom is the truth
-    if (projRef.current && !projRef.current.mine) projRef.current = null;
+    // clear the visual remote shell this boom belongs to — the server is the truth
+    if (chaosRef.current) { // ⚡ many shells in flight: kill the nearest remote one
+      const ps = projsRef.current;
+      let best = -1, bd = 120;
+      for (let i = 0; i < ps.length; i++) {
+        if (ps[i].mine) continue;
+        const d = Math.hypot(ps[i].x - m.x, ps[i].y - m.y);
+        if (d < bd) { bd = d; best = i; }
+      }
+      if (best >= 0) ps.splice(best, 1);
+    } else {
+      projsRef.current = projsRef.current.filter((p) => p.mine);
+    }
     subsRef.current = subsRef.current.filter((p) => p.mine);
     // dedupe my own echo: I already redrew the terrain locally at impact
     const recent = blastsDoneRef.current;
@@ -523,10 +560,17 @@ export default function Game({ gs, myId, local = 0 }) {
 
   // ── fire the (possibly special) shell ──
   const fire = useCallback(() => {
-    const me = activeTank();
-    if (!me || me.dead || projRef.current || turnRef.current.phase !== 'open') return; // your turn only
+    const me = controlTank();
+    if (!me || me.dead) return;
+    const chaosNow = chaosRef.current;
+    if (chaosNow) { // ⚡ real-time: reload gate, no turns, shells keep flying
+      if (turnRef.current.phase === 'over' || countdownRef.current > 0) return;
+      if ((me.cd || 0) > 0) return;
+    } else {
+      if (projsRef.current.length || turnRef.current.phase !== 'open') return; // your turn only
+    }
     if (onlineRef.current && me.id !== myIdRef.current) return; // online: your tank only
-    const a = aimRef.current;
+    const a = chaosNow ? (me.aim ?? aimRef.current) : aimRef.current;
     const p = Math.max(0.06, chargeRef.current.power);
     const tip = muzzleOf(me, a);
     // consume the selected special shell (keys 1–4), fall back to normal if empty
@@ -543,18 +587,22 @@ export default function Game({ gs, myId, local = 0 }) {
     let dmgScale = 1;
     if ((me.buff | 0) > 0) { me.buff--; dmgScale = 2; }
     if (kind !== 'normal' || dmgScale > 1) setInvUi((n) => n + 1);
-    projRef.current = {
+    projsRef.current.push({
       x: tip.x, y: tip.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
       src: me, armed: 0, kind, dmgScale, mine: true,
-    };
+    });
     if (kind === 'tomahawk') fxRef.current.text(tip.x, tip.y - 22, '☢ TOMAHAWK AWAY', '#ff5a4e');
     fxRef.current.muzzle(tip.x, tip.y, a);
     sfx('shoot');
-    shakeRef.current = 0.45;
-    turnRef.current.phase = 'shot'; // firing ends your action
-    setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
+    shakeRef.current = Math.max(shakeRef.current, 0.45);
+    if (chaosNow) {
+      me.cd = CHAOS_COOLDOWN; // ⏳ reload begins — movement/fuel unaffected
+    } else {
+      turnRef.current.phase = 'shot'; // firing ends your action
+      setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
+    }
     if (onlineRef.current) { // server validates/consumes authoritatively + relays
-      lastShotMineRef.current = true;
+      if (!chaosNow) lastShotMineRef.current = true;
       getSocket()?.emit('fire', { a, p, kind });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -576,10 +624,10 @@ export default function Game({ gs, myId, local = 0 }) {
     }
   };
 
-  // 🌀 spend the pending teleport: click → land there (must be this turn!)
+  // 🌀 spend the pending teleport: click → land there (classic: this turn only!)
   const doTeleport = (wx) => {
     const t = terrainRef.current;
-    const me = activeTank();
+    const me = controlTank();
     if (!t || !me || me.dead || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
     if (onlineRef.current && me.id !== myIdRef.current) return;
     const surfAt = (x) => t.surface[Math.max(0, Math.min(t.width - 1, Math.round(x)))];
@@ -623,15 +671,17 @@ export default function Game({ gs, myId, local = 0 }) {
       t.aim = m.a;
       const tip = muzzleOf(t, m.a);
       const v = SPEED(m.p) * (m.kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell — slow
-      projRef.current = {
+      projsRef.current.push({
         x: tip.x, y: tip.y, vx: Math.cos(m.a) * v, vy: Math.sin(m.a) * v,
         src: t, armed: 0, kind: m.kind, dmgScale: m.dmgScale || 1, mine: false,
-      };
+      });
       fxRef.current.muzzle(tip.x, tip.y, m.a);
       if (m.kind === 'tomahawk') fxRef.current.text(tip.x, tip.y - 22, '☢ TOMAHAWK AWAY', '#ff5a4e');
       sfx('shoot');
-      turnRef.current.phase = 'shot';
-      setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
+      if (!chaosRef.current) { // ⚡ chaos: no turn phase to move
+        turnRef.current.phase = 'shot';
+        setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
+      }
     };
     const onBlast = (m) => { if (m) applyServerBlast(m); };
     const onEvent = (e) => {
@@ -755,9 +805,11 @@ export default function Game({ gs, myId, local = 0 }) {
           continue;
         }
 
-        // act only while the turn is OPEN
-        const mine = me === active && turn.phase === 'open' && countdownRef.current <= 0
-          && (!onlineNow || me.id === myIdRef.current);
+        // act only while the turn is OPEN — ⚡ chaos: YOUR tank is always live
+        const mine = chaosRef.current
+          ? me.id === myIdRef.current && turn.phase !== 'over' && countdownRef.current <= 0
+          : me === active && turn.phase === 'open' && countdownRef.current <= 0
+            && (!onlineNow || me.id === myIdRef.current);
         const dir = mine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
         me.driving = false; // proves itself below when the engine actually pushes
 
@@ -861,13 +913,15 @@ export default function Game({ gs, myId, local = 0 }) {
         else me.fuel = Math.min(100, me.fuel + FUEL_REGEN * dt);
         me.noFuelT = Math.max(0, (me.noFuelT || 0) - dt);
         me.stopT = Math.max(0, (me.stopT || 0) - dt);
-        if (me === active && me.driving && me.fuel <= 0 && wasFuel > 0 && me.noFuelT <= 0) {
+        me.cd = Math.max(0, (me.cd || 0) - dt);         // ⚡ chaos reload
+        me.cdDenyT = Math.max(0, (me.cdDenyT || 0) - dt);
+        if ((chaosRef.current ? me.id === myIdRef.current : me === active) && me.driving && me.fuel <= 0 && wasFuel > 0 && me.noFuelT <= 0) {
           me.noFuelT = 3;
           fxRef.current.text(me.x, (me.y ?? surf(me.x)) - 62, 'OUT OF FUEL', '#ff9b5e');
           sfx('deny');
         }
 
-        if (me === active) me.aim = aimRef.current; // remember where this tank left its barrel
+        if (chaosRef.current ? me.id === myIdRef.current : me === active) me.aim = aimRef.current; // remember where this tank left its barrel
 
         // 🌐 stream my tank to the server (it relays to the other players)
         if (onlineNow && me.id === myIdRef.current) {
@@ -1154,9 +1208,9 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return true;
       };
-      if (projRef.current && !stepProj(projRef.current)) projRef.current = null;
+      if (projsRef.current.length) projsRef.current = projsRef.current.filter((p) => stepProj(p));
       if (subsRef.current.length) subsRef.current = subsRef.current.filter((p) => stepProj(p));
-      for (const q of [projRef.current, ...subsRef.current]) { // smoke trails
+      for (const q of [...projsRef.current, ...subsRef.current]) { // smoke trails
         if (!q) continue;
         const ang = Math.atan2(q.vy, q.vx);
         fxRef.current.trail(q.x - Math.cos(ang) * 8, q.y - Math.sin(ang) * 8, q.vx, q.vy);
@@ -1173,7 +1227,7 @@ export default function Game({ gs, myId, local = 0 }) {
       }
 
       // shot resolved? brief settle so everyone sees the result, then next player's turn
-      if (turn.phase === 'shot' && !projRef.current && subsRef.current.length === 0) {
+      if (turn.phase === 'shot' && projsRef.current.length === 0 && subsRef.current.length === 0) {
         turn.phase = 'settle';
         turn.settle = 1.3;
         if (onlineNow && lastShotMineRef.current) { // tell the server my shot is done
@@ -1387,13 +1441,15 @@ export default function Game({ gs, myId, local = 0 }) {
           continue;
         }
         const isActive = t === active;
+        const chaosR = chaosRef.current;
+        const spot = chaosR ? t.id === myIdRef.current : isActive; // ⚡ chaos: spotlight follows YOUR tank
         const gy = t.y ?? groundY(t.x);
         const sh = isActive ? shakeRef.current : 0;
         const rf = isActive && t.grounded ? Math.min(1, Math.abs(t.s || 0) / 150) : 0; // rumble ∝ speed
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
         const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
-        if (isActive && !t.dead && turn.phase !== 'over') { // soft team-color ground glow — whose turn reads instantly
+        if (spot && !t.dead && turn.phase !== 'over') { // soft team-color ground glow — whose turn (⚡: you) reads instantly
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
           const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
           gg.addColorStop(0, `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60% / 0.30)`);
@@ -1409,8 +1465,8 @@ export default function Game({ gs, myId, local = 0 }) {
           wheelRot: t.wheelRot || 0,
         });
 
-        // active-tank marker: bobbing ▼ (whose turn is it)
-        if (isActive && tanksRef.current.length > 1 && turn.phase !== 'over') {
+        // active-tank marker: bobbing ▼ (whose turn — ⚡ chaos: which one is you)
+        if (spot && tanksRef.current.length > 1 && turn.phase !== 'over') {
           const bob = Math.sin(now * 0.006) * 3;
           ctx.fillStyle = '#ffd75e';
           ctx.beginPath();
@@ -1430,9 +1486,11 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.globalAlpha = 1;
         }
 
-        // power ring + dotted aim guide — visible on EVERY active tank, so rivals
-        // can read each other's aim + power in real time (power is set by scroll)
-        if (isActive && turn.phase === 'open' && countdownRef.current <= 0) {
+        // power ring + dotted aim guide — classic: the active tank; ⚡ chaos:
+        // EVERY live tank shows its aim + power (all streamed, all public)
+        const aiming = !t.dead && turn.phase !== 'over' && countdownRef.current <= 0
+          && (chaosR || (isActive && turn.phase === 'open'));
+        if (aiming) {
           const p = mineT ? chargeRef.current.power : (t.netPower ?? 0.5);
           const pv = pivotOf(t);
           ctx.lineWidth = 5;
@@ -1456,6 +1514,17 @@ export default function Game({ gs, myId, local = 0 }) {
             const dy2 = vy0 * dt2 + 0.5 * GRAV * dt2 * dt2;
             ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, 1.7, 0, Math.PI * 2); ctx.fill();
           }
+        }
+
+        // ⚡ chaos reload ring — a draining arc over your tank while the gun cools
+        if (chaosR && mineT && (t.cd || 0) > 0 && !t.dead) {
+          const pvC = pivotOf(t);
+          const fr = t.cd / CHAOS_COOLDOWN;
+          ctx.lineWidth = 3.5;
+          ctx.strokeStyle = 'rgba(143,208,255,0.25)';
+          ctx.beginPath(); ctx.arc(pvC.x, pvC.y, 36, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = 'rgba(143,208,255,0.9)';
+          ctx.beginPath(); ctx.arc(pvC.x, pvC.y, 36, -Math.PI / 2, -Math.PI / 2 + (1 - fr) * Math.PI * 2); ctx.stroke();
         }
 
         // HP bar with tick points + number
@@ -1493,7 +1562,7 @@ export default function Game({ gs, myId, local = 0 }) {
       }
 
       // shells in flight (main + cluster subs): thruster flame + body
-      for (const proj of [projRef.current, ...subsRef.current]) {
+      for (const proj of [...projsRef.current, ...subsRef.current]) {
         if (!proj) continue;
         const ang = Math.atan2(proj.vy, proj.vx);
         const flick = Math.sin(now * 0.06) * 0.3 + Math.random() * 0.2;
@@ -1531,10 +1600,12 @@ export default function Game({ gs, myId, local = 0 }) {
 
       fxRef.current.draw(ctx, 'front');
 
-      // crosshair — bright while the turn is open, dim otherwise
+      // crosshair — bright while the turn is open, dim otherwise; ⚡ red-hot while reloading
       const m = mouseRef.current;
+      const myTankX = chaosRef.current ? tanksRef.current.find((tk) => tk.id === myIdRef.current) : null;
+      const cooling = !!myTankX && (myTankX.cd || 0) > 0;
       ctx.globalAlpha = turn.phase === 'open' ? 1 : 0.35;
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.strokeStyle = cooling ? 'rgba(255,120,90,0.85)' : 'rgba(255,255,255,0.75)';
       ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.arc(m.x, m.y, 7, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath();
@@ -1577,14 +1648,19 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(0, 0, cw, chh);
       }
 
-      // ⏱ turn timer — glass pill: big seconds + a draining time-track,
-      //    green → amber → red, shakes in the red zone
+      // ⏱ timer — classic: per-turn seconds; ⚡ chaos: the sudden-death match
+      //    clock (mm:ss). Glass pill with a draining track, green → amber → red.
       if (turn.phase === 'open') {
+        const chaosR = chaosRef.current;
         const tSec = Math.max(0, turn.time);
-        const tShow = Math.ceil(tSec);
-        const frac = Math.max(0, Math.min(1, tSec / TURN_TIME));
-        const tCol = tSec > 12 ? '#7fe066' : tSec > 7 ? '#ffd75e' : '#ff4d4d';
-        const inRed = tSec <= 7;
+        const cs = Math.ceil(tSec);
+        const tShow = chaosR ? `${Math.floor(cs / 60)}:${String(cs % 60).padStart(2, '0')}` : String(cs);
+        const total = chaosR ? ((gsRef.current?.dur ?? CHAOS_TIME * 1000) / 1000) : TURN_TIME;
+        const frac = Math.max(0, Math.min(1, tSec / total));
+        const tCol = chaosR
+          ? (tSec > 60 ? '#7fe066' : tSec > 30 ? '#ffd75e' : '#ff4d4d')
+          : (tSec > 12 ? '#7fe066' : tSec > 7 ? '#ffd75e' : '#ff4d4d');
+        const inRed = chaosR ? tSec <= 30 : tSec <= 7;
         const shakeX = inRed ? (Math.random() - 0.5) * 5 : 0;
         const shakeY = inRed ? (Math.random() - 0.5) * 5 : 0;
         const tx = 16 + shakeX, ty = 62 + shakeY; // below the frosted header
@@ -1598,13 +1674,13 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.lineWidth = inRed ? 1.8 : 1;
         ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.stroke();
         ctx.textAlign = 'left'; // seconds
-        ctx.font = 'bold 23px system-ui';
+        ctx.font = `bold ${chaosR ? 21 : 23}px system-ui`;
         ctx.fillStyle = tCol;
-        ctx.fillText(String(tShow), tx + 13, ty + 30);
+        ctx.fillText(tShow, tx + 13, ty + 30);
         ctx.font = '600 9.5px system-ui'; // label
         ctx.globalAlpha = 0.72;
         ctx.fillStyle = '#e8ece4';
-        ctx.fillText('⏱ SEC', tx + 46, ty + 28);
+        ctx.fillText(chaosR ? '⚡ LEFT' : '⏱ SEC', tx + (chaosR ? 60 : 46), ty + 28);
         ctx.globalAlpha = 1;
         ctx.fillStyle = 'rgba(255,255,255,0.10)'; // time-track
         ctx.beginPath(); ctx.roundRect(tx + 12, ty + th - 10, tw - 24, 4, 2); ctx.fill();
@@ -1628,10 +1704,17 @@ export default function Game({ gs, myId, local = 0 }) {
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
-        const targeting = teleRef.current?.targeting && at && (!onlineRef.current || at.id === myIdRef.current);
-        if (targeting) { // 🌀 teleport mode owns the banner — time is ticking!
-          banner = '🌀 TELEPORT — click where to land!  (T / Esc to cancel · turn ends = wasted)';
+        const ct = controlTank();
+        const targeting = teleRef.current?.targeting && ct && (!onlineRef.current || ct.id === myIdRef.current);
+        if (targeting) { // 🌀 teleport mode owns the banner — in classic the turn clock is ticking!
+          banner = chaosRef.current
+            ? '🌀 TELEPORT — click where to land!  (T / Esc to cancel)'
+            : '🌀 TELEPORT — click where to land!  (T / Esc to cancel · turn ends = wasted)';
           bCol = '#b48cff';
+        } else if (chaosRef.current) { // ⚡ chaos: bodies on the clock, most HP at 0:00
+          const aliveN = tanksRef.current.filter((t) => !t.dead).length;
+          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS — ${aliveN} tank${aliveN === 1 ? '' : 's'} left · most HP wins at 0:00`;
+          bCol = turn.time <= 30 ? '#ff6b4e' : '#ffb45e';
         } else {
           banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
           bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
@@ -1699,7 +1782,7 @@ export default function Game({ gs, myId, local = 0 }) {
       return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale };
     };
     const selectWeapon = (kind) => { // keys 1–4: pick the shell for the next shot
-      const me = activeTank();
+      const me = controlTank();
       if (!me || me.dead) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // your tank only
       if (kind !== 'normal' && !(me.inv?.[kind] > 0)) {
@@ -1711,7 +1794,7 @@ export default function Game({ gs, myId, local = 0 }) {
       setSelUi(kind);
     };
     const onMove = (e) => {
-      const me = activeTank();
+      const me = controlTank();
       if (!me || !terrainRef.current) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // online: aim your own barrel only
       const w = toWorld(e);
@@ -1721,8 +1804,11 @@ export default function Game({ gs, myId, local = 0 }) {
       aimRef.current = Math.atan2(w.y - pv.y, w.x - pv.x);
     };
     const onDown = (e) => {
-      if (e.button !== 0 || !ready || projRef.current || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
-      const me = activeTank();
+      if (e.button !== 0 || !ready || countdownRef.current > 0) return;
+      const chaosNow = chaosRef.current;
+      if (turnRef.current.phase === 'over') return;
+      if (!chaosNow && (projsRef.current.length > 0 || turnRef.current.phase !== 'open')) return;
+      const me = controlTank();
       if (!me || me.dead) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // your turn, your tank
       if (teleRef.current?.targeting) { // 🌀 targeting mode: click = land there, NOT fire
@@ -1738,11 +1824,20 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return;
       }
+      // ⚡ chaos reload — infinite shells, but the gun needs its 3 seconds
+      if (chaosNow && (me.cd || 0) > 0) {
+        if ((me.cdDenyT || 0) <= 0) {
+          me.cdDenyT = 1;
+          fxRef.current.text(me.x, (me.y ?? 0) - 62, `RELOADING ${me.cd.toFixed(1)}s`, '#8fd0ff');
+          sfx('deny');
+        }
+        return;
+      }
       fire();
     };
     const onCtx = (e) => e.preventDefault();
     const onWheel = (e) => { // scroll sets power — any time it's your turn, no need to hold
-      const me = activeTank();
+      const me = controlTank();
       if (!me || me.dead || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
       if (onlineRef.current && me.id !== myIdRef.current) return;
       e.preventDefault();
@@ -1756,14 +1851,14 @@ export default function Game({ gs, myId, local = 0 }) {
       }
       if (!down) return;
       if (countdownRef.current > 0) return; // no acting until "FIGHT!"
-      if (k === 'enter' && turnRef.current.phase === 'open') {
+      if (k === 'enter' && turnRef.current.phase === 'open' && !chaosRef.current) { // ⚡ chaos: no turns to pass
         e.preventDefault(); // pass the turn to the next player
         if (onlineRef.current) getSocket()?.emit('pass-turn');
         else advanceTurn();
       }
       if (WEAPON_KEYS[k] && turnRef.current.phase === 'open') selectWeapon(WEAPON_KEYS[k]);
       if ((k === 't' || k === 'escape') && teleRef.current && turnRef.current.phase === 'open') {
-        const meT = activeTank(); // 🌀 T re-enters targeting, Esc backs out (charge kept for this turn)
+        const meT = controlTank(); // 🌀 T re-enters targeting, Esc backs out (charge kept for this turn)
         if (meT && (!onlineRef.current || meT.id === myIdRef.current)) {
           const on = k === 't' ? !teleRef.current.targeting : false;
           teleRef.current.targeting = on;
@@ -1790,7 +1885,7 @@ export default function Game({ gs, myId, local = 0 }) {
   }, [ready, myId, fire, advanceTurn]);
 
   const cycleColor = () => {
-    const t = activeTank();
+    const t = controlTank();
     if (!t) return;
     if (onlineRef.current && t.id !== myIdRef.current) return; // recolor your own tank only
     t.palette = ((t.palette ?? 0) + 1) % TANK_PALETTES.length;
@@ -1845,6 +1940,12 @@ export default function Game({ gs, myId, local = 0 }) {
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
         <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
+        {chaos && (
+          <span style={{
+            background: 'rgba(255,180,94,0.16)', color: '#ffb45e', borderRadius: 6,
+            padding: '0.15rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
+          }} title="real-time free-for-all — infinite shells, 3s reload, most HP wins at 0:00">⚡ CHAOS</span>
+        )}
         {ready && (
           <span
             title={`wind ${windUi > 0 ? '→' : windUi < 0 ? '←' : 'calm'} (${Math.round(Math.abs(windUi) * 100)}%)`}
@@ -1870,7 +1971,7 @@ export default function Game({ gs, myId, local = 0 }) {
           {ctl(['⇅'], 'power')}
           {ctl(['🖱️'], 'fire')}
           {ctl(['1–4'], 'weapon')}
-          {ctl(['⏎'], 'pass')}
+          {chaos ? ctl(['⏳'], '3s reload') : ctl(['⏎'], 'pass')}
         </span>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
@@ -1916,7 +2017,7 @@ export default function Game({ gs, myId, local = 0 }) {
       }}>
         {roster.map((p, i) => {
           const t = tanksRef.current[i];
-          const isActive = roster.length > 1 && turnInfo.idx === i && turnInfo.phase !== 'over';
+          const isActive = !chaos && roster.length > 1 && turnInfo.idx === i && turnInfo.phase !== 'over'; // ⚡ chaos: nobody's turn
           const winner = turnInfo.phase === 'over' && t && !t.dead && roster.length > 1;
           const dead = !!t?.dead;
           return (
@@ -1937,9 +2038,9 @@ export default function Game({ gs, myId, local = 0 }) {
         })}
       </div>
 
-      {/* shell inventory — active tank's stock, keys 1-4 to pick */}
+      {/* shell inventory — your tank's stock (⚡ chaos) / active tank's (classic), keys 1-4 to pick */}
       {ready && turnInfo.phase !== 'over' && (() => {
-        const t = tanksRef.current[turnInfo.idx];
+        const t = chaos ? tanksRef.current.find((k) => k.id === myId) : tanksRef.current[turnInfo.idx];
         if (!t) return null;
         const slots = [
           { k: 'normal', icon: '🚀', key: '1', n: null },

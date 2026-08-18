@@ -13,6 +13,7 @@ export default function Room({ roomId }) {
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [hostId, setHostId] = useState(null);
   const [roundsTotal, setRoundsTotal] = useState(1);
+  const [mode, setMode] = useState('classic'); // 'classic' turns | ⚡ 'chaos' real-time FFA
   const [myId, setMyId] = useState(null);
   const [status, setStatus] = useState('connecting'); // connecting | online | offline
   const [error, setError] = useState('');
@@ -25,22 +26,44 @@ export default function Room({ roomId }) {
   //    Remove this block to restore pure multiplayer.
   const soloRef = useRef(false);
   const autoStartedRef = useRef(false);
+  const modeParamRef = useRef(null);   // 🧪 dev: ?mode=chaos pre-picks the game mode
+  const manualRef = useRef(false);     // 🧪 dev: ?manual=1 disables the solo auto-start
   const [localCount, setLocalCount] = useState(0); // hot-seat: ?local=N (2-4) on one screen
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('solo') === '1') {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    const m = q.get('mode');
+    if (m === 'chaos' || m === 'classic') modeParamRef.current = m;
+    if (q.get('manual') === '1') manualRef.current = true;
+    if (q.get('solo') === '1') {
       soloRef.current = true;
       const name = sessionStorage.getItem('player-name') || 'dev';
       nameRef.current = name;
       sessionStorage.setItem('player-name', name);
-      const n = parseInt(new URLSearchParams(window.location.search).get('local') || '0', 10);
+      const n = parseInt(q.get('local') || '0', 10);
       setLocalCount(Number.isFinite(n) ? Math.min(4, Math.max(0, n)) : 0);
       setJoined(true);
+    } else if (q.get('name')) { // 🧪 dev/test: ?name=X joins straight away, no prompt
+      const name = q.get('name').trim().slice(0, 20);
+      if (name) {
+        nameRef.current = name;
+        sessionStorage.setItem('player-name', name);
+        setJoined(true);
+      }
     }
   }, []);
 
+  // 🧪 dev: ?mode=chaos — the host pre-picks the mode before anyone starts
   useEffect(() => {
-    if (soloRef.current && joined && myId && gs === null && !autoStartedRef.current) {
+    if (joined && myId && modeParamRef.current) {
+      getSocket()?.emit('set-mode', modeParamRef.current);
+      modeParamRef.current = null; // once
+    }
+  }, [joined, myId]);
+
+  useEffect(() => {
+    if (soloRef.current && joined && myId && gs === null && !autoStartedRef.current && !manualRef.current) {
       autoStartedRef.current = true; // once per mount — don't restart after end-game
       getSocket()?.emit('start-game', { dev: true });
     }
@@ -70,6 +93,7 @@ export default function Room({ roomId }) {
         setMaxPlayers(res.room.maxPlayers);
         setHostId(res.room.hostId ?? null);
         setRoundsTotal(res.room.roundsTotal ?? 1);
+        setMode(res.room.mode ?? 'classic');
       });
     };
 
@@ -78,6 +102,7 @@ export default function Room({ roomId }) {
       setMaxPlayers(state.maxPlayers);
       setHostId(state.hostId ?? null);
       setRoundsTotal(state.roundsTotal ?? 1);
+      setMode(state.mode ?? 'classic');
     };
     const onGame = (state) => setGs(state);
     const onConnect = () => {
@@ -193,7 +218,26 @@ export default function Room({ roomId }) {
 
         {myId && myId === hostId ? (
           <>
-            <div className="rounds-picker">
+            <div className="rounds-picker" style={{ marginTop: '1.5rem' }}>
+              <span className="rounds-label">🎮 Mode</span>
+              <button
+                type="button"
+                className={`round-chip ${mode === 'classic' ? 'active' : ''}`}
+                title="Turn-based artillery — aim, charge, fire, next player"
+                onClick={() => getSocket()?.emit('set-mode', 'classic')}
+              >
+                ⚔️ Classic
+              </button>
+              <button
+                type="button"
+                className={`round-chip ${mode === 'chaos' ? 'active' : ''}`}
+                title="Real-time free-for-all — everyone moves at once, infinite shells, 3s reload, 3-minute clock"
+                onClick={() => getSocket()?.emit('set-mode', 'chaos')}
+              >
+                ⚡ Chaos
+              </button>
+            </div>
+            <div className="rounds-picker" style={{ marginTop: '0.6rem' }}>
               <span className="rounds-label">🎯 Rounds</span>
               {[1, 3, 5, 7].map((n) => (
                 <button
@@ -212,20 +256,22 @@ export default function Room({ roomId }) {
               disabled={players.length < 2 || status !== 'online'}
               onClick={() => getSocket()?.emit('start-game')}
             >
-              🎮 Start game
+              {mode === 'chaos' ? '⚡ Start chaos' : '🎮 Start game'}
             </button>
             <p className="hint">
               {players.length < 2
                 ? 'Share the link — you need at least 2 players to start.'
-                : roundsTotal > 1
-                  ? `Best of ${roundsTotal} — most round wins takes the match.`
-                  : 'Everyone is in! Start when ready.'}
+                : mode === 'chaos'
+                  ? `⚡ Chaos: everyone moves at once — infinite shells, 3s reload, 3-minute clock. Last tank standing, else most HP wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
+                  : roundsTotal > 1
+                    ? `Best of ${roundsTotal} — most round wins takes the match.`
+                    : 'Everyone is in! Start when ready.'}
             </p>
           </>
         ) : (
           <p className="hint" style={{ marginTop: '1.25rem' }}>
             👑 <strong>{players.find((p) => p.id === hostId)?.name ?? 'The host'}</strong> is the room master
-            {roundsTotal > 1 ? ` — best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
+            {mode === 'chaos' ? ' — ⚡ CHAOS mode' : ''}{roundsTotal > 1 ? ` — best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
           </p>
         )}
 

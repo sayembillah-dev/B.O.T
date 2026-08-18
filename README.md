@@ -8,22 +8,25 @@ Built on the multiplayer-room-starter session layer (rooms, lobby, reconnects, s
 
 | Mode | How |
 | --- | --- |
-| **Online rooms** | Create a room, send the invite link, 2+ players, server-authoritative match |
+| **Online rooms — ⚔️ Classic** | Create a room, send the invite link, 2+ players, server-authoritative turn-based match |
+| **Online rooms — ⚡ Chaos** | Same room, host picks ⚡ in the lobby: real-time free-for-all — no turns, everyone moves at once, infinite shells behind a 3s reload, 3-minute sudden-death clock. Last tank standing, else most HP at 0:00. Works with best-of-N rounds too |
 | **Solo practice** | One click from the home page (`?solo=1`) |
 | **Hot-seat 2–4P** | One screen, shared keyboard/mouse (`?solo=1&local=N`) |
 | **Spectating** | Join a room mid-game — you watch until the next rematch |
 
 ## Features
 
+- **Two rulesets** — Classic (turn-based, 20s turns) and ⚡ Chaos (real-time FFA, 3s reload, 3:00 clock, most HP wins at time-out)
 - **Destructible seeded terrain** — per-pixel bitmap, caves, floating-island cleanup, deterministic from a seed
-- **Wind** — re-rolled every turn, pushes shells, drifting smoke shows it, guided missiles resist it
-- **Supply drops** — parachute crates fall from the sky (never near players): ×2/×3 damage buffs, cluster shells, +10/+15 HP, rare guided missiles and tomahawks
+- **Wind** — re-rolled every turn (on a timer in Chaos), pushes shells, drifting smoke shows it, guided missiles resist it
+- **Supply drops** — mystery crates parachute in (contents revealed only on pickup or expiry): ×2/×3 damage buffs, cluster shells, +10/+15 HP, rare guided missiles, tomahawks, teleports
 - **Four shell types** — normal, cluster (splits into 3), guided (homing, super rare), tomahawk (insane blast, mushroom cloud, white flash, screen shake)
 - **Tank physics** — tangent-space driving, hydraulic suspension, spinning wheels, fuel management, jumps
-- **Turn rules** — 15-second turns, park to charge your shot, Enter to pass
+- **Turn rules** — park to fire, Enter to pass; Chaos replaces turns with a per-tank reload ring
+- **Fair spawns** — symmetric slots scaled to player count, but the assignment is shuffled every round — join order never decides position
 - **360° instant aim** — full barrel pivot, no tunneling, no floating terrain, no water
 - **Procedural SFX** — pure WebAudio oscillators/noise, mutable, persisted (`M` or the 🔊 button)
-- **Server-authoritative online** — the server owns the terrain bitmap, damage, drops, and turn timers; clients render what they're told
+- **Server-authoritative online** — the server owns the terrain bitmap, damage, drops, reload timers, and the match clock; clients render what they're told
 - **Rematch, elimination, 💀 ghost tanks, winner crown** — full match loop
 
 ## Controls
@@ -62,6 +65,8 @@ Friends on the same network can join via your LAN IP (`http://192.168.x.x:3000/r
 | `npm start` | Production server (on Windows: set `NODE_ENV=production` first) |
 | `npm run smoke` | Room-lifecycle smoke test (dev server must be running) |
 | `node scripts/mp-probe.mjs` | Full multiplayer protocol test: 2 headless clients play a turn, fire, take damage, rotate, rematch |
+| `node scripts/chaos-test.mjs` | ⚡ Chaos protocol test (start the dev server with `CHAOS_DURATION_MS=12000 CHAOS_COOLDOWN_MS=1500 CHAOS_WIND_MS=3000` for speed) |
+| `node scripts/spawn-random-test.mjs` | 🎲 Verifies spawn assignment is shuffled every round, never join order |
 
 ## Architecture
 

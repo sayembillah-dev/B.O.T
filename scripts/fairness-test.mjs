@@ -35,7 +35,7 @@ for (const n of [2, 3, 4]) {
       });
       socks[0].emit('start-game');
     });
-    const xs = g.tanks.map((t) => t.x);
+    const xs = g.tanks.map((t) => t.x).sort((a, b) => a - b); // 🎲 assignment is shuffled — sort before measuring gaps
     const gaps = xs.slice(1).map((x, i) => x - xs[i]);
     const minGap = Math.min(...gaps);
     const ok = minGap >= 90 && xs.every((x) => x >= 26 && x <= g.terrain.width - 26);

@@ -31,13 +31,13 @@ const MIN_PLAYERS = 2; // online games need 2+ — solo/hot-seat bypass with {de
 const EMOJIS = ['😀','😎','🤖','👾','🐸','🦊','🐼','🐯','🦁','🐙','🦄','🐲','👻','💀','🤠','😺','🙉','🦖','🍕','⚡','🔥','🌵','🥷','🧙'];
 const ROOM_ID_RE = /^[a-z0-9]{4,24}$/;
 
-/** rooms: Map<roomId, { id, createdAt, players: Map<socketId, player>, game: object|null, sim: object|null, hostId: string|null, roundsTotal: number, match: object|null }> */
+/** rooms: Map<roomId, { id, createdAt, players: Map<socketId, player>, game: object|null, sim: object|null, hostId: string|null, roundsTotal: number, match: object|null, mode: 'classic'|'chaos' }> */
 const rooms = new Map();
 
 function serializeRoom(room) {
   return {
     id: room.id, createdAt: room.createdAt, maxPlayers: MAX_PLAYERS,
-    hostId: room.hostId, roundsTotal: room.roundsTotal,
+    hostId: room.hostId, roundsTotal: room.roundsTotal, mode: room.mode,
     players: [...room.players.values()],
   };
 }
@@ -58,6 +58,14 @@ const GRAV = 850;
 const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
 const FORCE_DROP = process.env.FORCE_DROP || null; // 🧪 tests/dev: pin every crate to one type
+// ⚡ CHAOS mode — real-time free-for-all: no turns, everyone drives and shoots
+// at once. Infinite normal shells behind a per-tank reload, one sudden-death
+// match clock; last tank standing, else the most HP when time runs out.
+const CHAOS_DURATION_MS = Number(process.env.CHAOS_DURATION_MS || 180000); // 3:00 match clock
+const CHAOS_COOLDOWN_MS = Number(process.env.CHAOS_COOLDOWN_MS || 3000);   // per-tank reload
+const CHAOS_WIND_MS = Number(process.env.CHAOS_WIND_MS || 18000);          // wind re-roll (no turns)
+const CHAOS_GHOST_MS = 12000; // a dead tank's in-flight shells may still land
+const CHAOS_GRACE_MS = 8000;  // terrain-gen + countdown runway before the clock truly bites
 // ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
 const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
@@ -93,11 +101,18 @@ function findSpawn(T, ideal, placed, maxR) {
 
 async function createGame(room) {
   const seed = randomBytes(4).toString('hex');
+  const mode = room.mode === 'chaos' ? 'chaos' : 'classic';
   const dims = TERR.terrainDims(room.players.size || 2); // ⚖️ more players → bigger battlefield
   const T = await TERR.generateTerrain(seed, dims.width, dims.height);
   room.sim = { T }; // server-side bitmap: crate physics + destroyCircle + damage
   const players = [...room.players.values()];
   const slots = spawnSlots(players.length); // ⚖️ equal, symmetric positions for all
+  // 🎲 shuffled assignment — which player parks in which slot is re-rolled every
+  //    round, so spawn position NEVER follows the join order
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
   const placed = [];
   const slotGap = players.length > 1 ? T.width * 0.76 / (players.length - 1) : T.width;
   const tanks = players.map((p, i) => {
@@ -107,20 +122,30 @@ async function createGame(room) {
       id: p.id, name: p.name, emoji: p.emoji,
       x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
       hp: 100, fuel: 100, power: 0.5, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
+      cdAt: 0, // ⚡ chaos reload bookkeeping
     };
   });
-  return {
+  const now = Date.now();
+  const g = {
     phase: 'playing',
-    startedAt: Date.now(),
+    startedAt: now,
+    mode,
     terrain: { seed, width: T.width, height: T.height },
     players: players.map((p) => ({ id: p.id, name: p.name, emoji: p.emoji })),
     tanks,
-    turn: { num: 1, phase: 'open', activeIdx: 0, endsAt: Date.now() + TURN_TIME_MS, settleEnd: 0, fireAt: 0 },
+    turn: { num: 1, phase: 'open', activeIdx: 0, endsAt: now + TURN_TIME_MS, settleEnd: 0, fireAt: 0 },
     wind: rollWind(),
     crates: [], dropT: 10000, crateId: 0,
     blasts: [], // replay log for late joiners/spectators (terrain craters)
     winner: null,
   };
+  if (mode === 'chaos') {
+    g.dur = CHAOS_DURATION_MS;
+    g.endsAt = now + CHAOS_DURATION_MS + CHAOS_GRACE_MS; // ⏳ sudden-death match clock (+ gen runway)
+    g.turn.endsAt = g.endsAt;           // clients mirror this as the clock
+    g.windT = CHAOS_WIND_MS;
+  }
+  return g;
 }
 
 /** full=true includes the blast replay log (only for a joining socket). */
@@ -158,6 +183,23 @@ function broadcastGame(roomId) {
   if (room) io.to(roomId).emit('game-state', serializeGame(room));
 }
 
+/** ⚡ chaos time-out: the match clock hit 0:00 — most HP wins (top-tie = draw). */
+function endChaosByScore(room) {
+  const g = room.game;
+  if (!g || g.turn.phase === 'over') return;
+  const alive = g.tanks.filter((t) => !t.dead);
+  let top = null, tie = false;
+  for (const t of alive) {
+    if (!top || t.hp > top.hp) { top = t; tie = false; }
+    else if (t.hp === top.hp) tie = true;
+  }
+  const winnerId = alive.length === 1 ? alive[0].id : (top && !tie ? top.id : null);
+  finishRound(room, winnerId);
+  broadcastGame(room.id);
+  const wt = winnerId ? g.tanks.find((t) => t.id === winnerId) : null;
+  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over — winner: ${wt ? `${wt.name} (${wt.hp} HP)` : 'draw'}`);
+}
+
 /** Rotate to the next living tank; ends the game when ≤1 remains. */
 function advanceTurnServer(room) {
   const g = room.game;
@@ -170,6 +212,7 @@ function advanceTurnServer(room) {
     console.log(`[room ${room.id}] 🏆 round ${room.match?.round ?? 1} over — winner: ${alive[0]?.name ?? 'draw'}`);
     return;
   }
+  if (g.mode === 'chaos') return; // ⚡ chaos has no turns to rotate
   const prev = g.tanks[g.turn.activeIdx];
   if (prev?.tele) { // 🌀 teleport not used in time — the turn eats it
     prev.tele = false;
@@ -192,12 +235,24 @@ function tickRoom(room) {
   if (!g || g.phase !== 'playing') return;
   const now = Date.now();
   const tn = g.turn;
-  if (tn.phase === 'open' && now > tn.endsAt) return advanceTurnServer(room);
-  if (tn.phase === 'settle' && now > tn.settleEnd) return advanceTurnServer(room);
-  if (tn.phase === 'shot' && now - tn.fireAt > SHOT_TIMEOUT_MS) return advanceTurnServer(room);
+  if (tn.phase !== 'over') {
+    if (g.mode === 'chaos') {
+      if (now > g.endsAt) return endChaosByScore(room); // ⏳ 0:00 — most HP wins
+    } else {
+      if (tn.phase === 'open' && now > tn.endsAt) return advanceTurnServer(room);
+      if (tn.phase === 'settle' && now > tn.settleEnd) return advanceTurnServer(room);
+      if (tn.phase === 'shot' && now - tn.fireAt > SHOT_TIMEOUT_MS) return advanceTurnServer(room);
+    }
+  }
 
   const T = room.sim?.T;
   let dirty = false;
+
+  // ⚡ chaos: no turns, so wind re-rolls on a wall-clock timer instead
+  if (g.mode === 'chaos' && tn.phase !== 'over') {
+    g.windT = (g.windT ?? CHAOS_WIND_MS) - 100;
+    if (g.windT <= 0) { g.windT = CHAOS_WIND_MS; g.wind = rollWind(); dirty = true; }
+  }
 
   // supply drops: every 24–40s, max 3 live, placed FAIRLY (equidistant-ish from all)
   if (tn.phase !== 'over' && T) {
@@ -293,7 +348,7 @@ async function startGame(socket, payload) {
     room.match = null;
     return;
   }
-  console.log(`[room ${roomId}] 🎮 game started (${room.players.size} players, best of ${room.match.roundsTotal}${dev ? ', dev mode' : ''})`);
+  console.log(`[room ${roomId}] 🎮 game started (${room.players.size} players, ${room.game.mode}${room.game.mode === 'chaos' ? ` ${Math.round(room.game.dur / 1000)}s clock` : `best of ${room.match.roundsTotal}`}${dev ? ', dev mode' : ''})`);
   io.to(roomId).emit('game-state', serializeGame(room, true));
 }
 function endGame(socket) {
@@ -437,7 +492,7 @@ app.prepare().then(async () => {
 
         let room = rooms.get(roomId);
         if (!room) {
-          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, roundsTotal: 1, match: null };
+          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, roundsTotal: 1, match: null, mode: 'classic' };
           rooms.set(roomId, room);
           console.log(`[room ${roomId}] created`);
         }
@@ -476,12 +531,23 @@ app.prepare().then(async () => {
       io.to(room.id).emit('room-state', serializeRoom(room));
     });
 
+    // 👑 host picks the game mode in the lobby: ⚔️ classic turns or ⚡ chaos FFA
+    socket.on('set-mode', (m) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || socket.id !== room.hostId || room.game) return;
+      const v = m === 'chaos' ? 'chaos' : 'classic';
+      if (room.mode === v) return;
+      room.mode = v;
+      console.log(`[room ${room.id}] 🎮 mode set: ${v}`);
+      io.to(room.id).emit('room-state', serializeRoom(room));
+    });
+
     // ── 🛡️ tank battle events ──
-    // active player passes their turn early (Enter)
+    // active player passes their turn early (Enter) — classic mode only
     socket.on('pass-turn', () => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
-      if (!g) return;
+      if (!g || g.mode === 'chaos') return;
       const me = g.tanks[g.turn.activeIdx];
       if (me?.id === socket.id && g.turn.phase === 'open') advanceTurnServer(room);
     });
@@ -503,15 +569,18 @@ app.prepare().then(async () => {
         fuel: t.fuel, p: t.power ?? 0.5,
       });
     });
-    // 🌀 teleport: active tank spends its pending teleport to land at x (this turn only)
+    // 🌀 teleport: spend a pending teleport to land at x (classic: this turn
+    //    only, active tank; chaos: any live owner, any time before it's used)
     socket.on('teleport', (p) => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
       const T = room?.sim?.T; // full bitmap (surface/waterY) — g.terrain is just a descriptor
       if (!g || !T) return;
       const tn = g.turn;
-      const me = g.tanks[tn.activeIdx];
-      if (!me || me.id !== socket.id || me.dead || tn.phase !== 'open' || !me.tele) return;
+      const chaos = g.mode === 'chaos';
+      const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
+      if (!me || me.dead || tn.phase === 'over' || !me.tele) return;
+      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return;
       const x = Math.max(30, Math.min(T.width - 30, Math.round(Number(p?.x) || 0)));
       const y = surfOf(T, x);
       if (y > T.waterY - 6) return; // no watery graves — pick dry land
@@ -520,14 +589,22 @@ app.prepare().then(async () => {
       io.to(room.id).emit('game-event', { kind: 'teleport', id: me.id, x, y });
       broadcastGame(room.id);
     });
-    // active player fires — validate turn/phase/stock, consume, relay the shot
+    // fire — classic: the active player, turn ends; chaos: ANY living tank,
+    // infinite shells behind a per-tank 3s reload, match keeps rolling
     socket.on('fire', (p) => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
       if (!g) return;
       const tn = g.turn;
-      const me = g.tanks[tn.activeIdx];
-      if (!me || me.id !== socket.id || me.dead || tn.phase !== 'open') return;
+      const chaos = g.mode === 'chaos';
+      const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
+      if (!me || me.dead || tn.phase === 'over') return;
+      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return;
+      if (chaos) { // ⚡ reload gate — server is the referee
+        const nowF = Date.now();
+        if (nowF - (me.cdAt || 0) < CHAOS_COOLDOWN_MS) return;
+        me.cdAt = nowF;
+      }
       let kind = ['cluster', 'guided', 'tomahawk'].includes(p?.kind) ? p.kind : 'normal';
       if (kind !== 'normal') {
         if ((me.inv[kind] | 0) <= 0) kind = 'normal';
@@ -535,8 +612,7 @@ app.prepare().then(async () => {
       }
       let dmgScale = 1;
       if ((me.buff | 0) > 0) { me.buff--; dmgScale = 2; }
-      tn.phase = 'shot';
-      tn.fireAt = Date.now();
+      if (!chaos) { tn.phase = 'shot'; tn.fireAt = Date.now(); }
       const a = Number(p?.a) || 0;
       const pw = Math.max(0.06, Math.min(1, Number(p?.p) || 0.06));
       io.to(room.id).emit('fire', { id: me.id, a, p: pw, kind, dmgScale });
@@ -549,8 +625,13 @@ app.prepare().then(async () => {
       const g = room?.game;
       if (!g || !room.sim?.T) return;
       const tn = g.turn;
-      const me = g.tanks[tn.activeIdx];
-      if (!me || me.id !== socket.id || (tn.phase !== 'shot' && tn.phase !== 'settle')) return;
+      const chaos = g.mode === 'chaos';
+      const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
+      if (!me || tn.phase === 'over') return;
+      if (!chaos && (me.id !== socket.id || (tn.phase !== 'shot' && tn.phase !== 'settle'))) return;
+      // ⚡ chaos: a shell you fired while alive may land after you die — allow a
+      //    short ghost window so the shared terrain/damage stays consistent
+      if (chaos && me.dead && Date.now() - (me.cdAt || 0) > CHAOS_GHOST_MS) return;
       const x = Number(p?.x), y = Number(p?.y);
       if (!isFinite(x) || !isFinite(y)) return;
       const r = Math.min(200, Math.max(8, Number(p?.r) || BLAST_R));
@@ -590,11 +671,11 @@ app.prepare().then(async () => {
       io.to(room.id).emit('blast', { x, y, r, scale, big, dmg });
       broadcastGame(room.id);
     });
-    // shooter: all shells resolved → brief settle → next turn
+    // shooter: all shells resolved → brief settle → next turn (classic only)
     socket.on('shot-done', () => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
-      if (!g) return;
+      if (!g || g.mode === 'chaos') return;
       const tn = g.turn;
       const me = g.tanks[tn.activeIdx];
       if (!me || me.id !== socket.id || tn.phase !== 'shot') return;
