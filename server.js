@@ -472,10 +472,11 @@ function leaveCurrentRoom(socket) {
     rooms.delete(roomId);
     console.log(`[room ${roomId}] empty — deleted`);
   } else {
-    // host left → crown the longest-standing survivor (Map keeps join order)
+    // host left → crown the longest-standing survivor (Map keeps join order) as
+    // CARETAKER — the crown returns to the creator (hostCid) when they rejoin
     if (room.hostId === socket.id) {
       room.hostId = room.players.keys().next().value ?? null;
-      console.log(`[room ${roomId}] 👑 host transferred to ${room.players.get(room.hostId)?.name}`);
+      console.log(`[room ${roomId}] 👑 host transferred to ${room.players.get(room.hostId)?.name} (caretaker)`);
     }
     io.to(roomId).emit('room-state', serializeRoom(room));
   }
@@ -520,15 +521,21 @@ app.prepare().then(async () => {
 
         let room = rooms.get(roomId);
         if (!room) {
-          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, roundsTotal: 1, match: null, mode: 'classic' };
+          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, hostCid: null, roundsTotal: 1, match: null, mode: 'classic' };
           rooms.set(roomId, room);
           console.log(`[room ${roomId}] created`);
         }
         if (room.players.size >= MAX_PLAYERS) return reply({ ok: false, error: `Room is full (${MAX_PLAYERS} players max).` });
 
-        const player = { id: socket.id, name, emoji: pickEmoji(room), joinedAt: Date.now() };
+        const cid = String(payload?.cid || '').slice(0, 64) || null; // stable per-tab identity
+        const player = { id: socket.id, name, emoji: pickEmoji(room), joinedAt: Date.now(), cid };
         room.players.set(socket.id, player);
         if (!room.hostId) room.hostId = socket.id; // first joiner is the room master 👑
+        if (!room.hostCid && cid && room.hostId === socket.id) room.hostCid = cid; // remember the creator's identity — set once
+        if (cid && room.hostCid === cid && room.hostId !== socket.id) { // 👑 the crown ALWAYS returns to the creator
+          room.hostId = socket.id; //        on (re)join — reloads/reconnects never switch the master
+          console.log(`[room ${roomId}] 👑 crown returned to creator ${name}`);
+        }
         socket.data.roomId = roomId;
         socket.join(roomId);
         console.log(`[room ${roomId}] ${name} joined (${room.players.size} players)`);

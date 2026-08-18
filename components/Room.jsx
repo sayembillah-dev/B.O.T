@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSocket } from '@/lib/socket';
+import { getSocket, getClientId } from '@/lib/socket';
 import Game from '@/components/Game';
 
 export default function Room({ roomId }) {
@@ -81,7 +81,7 @@ export default function Room({ roomId }) {
     if (!socket) return;
 
     const join = () => {
-      socket.emit('join-room', { roomId, name: nameRef.current }, (res) => {
+      socket.emit('join-room', { roomId, name: nameRef.current, cid: getClientId() }, (res) => {
         if (!res?.ok) {
           setError(res?.error || 'Could not join the room.');
           setJoined(false);
