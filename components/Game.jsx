@@ -69,6 +69,8 @@ const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
 const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload — seconds between shots (server enforces too)
 const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn — seconds dead before you're back
 const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) — gentle drop-in
+// ⚡ chaos crates are UNCOVERED — badge shows the contents, not a mystery '?'
+const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️' };
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
 // ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
@@ -329,6 +331,7 @@ export default function Game({ gs, myId, local = 0 }) {
       t.inv = { ...st.inv };
       t.buff = st.buff;
       t.dmg = st.dmg | 0; // ⚡ chaos scoreboard — damage dealt
+      t.shieldUntil = st.shieldUntil ?? 0; // 🛡️ chaos shield bubble
       if (st.para) t.para = true; // 🪂 one-way: touchdown clears it locally
       t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
       if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
@@ -546,6 +549,10 @@ export default function Game({ gs, myId, local = 0 }) {
     for (const d of m.dmg ?? []) {
       const t = tanksRef.current.find((k) => k.id === d.id);
       if (!t) continue;
+      if (d.d === 0) { // 🛡️ shield ate the blast — no damage, no knockback
+        fxRef.current.text(t.x, (t.y ?? groundY(t.x)) - 60, '🛡️ BLOCKED', '#8fd0ff');
+        continue;
+      }
       const ty = (t.y ?? groundY(t.x)) - 18;
       fxRef.current.text(t.x, ty - 24, `-${d.d}`, d.direct ? '#ff5a4e' : '#ffb45e');
       const ang = Math.atan2(ty - m.y, t.x - m.x);
@@ -1456,7 +1463,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillStyle = '#3a2410';
         ctx.font = 'bold 10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('?', b.x, cy + 3.5);
+        ctx.fillText(chaosRef.current && b.type ? (CRATE_GLYPHS[b.type] ?? '?') : '?', b.x, cy + 3.5);
         ctx.globalAlpha = 1;
       }
 
@@ -1578,6 +1585,21 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now * 0.006);
           ctx.fillText('🌀', t.x + dx, gy - 92 + dy);
           ctx.globalAlpha = 1;
+        }
+
+        if ((t.shieldUntil ?? 0) > Date.now()) { // 🛡️ shield bubble + countdown — visible to all
+          const left = (t.shieldUntil - Date.now()) / 1000;
+          ctx.save();
+          ctx.fillStyle = 'rgba(143,208,255,0.10)';
+          ctx.beginPath(); ctx.arc(t.x + dx, gy - 18 + dy, 31, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(143,208,255,0.85)'; ctx.lineWidth = 2;
+          ctx.setLineDash([6, 5]); ctx.lineDashOffset = -now * 0.02;
+          ctx.beginPath(); ctx.arc(t.x + dx, gy - 18 + dy, 31, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font = 'bold 10.5px system-ui'; ctx.textAlign = 'center';
+          ctx.fillStyle = '#8fd0ff';
+          ctx.fillText(`🛡️${Math.ceil(left)}s`, t.x + dx, gy - 56 + dy);
+          ctx.restore();
         }
 
         // power ring + dotted aim guide — classic: the active tank; ⚡ chaos:

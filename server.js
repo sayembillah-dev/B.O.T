@@ -128,6 +128,7 @@ async function createGame(room) {
       cdAt: 0,   // ⚡ chaos reload bookkeeping
       dmg: 0,    // ⚡ chaos scoreboard — total damage dealt to OTHERS (the win metric)
       deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
+      shieldUntil: 0, // 🛡️ chaos shield pickup — invulnerable until this stamp
     };
   });
   const now = Date.now();
@@ -140,7 +141,7 @@ async function createGame(room) {
     tanks,
     turn: { num: 1, phase: 'open', activeIdx: 0, endsAt: now + TURN_TIME_MS, settleEnd: 0, fireAt: 0 },
     wind: rollWind(),
-    crates: [], dropT: 10000, crateId: 0,
+    crates: [], dropT: mode === 'chaos' ? 5000 : 10000, crateId: 0, // ⚡ chaos: drops come early…
     blasts: [], // replay log for late joiners/spectators (terrain craters)
     winner: null,
   };
@@ -158,9 +159,9 @@ function serializeGame(room, full = false) {
   const g = room.game;
   if (!g) return null;
   const out = full ? { ...g } : (({ blasts, ...rest }) => rest)(g);
-  // 🎁 mystery crates: never broadcast the contents — the type is revealed
-  //    only on pickup (crate-taken) or when the crate expires (crate-expire)
-  if (out.crates) out.crates = out.crates.map(({ type, ...pub }) => pub);
+  // 🎁 mystery crates: classic never broadcasts the contents (revealed on
+  //    pickup/expiry) — ⚡ chaos crates are UNCOVERED: type rides along
+  if (out.crates && g.mode !== 'chaos') out.crates = out.crates.map(({ type, ...pub }) => pub);
   out.hostId = room.hostId;               // clients gate host-only UI on this
   out.match = room.match ? { ...room.match } : null; // round/wins scoreboard
   return out;
@@ -278,8 +279,9 @@ function tickRoom(room) {
   if (tn.phase !== 'over' && T) {
     g.dropT -= 100;
     if (g.dropT <= 0) {
-      g.dropT = 24000 + Math.random() * 16000;
-      if (g.crates.filter((c) => !c.taken).length < 3) {
+      // ⚡ chaos: …and often — a 3-minute brawl wants a steady supply rain
+      g.dropT = g.mode === 'chaos' ? 7000 + Math.random() * 5000 : 24000 + Math.random() * 16000;
+      if (g.crates.filter((c) => !c.taken).length < (g.mode === 'chaos' ? 5 : 3)) {
         // ⚖️ fair drop: sample candidate spots, keep the one that maximizes the
         // distance to the NEAREST live tank — equal opportunity for everyone
         const aliveTanks = g.tanks.filter((t) => !t.dead);
@@ -291,7 +293,7 @@ function tickRoom(room) {
           if (score > bScore) { bScore = score; bx = x; }
         }
         if (bx != null) {
-          g.crates.push({ id: g.crateId++, type: FORCE_DROP || BONUS.pickDropType(), x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28, expiresAt: 0 });
+          g.crates.push({ id: g.crateId++, type: FORCE_DROP || BONUS.pickDropType(Math.random, g.mode === 'chaos'), x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28, expiresAt: 0 });
           io.to(room.id).emit('game-event', { kind: 'drop', x: bx });
           dirty = true;
         }
@@ -335,6 +337,7 @@ function tickRoom(room) {
           else if (c.type === 'x2') t.buff += 2;
           else if (c.type === 'x3') t.buff += 3;
           else if (c.type === 'teleport') t.tele = true; // 🌀 pending — use it this turn or lose it
+          else if (c.type === 'shield') t.shieldUntil = now + 10000; // 🛡️ 10s of invulnerability
           else t.inv[c.type] = (t.inv[c.type] | 0) + 1;
           io.to(room.id).emit('game-event', { kind: 'crate-taken', crateId: c.id, type: c.type, x: c.x, y: c.y, by: t.id });
           dirty = true;
@@ -684,6 +687,11 @@ app.prepare().then(async () => {
       const dmg = [];
       for (const t of g.tanks) {
         if (t.dead) continue;
+        // 🛡️ shielded tanks take nothing — report a 0-damage block instead
+        if (chaos && t.shieldUntil && Date.now() < t.shieldUntil) {
+          dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false });
+          continue;
+        }
         const d = Math.hypot(t.x - x, (t.y - 18) - y);
         if (d >= range) continue;
         const direct = d < 30;
