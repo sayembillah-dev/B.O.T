@@ -231,7 +231,7 @@ export default function Room({ roomId }) {
               <button
                 type="button"
                 className={`round-chip ${mode === 'chaos' ? 'active' : ''}`}
-                title="Real-time free-for-all — everyone moves at once, infinite shells, 3s reload, 3-minute clock"
+                title="Real-time free-for-all — everyone moves at once, infinite shells, 1s reload, 5s respawn, 3-minute clock, most damage wins"
                 onClick={() => getSocket()?.emit('set-mode', 'chaos')}
               >
                 ⚡ Chaos
@@ -262,7 +262,7 @@ export default function Room({ roomId }) {
               {players.length < 2
                 ? 'Share the link — you need at least 2 players to start.'
                 : mode === 'chaos'
-                  ? `⚡ Chaos: everyone moves at once — infinite shells, 3s reload, 3-minute clock. Last tank standing, else most HP wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
+                  ? `⚡ Chaos: everyone moves at once — infinite shells, 1s reload, 5s respawn, fast fuel refill, 3-minute clock. Most damage dealt wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
                   : roundsTotal > 1
                     ? `Best of ${roundsTotal} — most round wins takes the match.`
                     : 'Everyone is in! Start when ready.'}

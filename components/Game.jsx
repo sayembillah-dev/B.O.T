@@ -36,9 +36,10 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * Keys 1–4 pick the shell for the next shot (1 = normal).
  *
  * ⚡ CHAOS MODE (online) — real-time free-for-all: no turns, everyone drives
- * and shoots at once. Infinite normal shells behind a 3s reload (specials still
- * come from crates), same fuel rules, wind re-rolls on a wall-clock timer, one
- * 3:00 sudden-death clock: last tank standing, else most HP at 0:00 wins.
+ * and shoots at once. Infinite normal shells behind a 1s reload (specials still
+ * come from crates), fuel refills from empty in 3s, wind re-rolls on a
+ * wall-clock timer, one 3:00 match clock. Death is a 5s timeout — tanks
+ * respawn, and MOST DAMAGE DEALT at 0:00 wins.
  * Shells from every tank fly simultaneously (projsRef array).
  *
  * 🔊 SFX — procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
@@ -63,7 +64,8 @@ const GUIDED_FUEL = 12;    // s of motor burn — far more than any map crossing
 const GUIDED_FUSE = 28;    // px proximity fuse — this close already counts as a direct hit
 const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell — flies far slower than a normal shot
 const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
-const CHAOS_COOLDOWN = 3;  // ⚡ chaos reload — seconds between shots (server enforces too)
+const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload — seconds between shots (server enforces too)
+const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn — seconds dead before you're back
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
 // ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
@@ -322,11 +324,19 @@ export default function Game({ gs, myId, local = 0 }) {
       t.hp = st.hp;
       t.inv = { ...st.inv };
       t.buff = st.buff;
+      t.dmg = st.dmg | 0; // ⚡ chaos scoreboard — damage dealt
       t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
       if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
         teleRef.current = null; setTeleUi(null);
       }
-      if (st.dead && !t.dead) { t.dead = true; t.driving = false; }
+      if (st.dead && !t.dead) { t.dead = true; t.driving = false; t.deadAtMs = performance.now(); } // 💀 chaos: respawn countdown starts
+      else if (!st.dead && t.dead) { // ⚡ chaos respawn — server revived this tank at a fresh spot
+        t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
+        t.s = 0; t.airVy = 0; t.grounded = true; t.fuel = 100; t.aim = st.aim ?? t.aim;
+        fxRef.current.text(st.x, st.y - 56, 'RESPAWN', '#8fd0ff');
+        fxRef.current.add({ t: 'ring', x: st.x, y: st.y - 18, size: 8, grow: 320, life: 0.5, color: 'rgba(143,208,255,0.9)' });
+        if (st.id === myIdRef.current) { aimRef.current = t.aim; chargeRef.current.power = 0.5; sfx('turn'); }
+      }
     }
     // crates mirror — positions eased toward server targets in update()
     const prev = bonusRef.current;
@@ -907,10 +917,11 @@ export default function Game({ gs, myId, local = 0 }) {
           }
         }
 
-        // fuel: burn while driving, regenerate slowly otherwise (empty tank = engine dead)
+        // fuel: burn while driving, regenerate otherwise (empty tank = engine dead)
+        // ⚡ chaos: pit-stop refill — bone dry → full tank in 3 seconds
         const wasFuel = me.fuel;
         if (me.driving) me.fuel = Math.max(0, me.fuel - FUEL_BURN(me.s) * dt);
-        else me.fuel = Math.min(100, me.fuel + FUEL_REGEN * dt);
+        else me.fuel = Math.min(100, me.fuel + (chaosRef.current ? 100 / 3 : FUEL_REGEN) * dt);
         me.noFuelT = Math.max(0, (me.noFuelT || 0) - dt);
         me.stopT = Math.max(0, (me.stopT || 0) - dt);
         me.cd = Math.max(0, (me.cd || 0) - dt);         // ⚡ chaos reload
@@ -1437,6 +1448,12 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.textAlign = 'center';
           ctx.fillText('💀', t.x, gyD - 26 + bob);
           ctx.globalAlpha = 1;
+          if (chaosRef.current && turn.phase !== 'over' && t.deadAtMs) { // ⚡ respawn countdown under the skull
+            const back = Math.max(0, CHAOS_RESPAWN - (performance.now() - t.deadAtMs) / 1000);
+            ctx.font = 'bold 12px system-ui';
+            ctx.fillStyle = '#8fd0ff';
+            ctx.fillText(back > 0 ? `↻ ${back.toFixed(1)}s` : '↻ …', t.x, gyD - 6 + bob);
+          }
           drawNameTag(ctx, t.x, gyD - 42 + bob, t);
           continue;
         }
@@ -1699,8 +1716,12 @@ export default function Game({ gs, myId, local = 0 }) {
         const alive = tanksRef.current.filter((t) => !t.dead);
         const m = gsRef.current?.match;
         const inMatch = onlineRef.current && m && m.roundsTotal > 1;
-        banner = alive[0]
-          ? '🏆 ' + (alive[0].emoji ?? '') + ' ' + (alive[0].name ?? '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
+        // ⚡ chaos: the winner may be mid-respawn at 0:00 — trust the server's verdict
+        const wt = chaosRef.current && onlineRef.current
+          ? tanksRef.current.find((tk) => tk.id === gsRef.current?.winner)
+          : alive[0];
+        banner = wt
+          ? '🏆 ' + (wt.emoji ?? '') + ' ' + (wt.name ?? '') + (chaosRef.current ? ` — ${wt.dmg | 0} 💥` : '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
@@ -1711,9 +1732,9 @@ export default function Game({ gs, myId, local = 0 }) {
             ? '🌀 TELEPORT — click where to land!  (T / Esc to cancel)'
             : '🌀 TELEPORT — click where to land!  (T / Esc to cancel · turn ends = wasted)';
           bCol = '#b48cff';
-        } else if (chaosRef.current) { // ⚡ chaos: bodies on the clock, most HP at 0:00
-          const aliveN = tanksRef.current.filter((t) => !t.dead).length;
-          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS — ${aliveN} tank${aliveN === 1 ? '' : 's'} left · most HP wins at 0:00`;
+        } else if (chaosRef.current) { // ⚡ chaos: respawns forever — most DAMAGE at 0:00
+          const meT = tanksRef.current.find((tk) => tk.id === myIdRef.current);
+          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS — most DAMAGE wins at 0:00${meT ? ` · your 💥 ${meT.dmg | 0}` : ''}`;
           bCol = turn.time <= 30 ? '#ff6b4e' : '#ffb45e';
         } else {
           banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
@@ -1765,6 +1786,31 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillStyle = col;
         ctx.fillText(label, 0, 0);
         ctx.restore();
+      }
+
+      // ⚡ chaos: YOU died — centre-screen respawn countdown (damage still counts!)
+      if (chaosRef.current && turn.phase !== 'over' && countdownRef.current <= 0) {
+        const meDead = tanksRef.current.find((tk) => tk.id === myIdRef.current && tk.dead);
+        if (meDead?.deadAtMs) {
+          const back = Math.max(0, CHAOS_RESPAWN - (performance.now() - meDead.deadAtMs) / 1000);
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = 'bold 34px system-ui';
+          ctx.lineWidth = 7;
+          ctx.strokeStyle = 'rgba(4,7,4,0.85)';
+          ctx.strokeText('💀 DESTROYED', cw / 2, chh / 2 - 34);
+          ctx.fillStyle = '#ff6b4e';
+          ctx.fillText('💀 DESTROYED', cw / 2, chh / 2 - 34);
+          ctx.font = 'bold 22px system-ui';
+          ctx.strokeText(`respawn in ${back.toFixed(1)}s`, cw / 2, chh / 2 + 6);
+          ctx.fillStyle = '#8fd0ff';
+          ctx.fillText(`respawn in ${back.toFixed(1)}s`, cw / 2, chh / 2 + 6);
+          ctx.font = '600 13px system-ui';
+          ctx.fillStyle = 'rgba(232,236,228,0.75)';
+          ctx.fillText('your damage total still counts — get back in there!', cw / 2, chh / 2 + 34);
+          ctx.restore();
+        }
       }
     };
 
@@ -1944,7 +1990,7 @@ export default function Game({ gs, myId, local = 0 }) {
           <span style={{
             background: 'rgba(255,180,94,0.16)', color: '#ffb45e', borderRadius: 6,
             padding: '0.15rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
-          }} title="real-time free-for-all — infinite shells, 3s reload, most HP wins at 0:00">⚡ CHAOS</span>
+          }} title="real-time free-for-all — infinite shells, 1s reload, 5s respawn, most damage wins at 0:00">⚡ CHAOS</span>
         )}
         {ready && (
           <span
@@ -1971,7 +2017,7 @@ export default function Game({ gs, myId, local = 0 }) {
           {ctl(['⇅'], 'power')}
           {ctl(['🖱️'], 'fire')}
           {ctl(['1–4'], 'weapon')}
-          {chaos ? ctl(['⏳'], '3s reload') : ctl(['⏎'], 'pass')}
+          {chaos ? ctl(['⏳'], '1s reload') : ctl(['⏎'], 'pass')}
         </span>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
@@ -2018,7 +2064,8 @@ export default function Game({ gs, myId, local = 0 }) {
         {roster.map((p, i) => {
           const t = tanksRef.current[i];
           const isActive = !chaos && roster.length > 1 && turnInfo.idx === i && turnInfo.phase !== 'over'; // ⚡ chaos: nobody's turn
-          const winner = turnInfo.phase === 'over' && t && !t.dead && roster.length > 1;
+          // ⚡ chaos: winner = most damage (server's call) — they might be mid-respawn
+          const winner = turnInfo.phase === 'over' && roster.length > 1 && (chaos ? gs?.winner === p.id : t && !t.dead);
           const dead = !!t?.dead;
           return (
             <span key={p.id} style={{
@@ -2028,11 +2075,11 @@ export default function Game({ gs, myId, local = 0 }) {
               border: winner || isActive ? '1px solid rgba(255,215,94,0.75)'
                 : p.id === myId ? '1px solid rgba(127,176,105,0.6)' : '1px solid rgba(255,255,255,0.12)',
               color: '#e8ece4', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.8rem',
-              opacity: dead ? 0.35 : 1, textDecoration: dead ? 'line-through' : 'none',
+              opacity: dead ? (chaos ? 0.55 : 0.35) : 1, textDecoration: dead && !chaos ? 'line-through' : 'none', // ⚡ chaos: dead = 5s timeout, not elimination
               transition: 'all 0.25s',
               backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', // frosted pill
             }}>
-              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{showMatch ? ` · ${match.wins?.[p.id] | 0}W` : ''}{p.id === myId ? ' (you)' : ''}
+              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{chaos && t ? ` · 💥${t.dmg | 0}` : ''}{showMatch ? ` · ${match.wins?.[p.id] | 0}W` : ''}{p.id === myId ? ' (you)' : ''}
             </span>
           );
         })}

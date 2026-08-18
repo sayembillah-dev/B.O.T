@@ -59,10 +59,11 @@ const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
 const FORCE_DROP = process.env.FORCE_DROP || null; // 🧪 tests/dev: pin every crate to one type
 // ⚡ CHAOS mode — real-time free-for-all: no turns, everyone drives and shoots
-// at once. Infinite normal shells behind a per-tank reload, one sudden-death
-// match clock; last tank standing, else the most HP when time runs out.
+// at once. Infinite normal shells behind a 1s per-tank reload, dead tanks
+// respawn in 5s — one 3:00 match clock: MOST DAMAGE DEALT wins.
 const CHAOS_DURATION_MS = Number(process.env.CHAOS_DURATION_MS || 180000); // 3:00 match clock
-const CHAOS_COOLDOWN_MS = Number(process.env.CHAOS_COOLDOWN_MS || 3000);   // per-tank reload
+const CHAOS_COOLDOWN_MS = Number(process.env.CHAOS_COOLDOWN_MS || 1000);   // per-tank reload
+const CHAOS_RESPAWN_MS = Number(process.env.CHAOS_RESPAWN_MS || 5000);     // dead tank → back in 5s
 const CHAOS_WIND_MS = Number(process.env.CHAOS_WIND_MS || 18000);          // wind re-roll (no turns)
 const CHAOS_GHOST_MS = 12000; // a dead tank's in-flight shells may still land
 const CHAOS_GRACE_MS = 8000;  // terrain-gen + countdown runway before the clock truly bites
@@ -122,7 +123,9 @@ async function createGame(room) {
       id: p.id, name: p.name, emoji: p.emoji,
       x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
       hp: 100, fuel: 100, power: 0.5, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
-      cdAt: 0, // ⚡ chaos reload bookkeeping
+      cdAt: 0,   // ⚡ chaos reload bookkeeping
+      dmg: 0,    // ⚡ chaos scoreboard — total damage dealt to OTHERS (the win metric)
+      deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
     };
   });
   const now = Date.now();
@@ -183,21 +186,21 @@ function broadcastGame(roomId) {
   if (room) io.to(roomId).emit('game-state', serializeGame(room));
 }
 
-/** ⚡ chaos time-out: the match clock hit 0:00 — most HP wins (top-tie = draw). */
+/** ⚡ chaos time-out: the match clock hit 0:00 — MOST DAMAGE DEALT wins
+ *  (exact top-tie = draw). Even a tank that's mid-respawn can take it:
+ *  damage is the score, survival just keeps you dealing it. */
 function endChaosByScore(room) {
   const g = room.game;
   if (!g || g.turn.phase === 'over') return;
-  const alive = g.tanks.filter((t) => !t.dead);
   let top = null, tie = false;
-  for (const t of alive) {
-    if (!top || t.hp > top.hp) { top = t; tie = false; }
-    else if (t.hp === top.hp) tie = true;
+  for (const t of g.tanks) {
+    if (!top || (t.dmg | 0) > (top.dmg | 0)) { top = t; tie = false; }
+    else if ((t.dmg | 0) === (top.dmg | 0)) tie = true;
   }
-  const winnerId = alive.length === 1 ? alive[0].id : (top && !tie ? top.id : null);
+  const winnerId = top && !tie && (top.dmg | 0) > 0 ? top.id : null;
   finishRound(room, winnerId);
   broadcastGame(room.id);
-  const wt = winnerId ? g.tanks.find((t) => t.id === winnerId) : null;
-  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over — winner: ${wt ? `${wt.name} (${wt.hp} HP)` : 'draw'}`);
+  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over — winner: ${winnerId ? `${top.name} (${top.dmg | 0} dmg)` : 'draw'}`);
 }
 
 /** Rotate to the next living tank; ends the game when ≤1 remains. */
@@ -252,6 +255,21 @@ function tickRoom(room) {
   if (g.mode === 'chaos' && tn.phase !== 'over') {
     g.windT = (g.windT ?? CHAOS_WIND_MS) - 100;
     if (g.windT <= 0) { g.windT = CHAOS_WIND_MS; g.wind = rollWind(); dirty = true; }
+  }
+
+  // ⚡ chaos respawns: a dead tank is back after CHAOS_RESPAWN_MS at a fresh
+  // random spot with full HP + fuel — death is a timeout, not an elimination
+  if (g.mode === 'chaos' && tn.phase !== 'over' && T) {
+    for (const t of g.tanks) {
+      if (!t.dead || !t.deadAt || now - t.deadAt < CHAOS_RESPAWN_MS) continue;
+      const placed = g.tanks.filter((o) => o !== t && !o.dead).map((o) => o.x);
+      const x = findSpawn(T, 60 + Math.floor(Math.random() * (T.width - 120)), placed, T.width / 2);
+      t.x = x; t.y = surfOf(T, x);
+      t.aim = x < T.width / 2 ? -0.6 : -2.54;
+      t.hp = 100; t.fuel = 100; t.dead = false; t.deadAt = 0; t.cdAt = 0;
+      io.to(room.id).emit('game-event', { kind: 'respawn', id: t.id, x: t.x, y: t.y });
+      dirty = true;
+    }
   }
 
   // supply drops: every 24–40s, max 3 live, placed FAIRLY (equidistant-ish from all)
@@ -418,12 +436,17 @@ function handleGameLeave(socket, room) {
   g.players = g.players.filter((p) => p.id !== socket.id);
   const t = g.tanks.find((tk) => tk.id === socket.id);
   if (t && !t.dead) {
-    t.dead = true; t.hp = 0;
-    const alive = g.tanks.filter((tk) => !tk.dead);
-    if (g.tanks.length > 1 && alive.length <= 1) {
-      finishRound(room, alive[0]?.id ?? null);
-    } else if (g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
-      advanceTurnServer(room); // was their turn — move on
+    t.dead = true; t.hp = 0; // ⚡ chaos: no deadAt → leavers never respawn
+    if (g.mode === 'chaos') {
+      // ⚡ no eliminations in chaos — but if nobody's left to fight, score it now
+      if (g.players.length <= 1) endChaosByScore(room);
+    } else {
+      const alive = g.tanks.filter((tk) => !tk.dead);
+      if (g.tanks.length > 1 && alive.length <= 1) {
+        finishRound(room, alive[0]?.id ?? null);
+      } else if (g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
+        advanceTurnServer(room); // was their turn — move on
+      }
     }
   }
   if (g.players.length === 0) { room.game = null; room.sim = null; }
@@ -590,7 +613,7 @@ app.prepare().then(async () => {
       broadcastGame(room.id);
     });
     // fire — classic: the active player, turn ends; chaos: ANY living tank,
-    // infinite shells behind a per-tank 3s reload, match keeps rolling
+    // infinite shells behind a per-tank 1s reload, match keeps rolling
     socket.on('fire', (p) => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
@@ -663,11 +686,14 @@ app.prepare().then(async () => {
         const direct = d < 30;
         const dd = direct ? Math.round(50 * scale) : Math.max(2, Math.round(46 * scale * (1 - d / range)));
         t.hp = Math.max(0, t.hp - dd);
-        if (t.hp <= 0) t.dead = true;
+        if (t.hp <= 0) { t.dead = true; if (chaos) t.deadAt = Date.now(); } // ⚡ chaos: respawn timer starts
         dmg.push({ id: t.id, hp: t.hp, d: dd, direct, dead: t.dead });
       }
+      // ⚡ chaos scoreboard: damage dealt to OTHERS is the win metric
+      if (chaos) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
       const alive = g.tanks.filter((t) => !t.dead);
-      if (g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
+      // ⚡ chaos never ends on a wipeout — respawns keep the match rolling
+      if (!chaos && g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
       io.to(room.id).emit('blast', { x, y, r, scale, big, dmg });
       broadcastGame(room.id);
     });
