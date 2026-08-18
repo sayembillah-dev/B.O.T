@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSocket } from '@/lib/socket';
-import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid } from '@/lib/terrain.mjs';
+import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims } from '@/lib/terrain.mjs';
 import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
 import { FX } from '@/lib/fx.mjs';
 import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
@@ -148,8 +148,10 @@ export default function Game({ gs, myId, local = 0 }) {
   const [mutedUi, setMutedUi] = useState(false);
 
   const seed = gs?.terrain?.seed;
-  const tw = gs?.terrain?.width ?? 1920;
-  const th = gs?.terrain?.height ?? 1080;
+  // ⚖️ terrain grows with player count; online the server's dims are law,
+  // hot-seat sizes itself locally (its dev game only has 1 server tank)
+  const tw = local > 0 ? terrainDims(local).width : (gs?.terrain?.width ?? 1920);
+  const th = local > 0 ? terrainDims(local).height : (gs?.terrain?.height ?? 1080);
   const ready = progress === 1;
 
   // hot-seat roster (synthetic local players); online roster = server tanks

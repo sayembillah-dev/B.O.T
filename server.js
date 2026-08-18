@@ -93,7 +93,8 @@ function findSpawn(T, ideal, placed, maxR) {
 
 async function createGame(room) {
   const seed = randomBytes(4).toString('hex');
-  const T = await TERR.generateTerrain(seed, 1920, 1080);
+  const dims = TERR.terrainDims(room.players.size || 2); // ⚖️ more players → bigger battlefield
+  const T = await TERR.generateTerrain(seed, dims.width, dims.height);
   room.sim = { T }; // server-side bitmap: crate physics + destroyCircle + damage
   const players = [...room.players.values()];
   const slots = spawnSlots(players.length); // ⚖️ equal, symmetric positions for all
