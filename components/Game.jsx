@@ -115,6 +115,10 @@ export default function Game({ gs, myId, local = 0 }) {
   onlineRef.current = online;
   myIdRef.current = myId;
   const spectating = online && !!myId && !(gs?.tanks ?? []).some((t) => t.id === myId);
+  // 👑 room master gates game control (server enforces it too); local modes = the only screen is host
+  const isHost = !online || !gs?.hostId || gs.hostId === myId;
+  const match = gs?.match ?? null; // { round, roundsTotal, wins, over, lastWinner } | null
+  const showMatch = online && !!match && match.roundsTotal > 1;
 
   // ── terrain generation (seed from server) ──
   useEffect(() => {
@@ -1145,9 +1149,11 @@ export default function Game({ gs, myId, local = 0 }) {
       let banner, bCol;
       if (turn.phase === 'over') {
         const alive = tanksRef.current.filter((t) => !t.dead);
+        const m = gsRef.current?.match;
+        const inMatch = onlineRef.current && m && m.roundsTotal > 1;
         banner = alive[0]
-          ? `🏆 ${alive[0].emoji ?? ''} ${alive[0].name ?? ''} WINS! — 🎲 New terrain for a rematch`
-          : '💀 DRAW — 🎲 New terrain for a rematch';
+          ? '🏆 ' + (alive[0].emoji ?? '') + ' ' + (alive[0].name ?? '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
+          : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
         banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} · ⏱ ${Math.max(0, Math.ceil(turn.time))}s — A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass`;
@@ -1325,12 +1331,22 @@ export default function Game({ gs, myId, local = 0 }) {
             }}
           >🌬️ {windLabel}</span>
         )}
+        {showMatch && (
+          <span style={{
+            background: 'rgba(255,215,94,0.14)', color: '#ffd75e', borderRadius: 6,
+            padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
+          }}>ROUND {match.round}/{match.roundsTotal}</span>
+        )}
         <span style={{ fontSize: '0.8rem', opacity: 0.75 }}>A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass</span>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
         <button className="btn" onClick={cycleColor}>🎨 {colorName}</button>
+        {isHost && turnInfo.phase !== 'over' && (
+          <>
         <button className="btn" onClick={() => getSocket()?.emit('regen-terrain')}>🎲 New terrain</button>
         <button className="btn" onClick={() => getSocket()?.emit('end-game')}>🏁 End game</button>
+          </>
+        )}
       </div>
 
       {/* loading */}
@@ -1380,7 +1396,7 @@ export default function Game({ gs, myId, local = 0 }) {
               opacity: dead ? 0.35 : 1, textDecoration: dead ? 'line-through' : 'none',
               transition: 'all 0.25s',
             }}>
-              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{p.id === myId ? ' (you)' : ''}
+              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{showMatch ? ` · ${match.wins?.[p.id] | 0}W` : ''}{p.id === myId ? ' (you)' : ''}
             </span>
           );
         })}
@@ -1423,6 +1439,86 @@ export default function Game({ gs, myId, local = 0 }) {
                 </span>
               );
             })}
+          </div>
+        );
+      })()}
+
+      {/* 🏆 game over — round result, match scoreboard, host controls */}
+      {ready && turnInfo.phase === 'over' && (() => {
+        const roundWinner = online
+          ? (gs?.winner ? roster.find((p) => p.id === gs.winner) ?? null : null)
+          : (tanksRef.current.filter((t) => !t.dead)[0] ?? null);
+        const board = showMatch
+          ? roster.map((p) => ({ p, w: match.wins?.[p.id] | 0 })).sort((a, b) => b.w - a.w)
+          : [];
+        const champ = match?.over && board.length > 0 && board[0].w > 0 && (board.length === 1 || board[0].w > board[1].w)
+          ? board[0].p : null;
+        const title = match?.over && showMatch
+          ? (champ ? `🏆 ${champ.emoji} ${champ.name} WINS THE MATCH!` : '🏳️ MATCH DRAW')
+          : (roundWinner
+              ? `🏆 ${roundWinner.emoji ?? ''} ${roundWinner.name ?? ''} ${showMatch ? `wins round ${match.round}!` : 'WINS!'}`
+              : '🏳️ DRAW');
+        const btn = (label, event, primary) => (
+          <button
+            key={event}
+            className="btn"
+            onClick={() => getSocket()?.emit(event)}
+            style={{
+              padding: '0.7rem 1.3rem', fontSize: '0.95rem', fontWeight: 700, borderRadius: 10,
+              background: primary ? 'linear-gradient(90deg,#7fb069,#9be15d)' : 'rgba(255,255,255,0.1)',
+              color: primary ? '#0a0d09' : '#e8ece4', border: 'none', cursor: 'pointer',
+            }}
+          >{label}</button>
+        );
+        return (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+            background: 'rgba(4,7,4,0.55)', backdropFilter: 'blur(3px)',
+            fontFamily: 'system-ui, sans-serif', zIndex: 10,
+          }}>
+            <div style={{
+              background: 'rgba(10,14,9,0.92)', border: '1px solid rgba(255,215,94,0.35)',
+              borderRadius: 16, padding: '1.6rem 2.2rem', textAlign: 'center',
+              boxShadow: '0 12px 60px rgba(0,0,0,0.6)', minWidth: 300,
+            }}>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffd75e', marginBottom: '0.4rem' }}>{title}</div>
+              {showMatch && !match.over && (
+                <div style={{ color: '#9fb08f', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                  round {match.round} of {match.roundsTotal}
+                </div>
+              )}
+              {board.length > 0 && (
+                <div style={{ margin: '0.9rem 0 0.4rem', display: 'grid', gap: '0.3rem' }}>
+                  {board.map(({ p, w }, i) => (
+                    <div key={p.id} style={{
+                      display: 'flex', justifyContent: 'space-between', gap: '2rem',
+                      padding: '0.3rem 0.8rem', borderRadius: 8,
+                      background: i === 0 && w > 0 ? 'rgba(255,215,94,0.16)' : 'rgba(255,255,255,0.05)',
+                      color: i === 0 && w > 0 ? '#ffd75e' : '#cfd8c3', fontSize: '0.9rem',
+                      fontWeight: i === 0 ? 700 : 500,
+                    }}>
+                      <span>{i === 0 && w > 0 ? '👑 ' : ''}{p.emoji} {p.name}{p.id === myId ? ' (you)' : ''}</span>
+                      <span>{w}W</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                {isHost ? (
+                  <>
+                    {showMatch && !match.over && btn(`⚔️ Next round (${match.round + 1}/${match.roundsTotal})`, 'next-round', true)}
+                    {showMatch && match.over && btn('🏆 New match', 'new-match', true)}
+                    {!showMatch && btn('🎲 Rematch', 'regen-terrain', true)}
+                    {showMatch && !match.over && btn('🔁 Replay round', 'regen-terrain', false)}
+                    {btn(match?.over ? '🏁 Back to lobby' : '🏁 End game', 'end-game', false)}
+                  </>
+                ) : (
+                  <div style={{ color: '#9fb08f', fontSize: '0.9rem', padding: '0.5rem 0' }}>
+                    waiting for the 👑 room master…
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         );
       })()}

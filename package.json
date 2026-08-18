@@ -7,7 +7,8 @@
     "dev": "node server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "smoke:rounds": "node scripts/rounds-test.mjs && node scripts/rounds-test-2.mjs"
   },
   "dependencies": {
     "next": "latest",

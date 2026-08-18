@@ -11,6 +11,8 @@ export default function Room({ roomId }) {
   const [joined, setJoined] = useState(false);
   const [players, setPlayers] = useState([]);
   const [maxPlayers, setMaxPlayers] = useState(8);
+  const [hostId, setHostId] = useState(null);
+  const [roundsTotal, setRoundsTotal] = useState(1);
   const [myId, setMyId] = useState(null);
   const [status, setStatus] = useState('connecting'); // connecting | online | offline
   const [error, setError] = useState('');
@@ -66,12 +68,16 @@ export default function Room({ roomId }) {
         setMyId(res.you.id);
         setPlayers(res.room.players);
         setMaxPlayers(res.room.maxPlayers);
+        setHostId(res.room.hostId ?? null);
+        setRoundsTotal(res.room.roundsTotal ?? 1);
       });
     };
 
     const onState = (state) => {
       setPlayers(state.players);
       setMaxPlayers(state.maxPlayers);
+      setHostId(state.hostId ?? null);
+      setRoundsTotal(state.roundsTotal ?? 1);
     };
     const onGame = (state) => setGs(state);
     const onConnect = () => {
@@ -178,25 +184,50 @@ export default function Room({ roomId }) {
               <li key={p.id} className={`player ${p.id === myId ? 'me' : ''}`}>
                 <span className="player-emoji">{p.emoji}</span>
                 <span className="player-name">{p.name}</span>
+                {p.id === hostId && <span className="host-badge" title="Room master">👑</span>}
                 {p.id === myId && <span className="you-badge">you</span>}
               </li>
             ))}
           </ul>
         )}
 
-        <button
-          className="btn btn-primary btn-lg"
-          style={{ marginTop: '1.25rem' }}
-          disabled={players.length < 2 || status !== 'online'}
-          onClick={() => getSocket()?.emit('start-game')}
-        >
-          🎮 Start game
-        </button>
-        <p className="hint">
-          {players.length < 2
-            ? 'Share the link — you need at least 2 players to start.'
-            : 'Everyone is in! Start when ready.'}
-        </p>
+        {myId && myId === hostId ? (
+          <>
+            <div className="rounds-picker">
+              <span className="rounds-label">🎯 Rounds</span>
+              {[1, 3, 5, 7].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`round-chip ${roundsTotal === n ? 'active' : ''}`}
+                  onClick={() => getSocket()?.emit('set-rounds', n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ marginTop: '1.25rem' }}
+              disabled={players.length < 2 || status !== 'online'}
+              onClick={() => getSocket()?.emit('start-game')}
+            >
+              🎮 Start game
+            </button>
+            <p className="hint">
+              {players.length < 2
+                ? 'Share the link — you need at least 2 players to start.'
+                : roundsTotal > 1
+                  ? `Best of ${roundsTotal} — most round wins takes the match.`
+                  : 'Everyone is in! Start when ready.'}
+            </p>
+          </>
+        ) : (
+          <p className="hint" style={{ marginTop: '1.25rem' }}>
+            👑 <strong>{players.find((p) => p.id === hostId)?.name ?? 'The host'}</strong> is the room master
+            {roundsTotal > 1 ? ` — best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
+          </p>
+        )}
 
         <button className="btn btn-ghost" onClick={() => router.push('/')}>← Leave room</button>
       </div>

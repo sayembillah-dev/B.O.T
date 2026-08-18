@@ -31,11 +31,15 @@ const MIN_PLAYERS = 2; // online games need 2+ — solo/hot-seat bypass with {de
 const EMOJIS = ['😀','😎','🤖','👾','🐸','🦊','🐼','🐯','🦁','🐙','🦄','🐲','👻','💀','🤠','😺','🙉','🦖','🍕','⚡','🔥','🌵','🥷','🧙'];
 const ROOM_ID_RE = /^[a-z0-9]{4,24}$/;
 
-/** rooms: Map<roomId, { id, createdAt, players: Map<socketId, player>, game: object|null, sim: object|null }> */
+/** rooms: Map<roomId, { id, createdAt, players: Map<socketId, player>, game: object|null, sim: object|null, hostId: string|null, roundsTotal: number, match: object|null }> */
 const rooms = new Map();
 
 function serializeRoom(room) {
-  return { id: room.id, createdAt: room.createdAt, maxPlayers: MAX_PLAYERS, players: [...room.players.values()] };
+  return {
+    id: room.id, createdAt: room.createdAt, maxPlayers: MAX_PLAYERS,
+    hostId: room.hostId, roundsTotal: room.roundsTotal,
+    players: [...room.players.values()],
+  };
 }
 function pickEmoji(room) {
   const used = new Set([...room.players.values()].map((p) => p.emoji));
@@ -99,9 +103,28 @@ async function createGame(room) {
 function serializeGame(room, full = false) {
   const g = room.game;
   if (!g) return null;
-  if (full) return g;
-  const { blasts, ...rest } = g;
-  return rest;
+  const out = full ? { ...g } : (({ blasts, ...rest }) => rest)(g);
+  out.hostId = room.hostId;               // clients gate host-only UI on this
+  out.match = room.match ? { ...room.match } : null; // round/wins scoreboard
+  return out;
+}
+
+// ── Match bookkeeping: best-of-N rounds, wins per player ─────────────
+/** Fresh match when a game starts from the lobby. */
+function startMatch(room) {
+  room.match = { round: 1, roundsTotal: room.roundsTotal, wins: {}, over: false, lastWinner: null };
+}
+/** Record a round result exactly once (called from every game-over path). */
+function finishRound(room, winnerId) {
+  const g = room.game;
+  if (!g || g.turn.phase === 'over') return;
+  g.turn.phase = 'over';
+  g.winner = winnerId ?? null;
+  const m = room.match;
+  if (!m) return;
+  m.lastWinner = g.winner;
+  if (g.winner) m.wins[g.winner] = (m.wins[g.winner] | 0) + 1;
+  if (m.round >= m.roundsTotal) m.over = true; // played all rounds → most wins takes the match
 }
 function broadcastGame(roomId) {
   const room = rooms.get(roomId);
@@ -115,10 +138,9 @@ function advanceTurnServer(room) {
   const ts = g.tanks;
   const alive = ts.filter((t) => !t.dead);
   if (ts.length > 1 && alive.length <= 1) {
-    g.turn.phase = 'over';
-    g.winner = alive[0]?.id ?? null;
+    finishRound(room, alive[0]?.id ?? null);
     broadcastGame(room.id);
-    console.log(`[room ${room.id}] 🏆 game over — winner: ${alive[0]?.name ?? 'draw'}`);
+    console.log(`[room ${room.id}] 🏆 round ${room.match?.round ?? 1} over — winner: ${alive[0]?.name ?? 'draw'}`);
     return;
   }
   let i = g.turn.activeIdx;
@@ -210,37 +232,80 @@ async function startGame(socket, payload) {
   const roomId = socket.data.roomId;
   const room = rooms.get(roomId);
   if (!room) return;
-  if (room.players.size < MIN_PLAYERS && !payload?.dev) return; // {dev:true} = solo/hot-seat bypass
+  // {dev:true} = solo/hot-seat bypass — only valid in a 1-player room, so a
+  // non-host can't use it to force-start a real multiplayer game
+  const dev = !!payload?.dev && room.players.size === 1;
+  if (socket.id !== room.hostId && !dev) return; // 👑 only the room master starts games
+  if (room.players.size < MIN_PLAYERS && !dev) return;
   if (room.game) return; // already running
+  startMatch(room); // fresh match: round 1 of roundsTotal, clean scoreboard
   try {
     room.game = await createGame(room);
   } catch (err) {
     console.error(`[room ${roomId}] failed to create game:`, err);
+    room.match = null;
     return;
   }
-  console.log(`[room ${roomId}] 🎮 game started (${room.players.size} players${payload?.dev ? ', dev mode' : ''})`);
+  console.log(`[room ${roomId}] 🎮 game started (${room.players.size} players, best of ${room.match.roundsTotal}${dev ? ', dev mode' : ''})`);
   io.to(roomId).emit('game-state', serializeGame(room, true));
 }
 function endGame(socket) {
   const roomId = socket.data.roomId;
   const room = rooms.get(roomId);
   if (!room?.game) return;
+  if (socket.id !== room.hostId) return; // 👑 host only
   room.game = null;
   room.sim = null;
+  room.match = null;
   console.log(`[room ${roomId}] 🏁 game ended`);
   broadcastGame(roomId); // null → clients fall back to the lobby
 }
-/** Rematch: fresh terrain, tanks reset, everyone currently in the room plays. */
+/** Advance to the next round after a finished one (host only). */
+async function nextRound(socket) {
+  const room = rooms.get(socket.data.roomId);
+  if (!room || socket.id !== room.hostId) return; // 👑 host only
+  const g = room.game, m = room.match;
+  if (!g || g.turn.phase !== 'over' || !m || m.over) return;
+  m.round += 1;
+  m.lastWinner = null;
+  try {
+    room.game = await createGame(room);
+  } catch (err) {
+    console.error(`[room ${room.id}] next round failed:`, err);
+    return;
+  }
+  console.log(`[room ${room.id}] ⚔️ round ${m.round}/${m.roundsTotal} — new terrain (${room.game.terrain.seed})`);
+  io.to(room.id).emit('game-state', serializeGame(room, true));
+}
+/** Rematch after a completed match: clean scoreboard, back to round 1 (host only). */
+async function newMatch(socket) {
+  const room = rooms.get(socket.data.roomId);
+  if (!room || socket.id !== room.hostId) return; // 👑 host only
+  if (!room.game || room.game.turn.phase !== 'over' || !room.match?.over) return;
+  startMatch(room);
+  try {
+    room.game = await createGame(room);
+  } catch (err) {
+    console.error(`[room ${room.id}] new match failed:`, err);
+    room.match = null;
+    return;
+  }
+  console.log(`[room ${room.id}] 🏆 new match — best of ${room.match.roundsTotal}`);
+  io.to(room.id).emit('game-state', serializeGame(room, true));
+}
+/** Restart the current round on fresh terrain (host only); scoreboard untouched. */
 async function regenTerrain(socket) {
   const room = rooms.get(socket.data.roomId);
   if (!room?.game) return;
+  if (socket.id !== room.hostId) return; // 👑 host only
   try {
     room.game = await createGame(room);
   } catch (err) {
     console.error(`[room ${room.id}] regen failed:`, err);
     return;
   }
-  console.log(`[room ${room.id}] 🎲 rematch — new terrain (${room.game.terrain.seed})`);
+  if (room.match) room.match.lastWinner = null;
+  console.log(`[room ${room.id}] 🎲 round restarted — new terrain (${room.game.terrain.seed})`);
   io.to(room.id).emit('game-state', serializeGame(room, true));
 }
 
@@ -254,8 +319,7 @@ function handleGameLeave(socket, room) {
     t.dead = true; t.hp = 0;
     const alive = g.tanks.filter((tk) => !tk.dead);
     if (g.tanks.length > 1 && alive.length <= 1) {
-      g.turn.phase = 'over';
-      g.winner = alive[0]?.id ?? null;
+      finishRound(room, alive[0]?.id ?? null);
     } else if (g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
       advanceTurnServer(room); // was their turn — move on
     }
@@ -278,6 +342,11 @@ function leaveCurrentRoom(socket) {
     rooms.delete(roomId);
     console.log(`[room ${roomId}] empty — deleted`);
   } else {
+    // host left → crown the longest-standing survivor (Map keeps join order)
+    if (room.hostId === socket.id) {
+      room.hostId = room.players.keys().next().value ?? null;
+      console.log(`[room ${roomId}] 👑 host transferred to ${room.players.get(room.hostId)?.name}`);
+    }
     io.to(roomId).emit('room-state', serializeRoom(room));
   }
 }
@@ -321,7 +390,7 @@ app.prepare().then(async () => {
 
         let room = rooms.get(roomId);
         if (!room) {
-          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null };
+          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, roundsTotal: 1, match: null };
           rooms.set(roomId, room);
           console.log(`[room ${roomId}] created`);
         }
@@ -329,6 +398,7 @@ app.prepare().then(async () => {
 
         const player = { id: socket.id, name, emoji: pickEmoji(room), joinedAt: Date.now() };
         room.players.set(socket.id, player);
+        if (!room.hostId) room.hostId = socket.id; // first joiner is the room master 👑
         socket.data.roomId = roomId;
         socket.join(roomId);
         console.log(`[room ${roomId}] ${name} joined (${room.players.size} players)`);
@@ -345,6 +415,19 @@ app.prepare().then(async () => {
     socket.on('start-game', (payload) => startGame(socket, payload));
     socket.on('end-game', () => endGame(socket));
     socket.on('regen-terrain', () => regenTerrain(socket));
+    socket.on('next-round', () => nextRound(socket));
+    socket.on('new-match', () => newMatch(socket));
+    // 👑 host picks the match length in the lobby (1/3/5/7/9 rounds)
+    socket.on('set-rounds', (n) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || socket.id !== room.hostId || room.game) return;
+      const v = Math.round(Number(n));
+      if (![1, 3, 5, 7, 9].includes(v)) return;
+      if (room.roundsTotal === v) return;
+      room.roundsTotal = v;
+      console.log(`[room ${room.id}] 🎯 match length set: best of ${v}`);
+      io.to(room.id).emit('room-state', serializeRoom(room));
+    });
 
     // ── 🛡️ tank battle events ──
     // active player passes their turn early (Enter)
@@ -433,10 +516,7 @@ app.prepare().then(async () => {
         dmg.push({ id: t.id, hp: t.hp, d: dd, direct, dead: t.dead });
       }
       const alive = g.tanks.filter((t) => !t.dead);
-      if (g.tanks.length > 1 && alive.length <= 1) {
-        tn.phase = 'over';
-        g.winner = alive[0]?.id ?? null;
-      }
+      if (g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
       io.to(room.id).emit('blast', { x, y, r, scale, big, dmg });
       broadcastGame(room.id);
     });

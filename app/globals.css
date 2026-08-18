@@ -233,6 +233,42 @@ body {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   border-radius: 999px;
 }
+.host-badge {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.45rem;
+  font-size: 0.8rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+/* ---------- rounds picker (room master only) ---------- */
+.rounds-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+.rounds-label { color: var(--muted); font-size: 0.85rem; font-weight: 600; margin-right: 0.25rem; }
+.round-chip {
+  min-width: 2.4rem;
+  padding: 0.4rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.round-chip:hover { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.round-chip.active {
+  color: white;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+}
 
 .hint { margin: 1.5rem 0 0; text-align: center; color: var(--muted); font-size: 0.85rem; }
 .muted { color: var(--muted); }
