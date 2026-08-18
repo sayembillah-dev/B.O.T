@@ -74,11 +74,20 @@ if (!g1.tanks.every((t) => t.para === true && t.y < 0)) fail(`chaos tanks should
 else ok('all tanks parachute in from the sky at spawn 🪂');
 ok(`chaos game started — mode=${g1.mode}, dur=${g1.dur / 1000}s, ${g1.tanks.length} tanks, all live at once`);
 
+// 🪂 guns stay packed until touchdown — the server must reject mid-chute fire
+let chuteFire = 0;
+a.on('fire', () => { chuteFire += 1; });
+a.emit('fire', { a: -0.8, p: 0.5, kind: 'normal' }); // still mid-parachute → rejected
+await sleep(400);
+if (chuteFire !== 0) fail(`parachute fire rejected — got ${chuteFire} broadcast(s)`);
+else ok('fire while parachuting is rejected — guns stay packed 🪂');
+
 // both players drive simultaneously — no turn gate on tank-move
+// (para:false rides along = touchdown report, like the real client streams)
 const mvA = waitEvent(b, 'tank-move', (m) => m.id === aId, 'A move relayed');
 const mvB = waitEvent(a, 'tank-move', (m) => m.id === bId, 'B move relayed');
-a.emit('tank-move', { x: 500, y: 300, aim: -1, s: 30 });
-b.emit('tank-move', { x: 700, y: 300, aim: -2, s: -30 });
+a.emit('tank-move', { x: 500, y: 300, aim: -1, s: 30, para: false });
+b.emit('tank-move', { x: 700, y: 300, aim: -2, s: -30, para: false });
 await Promise.all([mvA, mvB]);
 ok('both tanks move simultaneously — no turns');
 
@@ -162,9 +171,9 @@ ok('room 2: 3-player chaos started — clock running');
 // park everyone at known, far-apart spots so blasts never cross-splash
 const W = g2.terrain.width;
 const pos = { [cId]: 0.15 * W, [dId]: 0.5 * W, [eId]: 0.85 * W };
-c.emit('tank-move', { x: pos[cId], y: 300, aim: -1, s: 0 });
-d.emit('tank-move', { x: pos[dId], y: 300, aim: -1, s: 0 });
-e.emit('tank-move', { x: pos[eId], y: 300, aim: -1, s: 0 });
+c.emit('tank-move', { x: pos[cId], y: 300, aim: -1, s: 0, para: false });
+d.emit('tank-move', { x: pos[dId], y: 300, aim: -1, s: 0, para: false });
+e.emit('tank-move', { x: pos[eId], y: 300, aim: -1, s: 0, para: false });
 await sleep(400); // let the streams land
 
 // scripted damage triangle — direct hits: dd = round(50 × scale)

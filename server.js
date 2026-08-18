@@ -635,7 +635,7 @@ app.prepare().then(async () => {
       const tn = g.turn;
       const chaos = g.mode === 'chaos';
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
-      if (!me || me.dead || tn.phase === 'over') return;
+      if (!me || me.dead || me.para || tn.phase === 'over') return; // 🪂 guns stay packed until touchdown
       if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return;
       if (chaos) { // ⚡ reload gate — server is the referee
         const nowF = Date.now();
