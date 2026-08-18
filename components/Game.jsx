@@ -117,6 +117,8 @@ export default function Game({ gs, myId, local = 0 }) {
   const aimRef = useRef(-0.6);
   const mouseRef = useRef({ x: 0, y: 0 });
   const chargeRef = useRef({ power: 0.5 });
+  const teleRef = useRef(null);              // 🌀 null | { targeting: bool } — pending teleport (owner only)
+  const [teleUi, setTeleUi] = useState(null); // null | 'pending' | 'targeting' — React mirror for UI chips
   const projRef = useRef(null);
   const subsRef = useRef([]);        // cluster sub-munitions
   const bonusRef = useRef([]);       // supply-drop crates (falling + landed)
@@ -182,6 +184,7 @@ export default function Game({ gs, myId, local = 0 }) {
     dropTRef.current = 10;
     chargeRef.current = { power: 0.5 };
     selRef.current = 'normal';
+    teleRef.current = null; setTeleUi(null); // 🌀 fresh game, no pending teleports
     whiteRef.current = 0;
     blastsDoneRef.current = [];
     lastShotMineRef.current = false;
@@ -233,6 +236,7 @@ export default function Game({ gs, myId, local = 0 }) {
             hp: st?.hp ?? 100, fuel: 100,
             driving: false, dead: !!st?.dead,
             inv: st?.inv ? { ...st.inv } : { cluster: 0, guided: 0, tomahawk: 0 }, // special shells in stock
+            tele: !!st?.tele,                                       // 🌀 pending teleport (visible to all)
             buff: st?.buff ?? 0,                                     // ×2-damage hits remaining
             palette: st?.palette ?? (i % TANK_PALETTES.length),
             aim: st?.aim ?? (x < terrain.width / 2 ? -0.6 : -2.54), // face the enemy side
@@ -291,6 +295,10 @@ export default function Game({ gs, myId, local = 0 }) {
       t.hp = st.hp;
       t.inv = { ...st.inv };
       t.buff = st.buff;
+      t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
+      if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
+        teleRef.current = null; setTeleUi(null);
+      }
       if (st.dead && !t.dead) { t.dead = true; t.driving = false; }
     }
     // crates mirror — positions eased toward server targets in update()
@@ -337,6 +345,11 @@ export default function Game({ gs, myId, local = 0 }) {
     selRef.current = 'normal'; // weapon pick doesn't carry across turns
     setSelUi('normal');
     if (checkGameOver()) return;
+    if (teleRef.current) { // 🌀 teleport not used in time — the turn eats it
+      const prev = ts[tn.activeIdx];
+      if (prev) { prev.tele = false; fxRef.current.text(prev.x, (prev.y ?? 0) - 56, '🌀 fizzled…', '#b48cff'); }
+      teleRef.current = null; setTeleUi(null);
+    }
     let i = tn.activeIdx;
     for (let k = 0; k < ts.length; k++) { i = (i + 1) % ts.length; if (!ts[i].dead) break; }
     ts.forEach((t) => { t.driving = false; });
@@ -541,6 +554,47 @@ export default function Game({ gs, myId, local = 0 }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── 🌀 teleport: violet swirl poofs at both ends of the jump ──
+  const teleFX = (x, y) => {
+    fxRef.current.add({ t: 'ring', x, y: y - 18, size: 6, grow: 420, life: 0.5, color: 'rgba(180,140,255,0.9)' });
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      fxRef.current.add({
+        t: 'spark', x: x + Math.cos(a) * 15, y: y - 18 + Math.sin(a) * 21,
+        vx: Math.cos(a) * 70, vy: Math.sin(a) * 70 - 40, size: 1.8, life: 0.5 + Math.random() * 0.25,
+        color: 'rgb(200,168,255)',
+      });
+    }
+    for (let i = 0; i < 6; i++) {
+      fxRef.current.smoke(x + (Math.random() - 0.5) * 22, y - 10 - Math.random() * 22,
+        (Math.random() - 0.5) * 26, -30 - Math.random() * 30, 5 + Math.random() * 5, 0.8, 'rgb(180,140,255)', 0.5);
+    }
+  };
+
+  // 🌀 spend the pending teleport: click → land there (must be this turn!)
+  const doTeleport = (wx) => {
+    const t = terrainRef.current;
+    const me = activeTank();
+    if (!t || !me || me.dead || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
+    if (onlineRef.current && me.id !== myIdRef.current) return;
+    const surfAt = (x) => t.surface[Math.max(0, Math.min(t.width - 1, Math.round(x)))];
+    const x = Math.max(30, Math.min(t.width - 30, Math.round(wx)));
+    const gy = surfAt(x);
+    if (gy > t.waterY - 6) { // no watery graves — stay in targeting mode
+      fxRef.current.text(x, gy - 46, 'TOO DEEP — pick dry land', '#ff9b5e');
+      sfx('deny');
+      return;
+    }
+    teleFX(me.x, me.y ?? surfAt(me.x));            // poof out
+    if (onlineRef.current) getSocket()?.emit('teleport', { x }); // server validates + relays
+    me.x = x; me.y = gy; me.s = 0; me.airVy = 0; me.grounded = true; me.driving = false; me.rot = 0;
+    me.netX = x; me.netY = gy;
+    me.tele = false;
+    teleFX(x, gy);                                  // poof in
+    teleRef.current = null; setTeleUi(null);
+    sfx('teleport');
+  };
+
   // ── 🌐 online socket listeners (remote tanks, shots, blasts, crate events) ──
   useEffect(() => {
     if (!ready) return;
@@ -581,6 +635,29 @@ export default function Game({ gs, myId, local = 0 }) {
       if (e.kind === 'crate-taken') {
         fxRef.current.text(e.x, e.y - 18, def ? (def.label.startsWith('+') ? `${def.label} ❤` : def.name) : '', def?.color ?? '#fff');
         sfx(e.type === 'hp10' || e.type === 'hp15' ? 'heal' : 'pickup');
+        if (e.type === 'teleport') { // 🌀 arm targeting for the owner (this turn only!)
+          const t = tanksRef.current.find((k) => k.id === e.by);
+          if (t) t.tele = true;
+          if (e.by === myIdRef.current) {
+            teleRef.current = { targeting: true }; setTeleUi('targeting');
+            fxRef.current.text(e.x, e.y - 46, 'click where to land!', '#b48cff');
+          }
+        }
+      } else if (e.kind === 'teleport') { // 🌀 a tank jumped — poof at both ends
+        const t = tanksRef.current.find((k) => k.id === e.id);
+        if (t) {
+          if (e.id !== myIdRef.current) { // owner already poofed + moved on click
+            teleFX(t.x, t.y ?? 0);
+            t.x = e.x; t.y = e.y; t.netX = e.x; t.netY = e.y; t.s = 0; t.grounded = true;
+            teleFX(e.x, e.y);
+            sfx('teleport');
+          }
+          t.tele = false;
+        }
+      } else if (e.kind === 'tele-fizzle') { // 🌀 turn ended before they clicked — wasted
+        const t = tanksRef.current.find((k) => k.id === e.id);
+        if (t) { t.tele = false; fxRef.current.text(t.x, (t.y ?? 0) - 56, '🌀 fizzled…', '#b48cff'); }
+        if (e.id === myIdRef.current) { teleRef.current = null; setTeleUi(null); }
       } else if (e.kind === 'crate-boom') {
         fxRef.current.text(e.x, e.y - 16, '📦 destroyed', '#ffb45e');
         sfx('crunch');
@@ -714,7 +791,10 @@ export default function Game({ gs, myId, local = 0 }) {
             const ns = surf(nx);
             const nth = slope(nx);
             const uphill = me.s * Math.sin(nth) < 0;
-            const hardBlock = nx < 26 || nx > terrain.width - 26 || (ns > terrain.waterY - 4 && ns < me.y + 4);
+            // 🛡️ other tanks are SOLID — bumper-to-bumper, never through
+            const tankBlock = tanksRef.current.some((o) =>
+              o !== me && !o.dead && Math.abs(nx - o.x) < 46 && Math.abs((o.y ?? me.y) - me.y) < 32);
+            const hardBlock = nx < 26 || nx > terrain.width - 26 || (ns > terrain.waterY - 4 && ns < me.y + 4) || tankBlock;
             if (hardBlock) {
               me.s *= 0.2; // blocked: world edge / water
             } else {
@@ -797,6 +877,32 @@ export default function Game({ gs, myId, local = 0 }) {
               fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
               p: Math.round(chargeRef.current.power * 100) / 100,     // 👀 rivals see your aim
             });
+          }
+        }
+      }
+
+      // ── 🛡️ tank↔tank collision: bodies are solid, overlaps get pushed apart.
+      //    Offline: both move. Online: only MY tank yields (the remote one is
+      //    stream-owned) — so an enemy landing on you shoves YOU aside. ──
+      {
+        const ts = tanksRef.current;
+        for (let i = 0; i < ts.length; i++) {
+          for (let j = i + 1; j < ts.length; j++) {
+            const A = ts[i], B = ts[j];
+            if (A.dead || B.dead) continue;
+            const dx = B.x - A.x, dy = (B.y ?? surf(B.x)) - (A.y ?? surf(A.x));
+            if (Math.abs(dx) >= 46 || Math.abs(dy) >= 32) continue;
+            const push = (46 - Math.abs(dx)) * (Math.sign(dx) || (i % 2 ? 1 : -1));
+            const aMine = !onlineNow || A.id === myIdRef.current;
+            const bMine = !onlineNow || B.id === myIdRef.current;
+            if (aMine && bMine) { A.x -= push / 2; B.x += push / 2; A.s *= 0.3; B.s *= 0.3; }
+            else if (aMine) { A.x -= push; A.s *= 0.3; }
+            else if (bMine) { B.x += push; B.s *= 0.3; }
+            else continue;
+            for (const t of [A, B]) { // stay inside the world + re-snap to ground
+              t.x = Math.max(26, Math.min(terrain.width - 26, t.x));
+              if (t.grounded) t.y = surf(t.x);
+            }
           }
         }
       }
@@ -891,6 +997,14 @@ export default function Game({ gs, myId, local = 0 }) {
               sfx('heal');
             } else if (b.type === 'x2' || b.type === 'x3') {
               t.buff = (t.buff | 0) + (b.type === 'x2' ? 2 : 3);
+              fxRef.current.text(b.x, b.y - 18, def.name, def.color);
+              sfx('pickup');
+            } else if (b.type === 'teleport') { // 🌀 use-it-this-turn targeting (only the active tank drives)
+              t.tele = true;
+              if (t === activeTank()) {
+                teleRef.current = { targeting: true }; setTeleUi('targeting');
+                fxRef.current.text(b.x, b.y - 44, 'click where to land!', def.color);
+              }
               fxRef.current.text(b.x, b.y - 18, def.name, def.color);
               sfx('pickup');
             } else {
@@ -1009,14 +1123,20 @@ export default function Game({ gs, myId, local = 0 }) {
         for (let s = 0; s < steps; s++) {
           p.x += (p.vx * dt) / steps;
           p.y += (p.vy * dt) / steps;
-          // tank hit — checked every 4px substep, no bypass/tunneling possible
+          // tank hit — checked every 4px substep, no bypass/tunneling possible.
+          // 🎯 PROPER collision mask: the tank's rotated hull box (tracks, turret
+          // and barrel root — 58×46 covers the whole visible body), so even a
+          // graze registers instead of the shell ghosting through the edges.
           let hitTank = null;
           for (const t of tanksRef.current) {
             if (t.dead) continue;
             if (t === p.src && p.armed < 0.12) continue; // just left our own muzzle
-            const ty = (t.y ?? 0) - 14;
-            if (Math.abs(p.x - t.x) < 24 && Math.abs(p.y - ty) < 24 &&
-                Math.hypot(p.x - t.x, p.y - ty) < 17) { hitTank = t; break; }
+            const cx = t.x, cy = (t.y ?? 0) - 19;
+            const th = t.rot || 0, co = Math.cos(th), si = Math.sin(th);
+            const ddx = p.x - cx, ddy = p.y - cy;
+            const lx = ddx * co + ddy * si;  // rotate the shell into the tank's frame
+            const ly = -ddx * si + ddy * co;
+            if (Math.abs(lx) <= 29 && Math.abs(ly) <= 23) { hitTank = t; break; }
           }
           const inX = p.x >= 0 && p.x < terrain.width;
           if (hitTank || (inX && p.y >= 0 && isSolid(terrain, p.x, p.y))) {
@@ -1191,6 +1311,14 @@ export default function Game({ gs, myId, local = 0 }) {
 
         drawNameTag(ctx, t.x + dx, gy - 82 + dy, t);
 
+        if (t.tele) { // 🌀 pending teleport — everyone sees it, like fuel and aim
+          ctx.font = '14px system-ui';
+          ctx.textAlign = 'center';
+          ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now * 0.006);
+          ctx.fillText('🌀', t.x + dx, gy - 92 + dy);
+          ctx.globalAlpha = 1;
+        }
+
         // power ring + dotted aim guide — visible on EVERY active tank, so rivals
         // can read each other's aim + power in real time (power is set by scroll)
         if (isActive && turn.phase === 'open' && countdownRef.current <= 0) {
@@ -1296,6 +1424,30 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.stroke();
       ctx.globalAlpha = 1;
 
+      // 🌀 teleport targeting — ghost landing pad under the cursor
+      if (teleRef.current?.targeting && turn.phase === 'open') {
+        const lx = Math.max(30, Math.min(terrain.width - 30, m.x));
+        const lgy = surf(lx);
+        const okSpot = lgy <= terrain.waterY - 6;
+        const col = okSpot ? '#b48cff' : '#ff6b4e';
+        ctx.save();
+        ctx.strokeStyle = col;
+        ctx.fillStyle = col;
+        ctx.setLineDash([5, 6]); // drop line from the sky to the pad
+        ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, lgy - 46); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(lx, lgy - 20, 20 + Math.sin(now * 0.008) * 3, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 0.3; // ghost tank footprint — exactly where you'll stand
+        ctx.beginPath(); ctx.roundRect(lx - 25, lgy - 36, 50, 36, 6); ctx.fill();
+        ctx.globalAlpha = 0.95;
+        ctx.font = 'bold 12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(okSpot ? '🌀 land here' : 'too deep!', lx, lgy - 54);
+        ctx.restore();
+      }
+
       ctx.restore();
 
       // ☢️ tomahawk white-screen flash (screen space, fades fast)
@@ -1347,8 +1499,14 @@ export default function Game({ gs, myId, local = 0 }) {
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
-        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
-        bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
+        const targeting = teleRef.current?.targeting && at && (!onlineRef.current || at.id === myIdRef.current);
+        if (targeting) { // 🌀 teleport mode owns the banner — time is ticking!
+          banner = '🌀 TELEPORT — click where to land!  (T / Esc to cancel · turn ends = wasted)';
+          bCol = '#b48cff';
+        } else {
+          banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
+          bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
+        }
       } else if (turn.phase === 'shot') {
         banner = `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
         bCol = '#8fd0ff';
@@ -1434,6 +1592,10 @@ export default function Game({ gs, myId, local = 0 }) {
       const me = activeTank();
       if (!me || me.dead) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // your turn, your tank
+      if (teleRef.current?.targeting) { // 🌀 targeting mode: click = land there, NOT fire
+        doTeleport(toWorld(e).x);
+        return;
+      }
       // no shooting on the move: must be parked on the ground to fire
       if (!me.grounded || Math.abs(me.s) > 12) {
         if ((me.stopT || 0) <= 0) {
@@ -1467,6 +1629,14 @@ export default function Game({ gs, myId, local = 0 }) {
         else advanceTurn();
       }
       if (WEAPON_KEYS[k] && turnRef.current.phase === 'open') selectWeapon(WEAPON_KEYS[k]);
+      if ((k === 't' || k === 'escape') && teleRef.current && turnRef.current.phase === 'open') {
+        const meT = activeTank(); // 🌀 T re-enters targeting, Esc backs out (charge kept for this turn)
+        if (meT && (!onlineRef.current || meT.id === myIdRef.current)) {
+          const on = k === 't' ? !teleRef.current.targeting : false;
+          teleRef.current.targeting = on;
+          setTeleUi(on ? 'targeting' : 'pending');
+        }
+      }
     };
     const onKeyDown = (e) => onKey(e, true);
     const onKeyUp = (e) => onKey(e, false);
@@ -1645,6 +1815,23 @@ export default function Game({ gs, myId, local = 0 }) {
             position: 'absolute', right: '1rem', bottom: '1rem', display: 'flex',
             gap: '0.35rem', alignItems: 'center', fontFamily: 'system-ui, sans-serif',
           }}>
+            {teleUi && ( // 🌀 pending teleport — only on the owner's screen; click or press T to aim
+              <span
+                onClick={() => {
+                  if (!teleRef.current) return;
+                  teleRef.current.targeting = !teleRef.current.targeting;
+                  setTeleUi(teleRef.current.targeting ? 'targeting' : 'pending');
+                }}
+                title="teleport — click where to land (this turn only, or it's wasted!)"
+                style={{
+                  background: teleUi === 'targeting' ? 'rgba(180,140,255,0.3)' : 'rgba(0,0,0,0.5)',
+                  border: teleUi === 'targeting' ? '1px solid #b48cff' : '1px solid rgba(180,140,255,0.45)',
+                  borderRadius: 8, padding: '0.25rem 0.5rem', fontSize: '0.85rem',
+                  color: '#e8ece4', cursor: 'pointer',
+                }}>
+                🌀<span style={{ fontSize: '0.62rem', marginLeft: 4, opacity: 0.55 }}>T</span>
+              </span>
+            )}
             {(t.buff | 0) > 0 && (
               <span style={{
                 background: 'rgba(255,215,94,0.2)', border: '1px solid rgba(255,215,94,0.7)',

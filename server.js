@@ -57,6 +57,7 @@ const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
 const GRAV = 850;
 const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
+const FORCE_DROP = process.env.FORCE_DROP || null; // 🧪 tests/dev: pin every crate to one type
 // ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
 const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
@@ -104,7 +105,7 @@ async function createGame(room) {
     return {
       id: p.id, name: p.name, emoji: p.emoji,
       x, y: surfOf(T, x), aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
-      hp: 100, fuel: 100, power: 0.5, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
+      hp: 100, fuel: 100, power: 0.5, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
     };
   });
   return {
@@ -165,6 +166,11 @@ function advanceTurnServer(room) {
     console.log(`[room ${room.id}] 🏆 round ${room.match?.round ?? 1} over — winner: ${alive[0]?.name ?? 'draw'}`);
     return;
   }
+  const prev = g.tanks[g.turn.activeIdx];
+  if (prev?.tele) { // 🌀 teleport not used in time — the turn eats it
+    prev.tele = false;
+    io.to(room.id).emit('game-event', { kind: 'tele-fizzle', id: prev.id, x: prev.x, y: prev.y });
+  }
   let i = g.turn.activeIdx;
   for (let k = 0; k < ts.length; k++) { i = (i + 1) % ts.length; if (!ts[i].dead) break; }
   g.turn.activeIdx = i;
@@ -206,7 +212,7 @@ function tickRoom(room) {
           if (score > bScore) { bScore = score; bx = x; }
         }
         if (bx != null) {
-          g.crates.push({ id: g.crateId++, type: BONUS.pickDropType(), x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28, expiresAt: 0 });
+          g.crates.push({ id: g.crateId++, type: FORCE_DROP || BONUS.pickDropType(), x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28, expiresAt: 0 });
           io.to(room.id).emit('game-event', { kind: 'drop', x: bx });
           dirty = true;
         }
@@ -249,6 +255,7 @@ function tickRoom(room) {
           if (c.type === 'hp10' || c.type === 'hp15') t.hp = Math.min(100, t.hp + (c.type === 'hp10' ? 10 : 15));
           else if (c.type === 'x2') t.buff += 2;
           else if (c.type === 'x3') t.buff += 3;
+          else if (c.type === 'teleport') t.tele = true; // 🌀 pending — use it this turn or lose it
           else t.inv[c.type] = (t.inv[c.type] | 0) + 1;
           io.to(room.id).emit('game-event', { kind: 'crate-taken', crateId: c.id, type: c.type, x: c.x, y: c.y, by: t.id });
           dirty = true;
@@ -491,6 +498,23 @@ app.prepare().then(async () => {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
         fuel: t.fuel, p: t.power ?? 0.5,
       });
+    });
+    // 🌀 teleport: active tank spends its pending teleport to land at x (this turn only)
+    socket.on('teleport', (p) => {
+      const room = rooms.get(socket.data.roomId);
+      const g = room?.game;
+      const T = room?.sim?.T; // full bitmap (surface/waterY) — g.terrain is just a descriptor
+      if (!g || !T) return;
+      const tn = g.turn;
+      const me = g.tanks[tn.activeIdx];
+      if (!me || me.id !== socket.id || me.dead || tn.phase !== 'open' || !me.tele) return;
+      const x = Math.max(30, Math.min(T.width - 30, Math.round(Number(p?.x) || 0)));
+      const y = surfOf(T, x);
+      if (y > T.waterY - 6) return; // no watery graves — pick dry land
+      me.tele = false;
+      me.x = x; me.y = y;
+      io.to(room.id).emit('game-event', { kind: 'teleport', id: me.id, x, y });
+      broadcastGame(room.id);
     });
     // active player fires — validate turn/phase/stock, consume, relay the shot
     socket.on('fire', (p) => {
