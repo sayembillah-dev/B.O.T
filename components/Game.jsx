@@ -1577,12 +1577,30 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.strokeStyle = 'rgba(10,14,10,0.35)';
           ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.stroke();
           ctx.restore();
-          if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in
+          if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in —
+            // the held side lights up green LIVE: if pressing A/D doesn't light
+            // it, the keypress never reached the game (window not focused?)
+            const kL = keysRef.current.has('a') || keysRef.current.has('arrowleft');
+            const kR = keysRef.current.has('d') || keysRef.current.has('arrowright');
             ctx.font = '600 11.5px system-ui';
+            ctx.globalAlpha = 0.9;
+            const parts = [
+              { txt: '◀ A', on: kL },
+              { txt: ' / ', on: false },
+              { txt: 'D ▶', on: kR },
+              { txt: kL || kR ? '  steering' : '  steer', on: kL || kR },
+            ];
+            const wTot = parts.reduce((w, p) => w + ctx.measureText(p.txt).width, 0);
+            const hx = Math.max(wTot / 2 + 8, Math.min(cw - wTot / 2 - 8, t.x + dx + swayX)); // never clip off-screen at the map edge
+            const hy = gy + dy + 30;
+            let px = hx - wTot / 2;
+            ctx.textAlign = 'left';
+            for (const p of parts) {
+              ctx.fillStyle = p.on ? '#86ffab' : '#d7ecff';
+              ctx.fillText(p.txt, px, hy);
+              px += ctx.measureText(p.txt).width;
+            }
             ctx.textAlign = 'center';
-            ctx.globalAlpha = 0.85;
-            ctx.fillStyle = '#d7ecff';
-            ctx.fillText('◀ A / D ▶  steer', t.x + dx + swayX, gy + dy + 30);
             ctx.globalAlpha = 1;
           }
         }

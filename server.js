@@ -593,6 +593,7 @@ app.prepare().then(async () => {
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
       if (typeof p?.p === 'number' && isFinite(p.p)) t.power = Math.max(0, Math.min(1, p.p));
       if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
+      if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
         fuel: t.fuel, p: t.power ?? 0.5, para: t.para === true,
