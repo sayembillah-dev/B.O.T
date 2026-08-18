@@ -43,8 +43,15 @@ const BLAST_R = 58;
 const FUEL_BURN = (s) => 3.5 + 15 * (Math.abs(s) / 175); // per-second while driving
 const FUEL_REGEN = 1.8;  // per-second while not driving
 const FUEL_JUMP = 14;    // one-off jump cost (hefty — hopping is expensive)
-const TURN_TIME = 15;    // seconds per turn, then it auto-passes
+const TURN_TIME = 20;    // seconds per turn, then it auto-passes
 const WIND_MAX = 95;     // px/s² sideways push on shells at full strength
+// 🎯 guided missile — a powered cruise missile, not a lobbed shell. It climbs
+// over intervening terrain and only dives once it has a clear look at the target.
+const GUIDED_SPEED = 900;  // constant motor speed (px/s) — charge power is irrelevant
+const GUIDED_TURN = 9;     // rad/s pitch authority (≈100px turn radius at cruise)
+const GUIDED_CLEAR = 95;   // px it tries to stay above the ridgeline ahead
+const GUIDED_LOOK = 320;   // px of terrain look-ahead when picking a cruise altitude
+const GUIDED_FUEL = 6;     // s of motor burn — then it goes ballistic and drops
 const NET_HZ = 12;       // own-tank position stream rate (online)
 
 const LOCAL_EMOJI = ['🐯', '🦊', '🐸', '🐵'];
@@ -820,8 +827,11 @@ export default function Game({ gs, myId, local = 0 }) {
         // remote shell: visual only — the server's 'blast' event makes the boom
       };
       const stepProj = (p) => { // advance one shell; returns false when it's gone
-        // 🎯 guided: relentless homing onto the closest living opponent — it WILL land
-        if (p.kind === 'guided') {
+        // 🎯 guided: powered cruise missile. Aiming straight at a ground-level
+        // tank just flies it into the dirt, so it climbs to clear the ridgeline
+        // ahead and holds that altitude until it has line of sight — then dives.
+        let powered = false;
+        if (p.kind === 'guided' && (p.armed || 0) < GUIDED_FUEL) {
           let best = null, bd = Infinity;
           for (const t of tanksRef.current) {
             if (t.dead || t === p.src) continue;
@@ -829,36 +839,79 @@ export default function Game({ gs, myId, local = 0 }) {
             if (d < bd) { bd = d; best = t; }
           }
           if (best) {
-            const want = Math.atan2((best.y - 14) - p.y, best.x - p.x);
+            powered = true;
+            const tgx = best.x, tgy = (best.y ?? 0) - 14;
+            const dx = tgx - p.x;
+            const dir = Math.sign(dx) || 1;
+            // clear shot at the target? sample the straight line for solid ground
+            let los = true;
+            for (let i = 1; i < 24; i++) {
+              const f = i / 24;
+              const sx = p.x + dx * f, sy = p.y + (tgy - p.y) * f;
+              if (sx >= 0 && sx < terrain.width && sy >= 0 && isSolid(terrain, sx, sy)) { los = false; break; }
+            }
+            let want;
+            if (los || Math.abs(dx) < 60) {
+              want = Math.atan2(tgy - p.y, dx); // terminal dive — straight at them
+            } else {
+              // cruise: ride GUIDED_CLEAR above the highest ground in the corridor ahead
+              let crest = Infinity;
+              for (let s = 0; s <= GUIDED_LOOK; s += 16) {
+                const sx = Math.max(0, Math.min(terrain.width - 1, Math.round(p.x + dir * s)));
+                crest = Math.min(crest, terrain.surface[sx]);
+              }
+              const cruiseY = Math.min(crest, tgy) - GUIDED_CLEAR;
+              // steep climb when low, gentle settle when high — never a shallow
+              // beeline at a distant target (that's what used to bury it in a hill)
+              const v = Math.max(-2.4, Math.min(2.4, (cruiseY - p.y) / 90));
+              want = Math.atan2(v, dir);
+            }
             let cur = Math.atan2(p.vy, p.vx);
             let dAng = want - cur;
             while (dAng > Math.PI) dAng -= Math.PI * 2;
             while (dAng < -Math.PI) dAng += Math.PI * 2;
-            const maxTurn = 8 * dt; // rad/s — tight, but not teleporty
+            const maxTurn = GUIDED_TURN * dt;
             cur += Math.max(-maxTurn, Math.min(maxTurn, dAng));
-            const sp = Math.max(560, Math.hypot(p.vx, p.vy)); // never stalls mid-air
-            p.vx = Math.cos(cur) * sp;
-            p.vy = Math.sin(cur) * sp;
+            p.vx = Math.cos(cur) * GUIDED_SPEED; // motor holds speed — no stall, no drop
+            p.vy = Math.sin(cur) * GUIDED_SPEED;
           }
         }
-        p.vy += GRAV * dt;
-        // 🌬️ wind pushes shells sideways (guided mostly self-corrects)
-        p.vx += windRef.current * WIND_MAX * dt * (p.kind === 'guided' ? 0.35 : 1);
+        if (!powered) { // ballistic: gravity + full wind (a guided missile ignores both)
+          p.vy += GRAV * dt;
+          p.vx += windRef.current * WIND_MAX * dt;
+        }
         p.armed = (p.armed || 0) + dt;
-        // 💥 cluster: split into 3 sub-bombs near the top of the arc
+        // 💥 cluster: always cracks open IN THE AIR into 3 independently-falling
+        // bomblets. Fuse burns down, but apex or an imminent impact splits it
+        // early — it must never reach the ground as a single shell.
         if (p.kind === 'cluster') {
           p.splitT -= dt;
-          if (p.splitT <= 0 && p.vy > -140) {
+          const apex = p.vy >= 0 && p.armed > 0.15;         // tipped over the top
+          let imminent = false;                             // about to hit something
+          if (p.splitT > 0 && !apex) {
+            const sp = Math.hypot(p.vx, p.vy) || 1;
+            const nx = p.x + (p.vx / sp) * 110, ny = p.y + (p.vy / sp) * 110; // ~110px ahead
+            if (nx >= 0 && nx < terrain.width && ny >= 0 && isSolid(terrain, nx, ny)) imminent = true;
+            if (!imminent) {
+              for (const t of tanksRef.current) {
+                if (t.dead || (t === p.src && p.armed < 0.15)) continue;
+                if (Math.hypot(t.x - p.x, (t.y - 14) - p.y) < 120) { imminent = true; break; }
+              }
+            }
+          }
+          if (p.splitT <= 0 || apex || imminent) {
             const ang = Math.atan2(p.vy, p.vx);
-            const sp = Math.hypot(p.vx, p.vy) * 0.85;
-            for (const off of [-0.42, 0, 0.42]) {
+            const base = Math.hypot(p.vx, p.vy);
+            // fan of 3: outer two slower so all three land well apart
+            for (const [off, mul] of [[-0.40, 0.78], [0, 1.0], [0.40, 0.78]]) {
               subsRef.current.push({
                 x: p.x, y: p.y,
-                vx: Math.cos(ang + off) * sp, vy: Math.sin(ang + off) * sp,
+                vx: Math.cos(ang + off) * base * mul, vy: Math.sin(ang + off) * base * mul,
                 src: p.src, armed: p.armed, kind: 'sub', dmgScale: p.dmgScale, mine: p.mine,
               });
             }
             fxRef.current.muzzle(p.x, p.y, ang);
+            fxRef.current.add({ t: 'ring', x: p.x, y: p.y, size: 4, grow: 300, life: 0.35, color: 'rgba(143,208,255,0.9)' });
             fxRef.current.text(p.x, p.y - 16, 'SPLIT!', '#8fd0ff');
             sfx('split');
             return false;
@@ -893,7 +946,7 @@ export default function Game({ gs, myId, local = 0 }) {
         fxRef.current.trail(q.x - Math.cos(ang) * 8, q.y - Math.sin(ang) * 8, q.vx, q.vy);
       }
 
-      // turn timer — 15s to act (online the server passes the turn at 0)
+      // turn timer — 20s to act (online the server passes the turn at 0)
       if (turn.phase === 'open') {
         turn.time -= dt;
         if (turn.time <= 0) {
@@ -1140,6 +1193,33 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(0, 0, cw, chh);
       }
 
+      // ⏱ big turn timer — top-left, green→yellow→red, shakes in the red zone
+      if (turn.phase === 'open') {
+        const tSec = Math.max(0, turn.time);
+        const tShow = Math.ceil(tSec);
+        const tCol = tSec > 12 ? '#7fe066' : tSec > 7 ? '#ffd75e' : '#ff4d4d';
+        const inRed = tSec <= 7;
+        const shakeX = inRed ? (Math.random() - 0.5) * 6 : 0;
+        const shakeY = inRed ? (Math.random() - 0.5) * 6 : 0;
+        const tx = 16 + shakeX, ty = 54 + shakeY;
+        const tw = 84, th = 68;
+        ctx.save();
+        ctx.fillStyle = 'rgba(6,10,6,0.72)';
+        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 14); ctx.fill();
+        ctx.strokeStyle = tCol + (inRed ? 'cc' : '66');
+        ctx.lineWidth = inRed ? 2.5 : 1.5;
+        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 14); ctx.stroke();
+        ctx.fillStyle = tCol;
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 40px system-ui';
+        ctx.fillText(String(tShow), tx + tw / 2, ty + 48);
+        ctx.font = 'bold 10px system-ui';
+        ctx.globalAlpha = 0.8;
+        ctx.fillText('SEC LEFT', tx + tw / 2, ty + 61);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
       // turn banner (screen space, just below the top bar)
       const at = activeTank();
       const multi = tanksRef.current.length > 1;
@@ -1156,8 +1236,8 @@ export default function Game({ gs, myId, local = 0 }) {
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
-        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} · ⏱ ${Math.max(0, Math.ceil(turn.time))}s — A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass`;
-        bCol = turn.time < 5 ? '#ff6b4e' : '#9be15d';
+        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} — A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass`;
+        bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
       } else if (turn.phase === 'shot') {
         banner = `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
         bCol = '#8fd0ff';

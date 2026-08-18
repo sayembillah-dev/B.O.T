@@ -2,7 +2,7 @@
 //  🛡️ TANK BATTLE — server (Next.js + Socket.IO in one process)
 //  Room state lives in memory. The server is AUTHORITATIVE for online
 //  games: terrain seed + bitmap, tank spawns, HP/inventory/buffs, turn
-//  rotation + 15s timer, wind, supply-drop schedule + crate physics,
+//  rotation + 20s timer, wind, supply-drop schedule + crate physics,
 //  blast application (destroyCircle) and damage. Clients simulate
 //  physics locally for feel; the active player streams their tank and
 //  reports shot impacts; the server validates, applies, broadcasts.
@@ -51,7 +51,7 @@ function pickEmoji(room) {
 // Server-authoritative online state. Clients render + simulate locally;
 // discrete events (fire/blast/pass/collect) flow through here.
 // ─────────────────────────────────────────────────────────────────────
-const TURN_TIME_MS = 15000;   // per-turn timer, then auto-pass
+const TURN_TIME_MS = 20000;   // per-turn timer, then auto-pass
 const SETTLE_MS = 1300;       // beat after a shot resolves before next turn
 const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
 const GRAV = 850;
