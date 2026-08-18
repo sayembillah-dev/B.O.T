@@ -1786,7 +1786,7 @@ export default function Game({ gs, myId, local = 0 }) {
       // 🌀 teleport targeting — ghost landing pad under the cursor
       if (teleRef.current?.targeting && turn.phase === 'open') {
         const lx = Math.max(30, Math.min(terrain.width - 30, m.x));
-        const lgy = surf(lx);
+        const lgy = groundY(lx); // 🐛 was surf() — undefined in render scope, froze the whole rAF loop
         const okSpot = lgy <= terrain.waterY - 6;
         const col = okSpot ? '#b48cff' : '#ff6b4e';
         ctx.save();
