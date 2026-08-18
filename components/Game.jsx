@@ -69,6 +69,7 @@ const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
 const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload — seconds between shots (server enforces too)
 const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn — seconds dead before you're back
 const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) — gentle drop-in
+const PARA_DRIFT = 95;     // 🪂 steering speed (px/s) — A/D glides you to a new landing spot
 // ⚡ chaos crates are UNCOVERED — badge shows the contents, not a mystery '?'
 const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️' };
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
@@ -111,14 +112,14 @@ const rollWind = () => {
 const drawNameTag = (ctx, x, y, t) => {
   const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
   if (!label) return;
-  ctx.font = 'bold 10px system-ui';
+  ctx.font = 'bold 13px system-ui';
   ctx.textAlign = 'center';
   const w = ctx.measureText(label).width;
   ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill behind the name
-  ctx.beginPath(); ctx.roundRect(x - w / 2 - 6, y - 9.5, w + 12, 13, 6.5); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x - w / 2 - 8, y - 12.5, w + 16, 17.5, 8.5); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 0.8; ctx.stroke();
   ctx.fillStyle = 'rgba(238,242,234,0.95)';
-  ctx.fillText(label, x, y + 0.5);
+  ctx.fillText(label, x, y + 1);
 };
 
 export default function Game({ gs, myId, local = 0 }) {
@@ -797,16 +798,42 @@ export default function Game({ gs, myId, local = 0 }) {
         if (me.dead) continue;
 
         // 🪂 parachute descent (⚡ chaos spawns/respawns): gentle fixed-rate
-        //    drop with no steering — you land, THEN you fight (brief spawn cover)
+        //    drop, STEERABLE with A/D — glide left/right to pick your landing
+        //    spot. You land, THEN you fight (brief spawn cover).
         if (me.para) {
-          me.grounded = false; me.driving = false; me.s = 0; me.airVy = 0;
+          me.grounded = false; me.driving = false; me.airVy = 0;
+          if (me.id === myIdRef.current) { // steer your own drop-in (even mid-countdown)
+            const pdir = (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0);
+            me.s = pdir * PARA_DRIFT;
+            if (pdir) me.x = Math.max(24, Math.min(terrain.width - 24, me.x + me.s * dt));
+          } else {
+            me.s = 0;
+            if (onlineNow && me.netX != null) me.x += (me.netX - me.x) * Math.min(1, 10 * dt); // mirror the owner's glide
+          }
           me.y = (me.y ?? -60) + PARA_FALL * dt;
           const gyP = surf(me.x);
           if (me.y >= gyP) { // touchdown — stow the chute, kick up dust
             me.y = gyP; me.para = false; me.grounded = true;
+            me.s = 0;
             me.susVel += 10;
             fxRef.current.add({ t: 'dirt', x: me.x - 10, y: me.y - 2, vx: -40, vy: -30, size: 2.2, life: 0.5 });
             fxRef.current.add({ t: 'dirt', x: me.x + 10, y: me.y - 2, vx: 40, vy: -30, size: 2.2, life: 0.5 });
+          }
+          // 🌐 owner streams the glide so rivals see you steer down
+          if (onlineNow && me.id === myIdRef.current) {
+            netAccRef.current += dt;
+            if (netAccRef.current >= 1 / NET_HZ) {
+              netAccRef.current = 0;
+              getSocket()?.emit('tank-move', {
+                x: Math.round(me.x * 10) / 10,
+                y: Math.round((me.y ?? 0) * 10) / 10,
+                aim: me.aim,
+                s: Math.round(me.s || 0),
+                fuel: Math.round(me.fuel ?? 100),
+                p: Math.round(chargeRef.current.power * 100) / 100,
+                para: true,
+              });
+            }
           }
           continue;
         }
@@ -1550,6 +1577,14 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.strokeStyle = 'rgba(10,14,10,0.35)';
           ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.stroke();
           ctx.restore();
+          if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in
+            ctx.font = '600 11.5px system-ui';
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = 0.85;
+            ctx.fillStyle = '#d7ecff';
+            ctx.fillText('◀ A / D ▶  steer', t.x + dx + swayX, gy + dy + 30);
+            ctx.globalAlpha = 1;
+          }
         }
 
         // ⚡ chaos: bright STEADY double ring around YOUR tank — no flicker, no marching ants
@@ -1573,7 +1608,7 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.font = 'bold 11px system-ui';
             const youLabel = '▼ YOU';
             const yw = ctx.measureText(youLabel).width;
-            const yx = t.x - yw / 2 - 9, yy = gy - 112, yh = 17;
+            const yx = t.x - yw / 2 - 9, yy = gy - 116, yh = 17;
             ctx.fillStyle = 'rgba(6,8,6,0.6)'; // dark offset backplate → crisp contrast edge
             ctx.beginPath(); ctx.roundRect(yx + 1.5, yy + 1.5, yw + 18, yh, 8.5); ctx.fill();
             ctx.fillStyle = '#ffd75e'; // solid bright gold — steady on purpose
