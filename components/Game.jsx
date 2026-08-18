@@ -1347,7 +1347,7 @@ export default function Game({ gs, myId, local = 0 }) {
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
-        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} — A/D drive · W jump · scroll power · click fire · 1-4 shell · Enter pass`;
+        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
         bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
       } else if (turn.phase === 'shot') {
         banner = `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
@@ -1508,6 +1508,20 @@ export default function Game({ gs, myId, local = 0 }) {
     return (windUi > 0 ? '▶' : '◀').repeat(n);
   })();
 
+  // ⌨️ little keyboard-key cap for the controls hint
+  const kbd = (label) => (
+    <kbd style={{
+      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.25)',
+      borderBottomWidth: 2, borderRadius: 4, padding: '0 4px', marginRight: 2,
+      fontSize: '0.66rem', fontFamily: 'inherit', fontWeight: 700, lineHeight: 1.6,
+    }}>{label}</kbd>
+  );
+  const ctl = (keys, verb) => ( // key cap(s) + tiny verb, e.g. [A][D] drive
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      {keys.map((k) => kbd(k))}<span style={{ marginLeft: 2 }}>{verb}</span>
+    </span>
+  );
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#0a0d09', overflow: 'hidden' }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'none' }} />
@@ -1525,15 +1539,6 @@ export default function Game({ gs, myId, local = 0 }) {
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
         <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
-        <code style={{
-          background: 'rgba(255,255,255,0.1)', borderRadius: 6,
-          padding: '0.15rem 0.5rem', fontSize: '0.8rem',
-        }}>seed {seed}</code>
-        <span style={{
-          background: local > 0 ? 'rgba(127,200,255,0.15)' : online ? 'rgba(155,225,93,0.15)' : 'rgba(255,210,80,0.15)',
-          color: local > 0 ? '#7fc8ff' : online ? '#9be15d' : '#ffd250', borderRadius: 6,
-          padding: '0.15rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
-        }}>{local > 0 ? `HOT-SEAT ${roster.length}P` : online ? `ONLINE ${roster.length}P` : 'SOLO DEV'}</span>
         {ready && (
           <span
             title={`wind ${windUi > 0 ? '→' : windUi < 0 ? '←' : 'calm'} (${Math.round(Math.abs(windUi) * 100)}%)`}
@@ -1550,7 +1555,17 @@ export default function Game({ gs, myId, local = 0 }) {
             padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
           }}>ROUND {match.round}/{match.roundsTotal}</span>
         )}
-        <span style={{ fontSize: '0.8rem', opacity: 0.75 }}>A/D drive · W jump · scroll power · click fire · 1-4 shell · Enter pass</span>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+          fontSize: '0.68rem', opacity: 0.85, whiteSpace: 'nowrap',
+        }}>
+          {ctl(['A', 'D'], 'drive')}
+          {ctl(['W'], 'jump')}
+          {ctl(['⇅'], 'power')}
+          {ctl(['🖱️'], 'fire')}
+          {ctl(['1–4'], 'shell')}
+          {ctl(['⏎'], 'pass')}
+        </span>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
         <button className="btn" onClick={cycleColor}>🎨 {colorName}</button>
