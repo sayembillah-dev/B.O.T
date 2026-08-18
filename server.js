@@ -128,6 +128,9 @@ function serializeGame(room, full = false) {
   const g = room.game;
   if (!g) return null;
   const out = full ? { ...g } : (({ blasts, ...rest }) => rest)(g);
+  // 🎁 mystery crates: never broadcast the contents — the type is revealed
+  //    only on pickup (crate-taken) or when the crate expires (crate-expire)
+  if (out.crates) out.crates = out.crates.map(({ type, ...pub }) => pub);
   out.hostId = room.hostId;               // clients gate host-only UI on this
   out.match = room.match ? { ...room.match } : null; // round/wins scoreboard
   return out;
@@ -231,7 +234,7 @@ function tickRoom(room) {
         if (!c.expiresAt) c.expiresAt = now + CRATE_TTL_MS; // ⏳ 1 minute on the ground, then gone
         if (now > c.expiresAt) {
           c.taken = true;
-          io.to(room.id).emit('game-event', { kind: 'crate-expire', x: c.x, y: c.y - 14 });
+          io.to(room.id).emit('game-event', { kind: 'crate-expire', type: c.type, x: c.x, y: c.y - 14 }); // 🎁 reveal what was lost
           continue;
         }
       } else {

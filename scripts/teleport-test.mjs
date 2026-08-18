@@ -59,8 +59,9 @@ for (let i = 0; i < 600 && !crate; i++) { // up to 90s (first drop ~10s + fall)
   crate = state.crates?.find((c) => c.landed && !c.taken) ?? null;
 }
 if (!crate) fail('no landed crate within 90s');
-if (crate.type !== 'teleport') fail(`crate is ${crate.type} — server started without FORCE_DROP=teleport?`);
-console.log(`📦 teleport crate landed at x=${Math.round(crate.x)} — driving the active tank onto it`);
+// 🎁 mystery crates: the type stays secret until pickup — the crate-taken
+//    assert below is what verifies the server runs FORCE_DROP=teleport
+console.log(`📦 mystery crate landed at x=${Math.round(crate.x)} — driving the active tank onto it`);
 
 let taken = null;
 for (let i = 0; i < 100 && !taken; i++) {

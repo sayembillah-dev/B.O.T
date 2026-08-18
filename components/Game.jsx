@@ -122,6 +122,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const projRef = useRef(null);
   const subsRef = useRef([]);        // cluster sub-munitions
   const bonusRef = useRef([]);       // supply-drop crates (falling + landed)
+  const streaksRef = useRef([]);     // 🌬️ ambient wind streaks in the sky
   const dropTRef = useRef(10);       // countdown to the next supply drop (local modes)
   const crateIdRef = useRef(0);
   const selRef = useRef('normal');   // selected shell for the next shot
@@ -184,6 +185,7 @@ export default function Game({ gs, myId, local = 0 }) {
     subsRef.current = [];
     bonusRef.current = [];
     dropTRef.current = 10;
+    streaksRef.current = []; // 🌬️ fresh sky for a fresh battle
     chargeRef.current = { power: 0.5 };
     selRef.current = 'normal';
     teleRef.current = null; setTeleUi(null); // 🌀 fresh game, no pending teleports
@@ -663,8 +665,8 @@ export default function Game({ gs, myId, local = 0 }) {
       } else if (e.kind === 'crate-boom') {
         fxRef.current.text(e.x, e.y - 16, '📦 destroyed', '#ffb45e');
         sfx('crunch');
-      } else if (e.kind === 'crate-expire') { // ⏳ sat on the ground for 60s
-        fxRef.current.text(e.x, e.y - 16, '📦 expired', '#9fb08f');
+      } else if (e.kind === 'crate-expire') { // ⏳ sat on the ground for 60s — reveal what was inside
+        fxRef.current.text(e.x, e.y - 16, def ? `📦 was ${def.label} ${def.name}!` : '📦 expired', def?.color ?? '#9fb08f');
         for (let i = 0; i < 7; i++) {
           fxRef.current.smoke(e.x + (Math.random() - 0.5) * 18, e.y - 12,
             (Math.random() - 0.5) * 30, -25 - Math.random() * 30, 4 + Math.random() * 4, 0.7 + Math.random() * 0.4);
@@ -949,7 +951,8 @@ export default function Game({ gs, myId, local = 0 }) {
             b.expire -= dt;
             if (b.expire <= 0) {
               b.taken = true;
-              fxRef.current.text(b.x, b.y - 30, '📦 expired', '#9fb08f');
+              const defX = BONUS_DEFS[b.type]; // 🎁 reveal what was lost
+              fxRef.current.text(b.x, b.y - 30, defX ? `📦 was ${defX.label} ${defX.name}!` : '📦 expired', defX?.color ?? '#9fb08f');
               for (let i = 0; i < 7; i++) {
                 fxRef.current.smoke(b.x + (Math.random() - 0.5) * 18, b.y - 12,
                   (Math.random() - 0.5) * 30, -25 - Math.random() * 30, 4 + Math.random() * 4, 0.7 + Math.random() * 0.4);
@@ -1182,6 +1185,30 @@ export default function Game({ gs, myId, local = 0 }) {
         if (turn.settle <= 0) advanceTurn();
       }
 
+      // ── 🌬️ wind streaks: ambient speed-lines in the sky — density, speed
+      //    and direction all follow this turn's wind (calm air = none) ──
+      {
+        const w = windRef.current, aw = Math.abs(w);
+        const ss = streaksRef.current;
+        const target = Math.round(aw * 26);
+        while (ss.length < target) ss.push({ x: Math.random() * terrain.width, y: 30, len: 20, sp: 0.6 + Math.random() * 0.9, ph: Math.random() * 6.28, amp: 4 + Math.random() * 9, fresh: true });
+        if (ss.length > target) ss.length = target;
+        const upwind = w > 0 ? -50 : terrain.width + 50;
+        for (const s of ss) {
+          s.x += w * 320 * s.sp * dt;
+          const cx = Math.max(30, Math.min(terrain.width - 30, s.x));
+          if (s.fresh || s.x < -70 || s.x > terrain.width + 70 || s.y > Math.min(surf(cx), terrain.waterY) - 28) {
+            // (re)spawn at the upwind edge (fresh spawns scatter map-wide)
+            if (!s.fresh) s.x = upwind;
+            s.fresh = false;
+            const gx = Math.max(30, Math.min(terrain.width - 30, s.x));
+            const ceiling = Math.min(surf(gx), terrain.waterY) - 40;
+            s.y = 20 + Math.random() * Math.max(40, ceiling - 40);
+            s.len = (14 + Math.random() * 24) * (0.5 + aw);
+          }
+        }
+      }
+
       fxRef.current.update(dt);
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 1.6);
       if (whiteRef.current > 0) whiteRef.current = Math.max(0, whiteRef.current - dt * 0.7); // ☢️ flash fades slowly
@@ -1225,6 +1252,27 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.translate(ox, oy);
       ctx.scale(scale, scale);
 
+      // 🌬️ wind streaks — faint speed-lines drifting across the sky; you read
+      //    direction, strength and gusts at a glance while aiming
+      {
+        const w = windRef.current, aw = Math.abs(w);
+        if (aw > 0.04) {
+          const dir = w > 0 ? 1 : -1;
+          ctx.lineWidth = 1.7;
+          ctx.lineCap = 'round';
+          for (const s of streaksRef.current) {
+            const wob = Math.sin(now * 0.0035 + s.ph) * s.amp * 0.4;
+            ctx.strokeStyle = `rgba(200,225,255,${(0.06 + 0.15 * aw) * (0.55 + s.sp * 0.45)})`;
+            ctx.beginPath();
+            ctx.moveTo(s.x, s.y + wob);
+            ctx.quadraticCurveTo(
+              s.x - dir * s.len * 0.5, s.y + wob + Math.sin(now * 0.0035 + s.ph + 1.2) * 3.5,
+              s.x - dir * s.len, s.y + wob * 0.4);
+            ctx.stroke();
+          }
+        }
+      }
+
       fxRef.current.draw(ctx, 'back'); // smoke behind tanks
 
       const active = activeTank();
@@ -1234,7 +1282,8 @@ export default function Game({ gs, myId, local = 0 }) {
       // ground (pulsing glow box), always visible
       for (const b of bonusRef.current) {
         if (b.taken) continue;
-        const def = BONUS_DEFS[b.type];
+        // 🎁 mystery crate — contents hidden until pickup or expiry
+        const MC = '#ffcf6e';
         const pulse = 0.6 + 0.4 * Math.sin(now * 0.006 + b.bob);
         // ⏳ expiry blink — landed crates flash during their last 5s (local crates
         // count down b.expire; online crates carry the server's expiresAt stamp)
@@ -1253,7 +1302,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.stroke();
         } else {
           ctx.globalAlpha = 0.3 * pulse * blink; // landed glow halo
-          ctx.fillStyle = def.color;
+          ctx.fillStyle = MC;
           ctx.beginPath(); ctx.arc(b.x, b.y - 14, 18, 0, Math.PI * 2); ctx.fill();
           ctx.globalAlpha = 1;
         }
@@ -1261,13 +1310,13 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.globalAlpha = blink;
         ctx.fillStyle = 'rgba(10,13,9,0.9)';
         ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 6); ctx.fill();
-        ctx.strokeStyle = def.color;
+        ctx.strokeStyle = MC;
         ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 6); ctx.stroke();
-        ctx.fillStyle = def.color;
-        ctx.font = 'bold 12px system-ui';
+        ctx.fillStyle = MC;
+        ctx.font = 'bold 14px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(def.label, b.x, cy + 4);
+        ctx.fillText('?', b.x, cy + 5);
         ctx.globalAlpha = 1;
       }
 

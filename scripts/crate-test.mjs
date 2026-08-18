@@ -38,6 +38,8 @@ b.on('game-event', (e) => {
     const stayed = ((Date.now() - landedAt) / 1000).toFixed(1);
     console.log(`⏳ crate expired after staying ${stayed}s on the ground`);
     if (!landedAt) fail('expire before land?!');
+    if (!e.type) fail('🎁 expire did not reveal the hidden crate contents (no type)');
+    console.log(`🎁 revealed on expiry: it was a ${e.type} crate`);
     const secs = (Date.now() - landedAt) / 1000;
     if (secs < 55 || secs > 66) fail(`crate lifetime ${secs}s — expected ~60s`);
     console.log('🎉 crate TTL OK (~60s)');
