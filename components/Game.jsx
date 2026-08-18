@@ -52,6 +52,15 @@ const GUIDED_TURN = 9;     // rad/s pitch authority (≈100px turn radius at cru
 const GUIDED_CLEAR = 95;   // px it tries to stay above the ridgeline ahead
 const GUIDED_LOOK = 320;   // px of terrain look-ahead when picking a cruise altitude
 const GUIDED_FUEL = 6;     // s of motor burn — then it goes ballistic and drops
+// 🎥 shell cam — world-space widths the camera tries to frame (px). Smaller =
+// tighter zoom. It never zooms out past the whole-map fit, so small maps are safe.
+const CAM_SHELL_W = 1200;  // riding a shell in flight
+const CAM_BOOM_W = 950;    // holding on an ordinary crater
+const CAM_BIG_W = 1500;    // holding on a tomahawk — wide enough for the mushroom
+const CAM_BOOM_HOLD = 0.8; // s to linger on an ordinary blast
+const CAM_BIG_HOLD = 1.6;  // s to linger on a tomahawk
+// ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
+const COUNTDOWN_TOTAL = 3.6;
 const NET_HZ = 12;       // own-tank position stream rate (online)
 
 const LOCAL_EMOJI = ['🐯', '🦊', '🐸', '🐵'];
@@ -65,11 +74,29 @@ const rollWind = () => {
   return Math.sign(w) * Math.pow(Math.abs(w), 0.7);
 };
 
+/** Small name tag floating above a tank (world-space) — stroked for legibility over any terrain. */
+const drawNameTag = (ctx, x, y, t) => {
+  const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
+  if (!label) return;
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = 'rgba(8,11,7,0.85)';
+  ctx.strokeText(label, x, y);
+  ctx.fillStyle = 'rgba(232,236,228,0.92)';
+  ctx.fillText(label, x, y);
+};
+
 export default function Game({ gs, myId, local = 0 }) {
   const canvasRef = useRef(null);
   const terrainCanvasRef = useRef(null);
   const terrainRef = useRef(null);
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 });
+  // 🎥 shell cam — smoothed camera that rides the shell and holds on the impact
+  const camRef = useRef({ x: 0, y: 0, scale: 0, init: false, hold: 0, hx: 0, hy: 0, hw: 0, hbig: false });
+  // ⏳ pre-round "3, 2, 1, FIGHT!" — remaining seconds; input/turn-timer freeze while > 0
+  const countdownRef = useRef(0);
+  const cdLabelRef = useRef(null); // last shown label, so the tick/FIGHT sfx fires once per beat
   const tanksRef = useRef([]);
   const aimRef = useRef(-0.6);
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -142,6 +169,8 @@ export default function Game({ gs, myId, local = 0 }) {
     whiteRef.current = 0;
     blastsDoneRef.current = [];
     lastShotMineRef.current = false;
+    countdownRef.current = COUNTDOWN_TOTAL;
+    cdLabelRef.current = null;
     turnRef.current = { num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME };
     numRef.current = 1;
     fxRef.current = new FX();
@@ -323,6 +352,16 @@ export default function Game({ gs, myId, local = 0 }) {
     reflowSky(terrain, x, y, r + 16); // craters are open to the sky — no black
     const reg = renderTerrainRegion(terrain, x - r - 16, y - r - 16, (r + 16) * 2, (r + 16) * 2);
     off.getContext('2d').putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
+    // 🎥 hold the shell cam on the impact so the blast is actually watched.
+    // A big blast outranks an ordinary one (cluster bomblets can't steal focus).
+    const cam = camRef.current;
+    if (opts.big || !(cam.hbig && cam.hold > 0)) {
+      cam.hold = opts.big ? CAM_BIG_HOLD : CAM_BOOM_HOLD;
+      cam.hw = opts.big ? CAM_BIG_W : CAM_BOOM_W;
+      cam.hx = x;
+      cam.hy = opts.big ? y - 120 : y; // bias up so the mushroom is framed
+      cam.hbig = !!opts.big;
+    }
     if (opts.big) { // ☢️ tomahawk: mushroom cloud + white screen + mega shake + huge ring
       fxRef.current.mushroom(x, y);
       fxRef.current.add({ t: 'ring', x, y, size: 14, grow: 1500, life: 0.9, color: 'rgba(255,250,235,0.9)' });
@@ -561,6 +600,14 @@ export default function Game({ gs, myId, local = 0 }) {
       const ch = chargeRef.current;
       const onlineNow = onlineRef.current;
       fxRef.current.wind = windRef.current; // 🌬️ smoke drifts with the wind
+
+      // ⏳ pre-round countdown — ticks down once, freezes input + the turn timer
+      if (countdownRef.current > 0) {
+        countdownRef.current = Math.max(0, countdownRef.current - dt);
+        const cd = countdownRef.current;
+        const label = cd > 2.6 ? '3' : cd > 1.6 ? '2' : cd > 0.6 ? '1' : cd > 0 ? 'FIGHT!' : null;
+        if (label !== cdLabelRef.current) { cdLabelRef.current = label; if (label) sfx(label === 'FIGHT!' ? 'go' : 'tick'); }
+      }
       if (ch.on) ch.power = Math.min(1, ch.power + dt / CHARGE_TIME);
       const active = activeTank();
       const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
@@ -606,7 +653,8 @@ export default function Game({ gs, myId, local = 0 }) {
         }
 
         // act only while the turn is OPEN — and charging locks the wheels
-        const mine = me === active && turn.phase === 'open' && !ch.on && (!onlineNow || me.id === myIdRef.current);
+        const mine = me === active && turn.phase === 'open' && !ch.on && countdownRef.current <= 0
+          && (!onlineNow || me.id === myIdRef.current);
         const dir = mine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
         me.driving = false; // proves itself below when the engine actually pushes
 
@@ -946,8 +994,9 @@ export default function Game({ gs, myId, local = 0 }) {
         fxRef.current.trail(q.x - Math.cos(ang) * 8, q.y - Math.sin(ang) * 8, q.vx, q.vy);
       }
 
-      // turn timer — 20s to act (online the server passes the turn at 0)
-      if (turn.phase === 'open') {
+      // turn timer — 20s to act (online the server passes the turn at 0).
+      // Frozen during the pre-round countdown so it isn't eaten by "3, 2, 1".
+      if (turn.phase === 'open' && countdownRef.current <= 0) {
         turn.time -= dt;
         if (turn.time <= 0) {
           if (onlineNow) turn.time = 0;
@@ -978,11 +1027,11 @@ export default function Game({ gs, myId, local = 0 }) {
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
       update(dt);
-      render(now);
+      render(now, dt);
       raf = requestAnimationFrame(frame);
     };
 
-    const render = (now) => {
+    const render = (now, dt) => {
       const canvas = canvasRef.current;
       const off = terrainCanvasRef.current;
       const terrain = terrainRef.current;
@@ -998,9 +1047,48 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#0a0d09';
       ctx.fillRect(0, 0, cw, chh);
-      const scale = Math.min(cw / off.width, chh / off.height) * 0.985;
-      const ox = (cw - off.width * scale) / 2;
-      const oy = (chh - off.height * scale) / 2;
+      // ── 🎥 shell cam ─────────────────────────────────────────────────
+      // Idle it frames the whole map (identical to the old fixed view, so
+      // aiming is untouched). While a shell is up it rides along zoomed in,
+      // then lingers on the crater before easing back out.
+      const cam = camRef.current;
+      const fitScale = Math.min(cw / off.width, chh / off.height) * 0.985;
+      if (turnRef.current.phase === 'open') cam.hold = 0; // never pan while aiming
+      else if (cam.hold > 0) cam.hold = Math.max(0, cam.hold - dt);
+
+      let lead = projRef.current;
+      if (!lead && subsRef.current.length) { // cluster: frame the bomblets together
+        let sx = 0, sy = 0;
+        for (const s of subsRef.current) { sx += s.x; sy += s.y; }
+        lead = { x: sx / subsRef.current.length, y: sy / subsRef.current.length };
+      }
+      // target: whole map by default, else frame a world-width around the action.
+      // Math.max keeps it from ever zooming out past the map fit.
+      let tx, ty, tScale;
+      if (lead) {
+        tx = lead.x; ty = lead.y; tScale = Math.max(fitScale, cw / CAM_SHELL_W);
+      } else if (cam.hold > 0) {
+        tx = cam.hx; ty = cam.hy; tScale = Math.max(fitScale, cw / cam.hw);
+      } else { // idle — exactly the old fixed fit view, so aiming is unchanged
+        tx = off.width / 2; ty = off.height / 2; tScale = fitScale;
+      }
+      if (!cam.init) { cam.x = tx; cam.y = ty; cam.scale = tScale; cam.init = true; }
+      // exponential smoothing — framerate-independent, snappier while chasing
+      const kPos = 1 - Math.exp(-(lead ? 10 : 5) * dt);
+      const kZoom = 1 - Math.exp(-(lead ? 4.5 : 4) * dt);
+      cam.x += (tx - cam.x) * kPos;
+      cam.y += (ty - cam.y) * kPos;
+      cam.scale += (tScale - cam.scale) * kZoom;
+
+      const scale = cam.scale;
+      // keep the viewport inside the map; centre any axis the map can't fill
+      const halfW = cw / (2 * scale), halfH = chh / (2 * scale);
+      const cx = off.width <= halfW * 2 ? off.width / 2
+        : Math.max(halfW, Math.min(off.width - halfW, cam.x));
+      const cy = off.height <= halfH * 2 ? off.height / 2
+        : Math.max(halfH, Math.min(off.height - halfH, cam.y));
+      const ox = cw / 2 - cx * scale;
+      const oy = chh / 2 - cy * scale;
       viewRef.current = { scale, ox, oy };
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -1060,6 +1148,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.textAlign = 'center';
           ctx.fillText('💀', t.x, gyD - 26 + bob);
           ctx.globalAlpha = 1;
+          drawNameTag(ctx, t.x, gyD - 42 + bob, t);
           continue;
         }
         const isActive = t === active;
@@ -1086,6 +1175,8 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.lineTo(t.x + 6.5, gy - 75 + bob);
           ctx.closePath(); ctx.fill();
         }
+
+        drawNameTag(ctx, t.x + dx, gy - 82 + dy, t);
 
         // charge ring + dotted aim guide
         if (isActive && chargeRef.current.on) {
@@ -1255,6 +1346,32 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.fillStyle = bCol;
       ctx.textAlign = 'center';
       ctx.fillText(banner, cw / 2, 62);
+
+      // ⏳ pre-round countdown — "3, 2, 1, FIGHT!" dead centre, on top of everything
+      const cd = countdownRef.current;
+      if (cd > 0) {
+        const segT = cd > 2.6 ? cd - 2.6 : cd > 1.6 ? cd - 1.6 : cd > 0.6 ? cd - 0.6 : cd; // s left in this beat
+        const segDur = cd > 0.6 ? 1 : 0.6;
+        const label = cd > 2.6 ? '3' : cd > 1.6 ? '2' : cd > 0.6 ? '1' : 'FIGHT!';
+        const col = cd > 2.6 ? '#e8ece4' : cd > 1.6 ? '#ffd75e' : cd > 0.6 ? '#ff6b4e' : '#7fe066';
+        const justIn = Math.min(1, 1 - segT / segDur); // 0 → 1 over the first slice of the beat
+        const pop = 1 + 0.55 * Math.max(0, 1 - justIn * 4.5); // quick punch-in, settles fast
+        ctx.save();
+        ctx.fillStyle = 'rgba(4,7,4,0.32)';
+        ctx.fillRect(0, 0, cw, chh);
+        ctx.globalAlpha = Math.min(1, justIn * 6); // quick fade-in per beat, no fade-out (hard swap reads snappier)
+        ctx.translate(cw / 2, chh / 2);
+        ctx.scale(pop, pop);
+        ctx.font = label === 'FIGHT!' ? 'bold 90px system-ui' : 'bold 140px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = 'rgba(4,7,4,0.85)';
+        ctx.strokeText(label, 0, 0);
+        ctx.fillStyle = col;
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
     };
 
     raf = requestAnimationFrame(frame);
@@ -1293,7 +1410,7 @@ export default function Game({ gs, myId, local = 0 }) {
       aimRef.current = Math.atan2(w.y - pv.y, w.x - pv.x);
     };
     const onDown = (e) => {
-      if (e.button !== 0 || !ready || projRef.current || turnRef.current.phase !== 'open') return;
+      if (e.button !== 0 || !ready || projRef.current || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
       const me = activeTank();
       if (!me || me.dead) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // your turn, your tank
@@ -1326,6 +1443,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (down) keysRef.current.add(k); else keysRef.current.delete(k);
       }
       if (!down) return;
+      if (countdownRef.current > 0) return; // no acting until "FIGHT!"
       if (k === 'enter' && turnRef.current.phase === 'open') {
         e.preventDefault(); // pass the turn to the next player
         if (onlineRef.current) getSocket()?.emit('pass-turn');
