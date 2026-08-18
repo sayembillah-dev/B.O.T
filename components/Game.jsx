@@ -10,13 +10,13 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
 
 /**
  * 🛡️ TANK BATTLE — Worms-style, side-view destructible terrain, zero sprites.
- * mouse aims (free, live), HOLD left button to charge power, release to fire.
+ * mouse aims (free, live), scroll to set power, click to fire.
  *
  * 🔁 TURNS + FUEL — a turn is OPEN (act) → shot → settle → next player.
- * Moving and shooting are mutually exclusive WITHOUT a mode key: charging can
- * only start while parked (grounded, near-zero speed), and drive/jump input is
- * ignored while charging. Firing ends the turn; Enter passes. Fuel burns while
- * driving/jumping and regenerates slowly; empty tank = engine dead.
+ * Power carries across the turn (scroll to adjust any time); firing only
+ * requires being parked (grounded, near-zero speed) at the moment you click.
+ * Firing ends the turn; Enter passes. Fuel burns while driving/jumping and
+ * regenerates slowly; empty tank = engine dead.
  *
  * 🌬️ WIND (milestone 9) — rolled fresh every turn, shown in the top bar.
  * Pushes shells sideways (guided resists), sways parachuting crates, and
@@ -37,7 +37,7 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * 🔊 SFX — procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
  */
 const GRAV = 850;
-const CHARGE_TIME = 1.15;          // s to full power
+const POWER_SCROLL = 0.0009;       // power change per wheel-delta unit
 const SPEED = (p) => 300 + p * 1200; // more push — full power really launches
 const BLAST_R = 58;
 const FUEL_BURN = (s) => 3.5 + 15 * (Math.abs(s) / 175); // per-second while driving
@@ -100,7 +100,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const tanksRef = useRef([]);
   const aimRef = useRef(-0.6);
   const mouseRef = useRef({ x: 0, y: 0 });
-  const chargeRef = useRef({ on: false, power: 0 });
+  const chargeRef = useRef({ power: 0.5 });
   const projRef = useRef(null);
   const subsRef = useRef([]);        // cluster sub-munitions
   const bonusRef = useRef([]);       // supply-drop crates (falling + landed)
@@ -164,7 +164,7 @@ export default function Game({ gs, myId, local = 0 }) {
     subsRef.current = [];
     bonusRef.current = [];
     dropTRef.current = 10;
-    chargeRef.current = { on: false, power: 0 };
+    chargeRef.current = { power: 0.5 };
     selRef.current = 'normal';
     whiteRef.current = 0;
     blastsDoneRef.current = [];
@@ -316,7 +316,7 @@ export default function Game({ gs, myId, local = 0 }) {
     const tn = turnRef.current;
     const ts = tanksRef.current;
     if (!ts.length || tn.phase === 'over') return;
-    chargeRef.current = { on: false, power: 0 };
+    chargeRef.current = { power: 0.5 };
     selRef.current = 'normal'; // weapon pick doesn't carry across turns
     setSelUi('normal');
     if (checkGameOver()) return;
@@ -597,7 +597,6 @@ export default function Game({ gs, myId, local = 0 }) {
     const update = (dt) => {
       const terrain = terrainRef.current;
       const turn = turnRef.current;
-      const ch = chargeRef.current;
       const onlineNow = onlineRef.current;
       fxRef.current.wind = windRef.current; // 🌬️ smoke drifts with the wind
 
@@ -608,7 +607,6 @@ export default function Game({ gs, myId, local = 0 }) {
         const label = cd > 2.6 ? '3' : cd > 1.6 ? '2' : cd > 0.6 ? '1' : cd > 0 ? 'FIGHT!' : null;
         if (label !== cdLabelRef.current) { cdLabelRef.current = label; if (label) sfx(label === 'FIGHT!' ? 'go' : 'tick'); }
       }
-      if (ch.on) ch.power = Math.min(1, ch.power + dt / CHARGE_TIME);
       const active = activeTank();
       const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
       const slope = (x) => Math.atan2(surf(x + 8) - surf(x - 8), 16);
@@ -652,8 +650,8 @@ export default function Game({ gs, myId, local = 0 }) {
           continue;
         }
 
-        // act only while the turn is OPEN — and charging locks the wheels
-        const mine = me === active && turn.phase === 'open' && !ch.on && countdownRef.current <= 0
+        // act only while the turn is OPEN
+        const mine = me === active && turn.phase === 'open' && countdownRef.current <= 0
           && (!onlineNow || me.id === myIdRef.current);
         const dir = mine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
         me.driving = false; // proves itself below when the engine actually pushes
@@ -1178,8 +1176,9 @@ export default function Game({ gs, myId, local = 0 }) {
 
         drawNameTag(ctx, t.x + dx, gy - 82 + dy, t);
 
-        // charge ring + dotted aim guide
-        if (isActive && chargeRef.current.on) {
+        // power ring + dotted aim guide — always visible on your turn (power is set by scroll)
+        if (isActive && turn.phase === 'open' && countdownRef.current <= 0
+          && (!onlineRef.current || t.id === myIdRef.current)) {
           const p = chargeRef.current.power;
           const pv = pivotOf(t);
           ctx.lineWidth = 5;
@@ -1191,11 +1190,17 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.font = 'bold 13px system-ui';
           ctx.textAlign = 'center';
           ctx.fillText(`${Math.round(p * 100)}%`, pv.x + dx, pv.y + dy - 40);
+          // dotted arc actually traces the shot's parabola, so it bends flatter/steeper as power changes
           const a = aimRef.current;
           const tip = muzzleOf(t, a);
+          const v = SPEED(Math.max(0.06, p));
+          const vx = Math.cos(a) * v, vy0 = Math.sin(a) * v;
           ctx.fillStyle = 'rgba(255,255,255,0.55)';
-          for (let d = 12; d <= 80; d += 17) {
-            ctx.beginPath(); ctx.arc(tip.x + Math.cos(a) * d, tip.y + Math.sin(a) * d, 1.6, 0, Math.PI * 2); ctx.fill();
+          for (let i = 1; i <= 9; i++) {
+            const dt2 = i * 0.09;
+            const dx2 = vx * dt2;
+            const dy2 = vy0 * dt2 + 0.5 * GRAV * dt2 * dt2;
+            ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, 1.6, 0, Math.PI * 2); ctx.fill();
           }
         }
 
@@ -1327,7 +1332,7 @@ export default function Game({ gs, myId, local = 0 }) {
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
-        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} — A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass`;
+        banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num} — A/D drive · W jump · scroll power · click fire · 1-4 shell · Enter pass`;
         bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
       } else if (turn.phase === 'shot') {
         banner = `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
@@ -1378,7 +1383,7 @@ export default function Game({ gs, myId, local = 0 }) {
     return () => cancelAnimationFrame(raf);
   }, [ready, myId, explode, explodeTerrain, fire, advanceTurn]);
 
-  // ── input: aim always, hold to charge, release to fire ──
+  // ── input: aim always, scroll to set power, click to fire ──
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1414,7 +1419,7 @@ export default function Game({ gs, myId, local = 0 }) {
       const me = activeTank();
       if (!me || me.dead) return;
       if (onlineRef.current && me.id !== myIdRef.current) return; // your turn, your tank
-      // no shooting on the move: must be parked on the ground to charge
+      // no shooting on the move: must be parked on the ground to fire
       if (!me.grounded || Math.abs(me.s) > 12) {
         if ((me.stopT || 0) <= 0) {
           me.stopT = 1.5;
@@ -1423,18 +1428,15 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return;
       }
-      chargeRef.current = { on: true, power: 0 };
-    };
-    const onUp = () => {
-      if (!chargeRef.current.on) return;
-      chargeRef.current.on = false;
       fire();
     };
     const onCtx = (e) => e.preventDefault();
-    const onWheel = (e) => { // while holding LMB: scroll fine-tunes charge power
-      if (!chargeRef.current.on) return;
+    const onWheel = (e) => { // scroll sets power — any time it's your turn, no need to hold
+      const me = activeTank();
+      if (!me || me.dead || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
+      if (onlineRef.current && me.id !== myIdRef.current) return;
       e.preventDefault();
-      chargeRef.current.power = Math.max(0, Math.min(1, chargeRef.current.power - e.deltaY * 0.0009));
+      chargeRef.current.power = Math.max(0, Math.min(1, chargeRef.current.power - e.deltaY * POWER_SCROLL));
     };
     const onKey = (e, down) => {
       const k = e.key.toLowerCase();
@@ -1455,7 +1457,6 @@ export default function Game({ gs, myId, local = 0 }) {
     const onKeyUp = (e) => onKey(e, false);
     canvas.addEventListener('mousemove', onMove);
     canvas.addEventListener('mousedown', onDown);
-    window.addEventListener('mouseup', onUp);
     canvas.addEventListener('contextmenu', onCtx);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', onKeyDown);
@@ -1463,7 +1464,6 @@ export default function Game({ gs, myId, local = 0 }) {
     return () => {
       canvas.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mousedown', onDown);
-      window.removeEventListener('mouseup', onUp);
       canvas.removeEventListener('contextmenu', onCtx);
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
@@ -1535,7 +1535,7 @@ export default function Game({ gs, myId, local = 0 }) {
             padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
           }}>ROUND {match.round}/{match.roundsTotal}</span>
         )}
-        <span style={{ fontSize: '0.8rem', opacity: 0.75 }}>A/D drive · W jump · hold LMB fire · 1-4 shell · Enter pass</span>
+        <span style={{ fontSize: '0.8rem', opacity: 0.75 }}>A/D drive · W jump · scroll power · click fire · 1-4 shell · Enter pass</span>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
         <button className="btn" onClick={cycleColor}>🎨 {colorName}</button>
