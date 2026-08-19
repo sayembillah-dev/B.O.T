@@ -2,24 +2,18 @@
 
 Worms-style artillery on fully destructible terrain - wind, supply drops, special shells, hot-seat or online rooms. Everything is procedural: terrain, tanks, particles, even the sound effects. Zero art assets, zero accounts, zero database.
 
+<img width="1920" height="1080" alt="SCR-20260819-ktyg" src="https://github.com/user-attachments/assets/90f7d527-6c77-448d-b2d7-8e2e69cac99f" />
+
+
 Next.js + Socket.IO run in **one Node process**: the same server serves the pages and referees the realtime game.
-
-## Screenshots
-
-<!-- 📸 Images are hosted on GitHub user-attachments: drag each screenshot into any
-     issue/PR comment box, copy the generated https://github.com/user-attachments/...
-     URL, and paste it over the matching PASTE_..._HERE placeholder below.
-     (Uploading is instant - no need to submit the issue.) -->
-
-![B.O.T - battle of tanks](PASTE_HERO_IMAGE_HERE)
 
 | 🏠 Home | 👥 Lobby | ⚔️ Classic battle |
 | :-: | :-: | :-: |
-| ![Home menu](PASTE_HOME_IMAGE_HERE) | ![Lobby](PASTE_LOBBY_IMAGE_HERE) | ![Classic battle](PASTE_CLASSIC_IMAGE_HERE) |
+<img width="1847" height="974" alt="SCR-20260819-ktrt" src="https://github.com/user-attachments/assets/acee32e0-fdcb-4dfd-8609-0b4890e85a00" />
+
 
 | ⚡ Chaos mode | 💥 Destruction | 🏆 Victory |
 | :-: | :-: | :-: |
-| ![Chaos mode](PASTE_CHAOS_IMAGE_HERE) | ![Destruction](PASTE_DESTRUCTION_IMAGE_HERE) | ![Victory](PASTE_VICTORY_IMAGE_HERE) |
 
 ## Game modes
 
