@@ -57,6 +57,7 @@ const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
 const GRAV = 850;
 const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
+const START_GRACE_MS = 4000;  // 🎬 turn-1 runway: clients freeze their clock during "3,2,1,FIGHT!" — the server must too
 const FORCE_DROP = process.env.FORCE_DROP || null; // 🧪 tests/dev: pin every crate to one type
 // ⚡ CHAOS mode — real-time free-for-all: no turns, everyone drives and shoots
 // at once. Infinite normal shells behind a 1s per-tank reload, dead tanks
@@ -67,6 +68,7 @@ const CHAOS_RESPAWN_MS = Number(process.env.CHAOS_RESPAWN_MS || 5000);     // de
 const CHAOS_WIND_MS = Number(process.env.CHAOS_WIND_MS || 18000);          // wind re-roll (no turns)
 const CHAOS_GHOST_MS = 12000; // a dead tank's in-flight shells may still land
 const CHAOS_GRACE_MS = 8000;  // terrain-gen + countdown runway before the clock truly bites
+const CHAOS_FIRE_GRACE_MS = Number(process.env.CHAOS_FIRE_GRACE_MS || 3400); // 🎬 no fire during the client's "3,2,1" (3.6s from state receipt, 200ms slack) — crafted-client pre-fires get nacked
 // ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
 const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
@@ -74,6 +76,7 @@ const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
 
 let TERR = null;  // lib/terrain.mjs (ESM, imported dynamically below)
 let BONUS = null; // lib/bonus.mjs
+let AI = null;    // lib/ai.mjs — 🤖 turn-based CPU opponents (vs-AI games)
 
 /** Worms wind ∈ [-1,1], biased toward useful strengths. */
 function rollWind() {
@@ -103,10 +106,18 @@ function findSpawn(T, ideal, placed, maxR) {
 async function createGame(room) {
   const seed = randomBytes(4).toString('hex');
   const mode = room.mode === 'chaos' ? 'chaos' : 'classic';
-  const dims = TERR.terrainDims(room.players.size || 2); // ⚖️ more players → bigger battlefield
+  // 🤖 vs-AI: synthetic CPU players ride along in the game roster (not in
+  // room.players — they have no socket). Stable ids keep match wins sane.
+  const bots = (room.aiBots ?? []).map((b, i) => ({
+    id: `ai-${b.difficulty}-${i}`,
+    name: `CPU · ${AI?.DIFFS?.[b.difficulty]?.label ?? b.difficulty}`,
+    emoji: '🤖', ai: b.difficulty,
+  }));
+  const dims = TERR.terrainDims(room.players.size + bots.length || 2); // ⚖️ more players → bigger battlefield
   const T = await TERR.generateTerrain(seed, dims.width, dims.height);
   room.sim = { T }; // server-side bitmap: crate physics + destroyCircle + damage
-  const players = [...room.players.values()];
+  room.aiRt = new Map(); // 🤖 per-turn bot runtime (think/drive/aim/shells)
+  const players = [...room.players.values(), ...bots];
   const slots = spawnSlots(players.length); // ⚖️ equal, symmetric positions for all
   // 🎲 shuffled assignment — which player parks in which slot is re-rolled every
   //    round, so spawn position NEVER follows the join order
@@ -120,7 +131,7 @@ async function createGame(room) {
     const x = findSpawn(T, Math.round(T.width * slots[i]), placed, Math.max(0, slotGap / 2 - 100));
     placed.push(x);
     return {
-      id: p.id, name: p.name, emoji: p.emoji,
+      id: p.id, name: p.name, emoji: p.emoji, ai: p.ai ?? null, // 🤖 CPU difficulty tag
       x, y: mode === 'chaos' ? -60 : surfOf(T, x), // 🪂 chaos drops in by parachute
       para: mode === 'chaos',
       aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
@@ -239,13 +250,21 @@ function advanceTurnServer(room) {
 function tickRoom(room) {
   const g = room.game;
   if (!g || g.phase !== 'playing') return;
+  // 🖥️ solo/hot-seat sandbox (dev start, no bots, not chaos): the game runs
+  // fully client-side — no phantom turn auto-pass, supply drops, or crate events
+  if (room.localOnly) return;
   const now = Date.now();
+  // ⏱ real elapsed time, not the nominal 100ms — setInterval jitter (event-loop
+  //    stalls, busy ticks) would otherwise compound into sim drift
+  const dt = Math.min(0.5, Math.max(0.02, (now - (room.tickAt ?? now - 100)) / 1000));
+  room.tickAt = now;
   const tn = g.turn;
   if (tn.phase !== 'over') {
     if (g.mode === 'chaos') {
       if (now > g.endsAt) return endChaosByScore(room); // ⏳ 0:00 — most HP wins
     } else {
-      if (tn.phase === 'open' && now > tn.endsAt) return advanceTurnServer(room);
+      // 🎬 turn 1 gets START_GRACE_MS extra — everyone's client is still in "3,2,1,FIGHT!"
+      if (tn.phase === 'open' && now > tn.endsAt + (tn.num === 1 ? START_GRACE_MS : 0)) return advanceTurnServer(room);
       if (tn.phase === 'settle' && now > tn.settleEnd) return advanceTurnServer(room);
       if (tn.phase === 'shot' && now - tn.fireAt > SHOT_TIMEOUT_MS) return advanceTurnServer(room);
     }
@@ -256,7 +275,7 @@ function tickRoom(room) {
 
   // ⚡ chaos: no turns, so wind re-rolls on a wall-clock timer instead
   if (g.mode === 'chaos' && tn.phase !== 'over') {
-    g.windT = (g.windT ?? CHAOS_WIND_MS) - 100;
+    g.windT = (g.windT ?? CHAOS_WIND_MS) - dt * 1000;
     if (g.windT <= 0) { g.windT = CHAOS_WIND_MS; g.wind = rollWind(); dirty = true; }
   }
 
@@ -277,7 +296,7 @@ function tickRoom(room) {
 
   // supply drops: every 24–40s, max 3 live, placed FAIRLY (equidistant-ish from all)
   if (tn.phase !== 'over' && T) {
-    g.dropT -= 100;
+    g.dropT -= dt * 1000;
     if (g.dropT <= 0) {
       // ⚡ chaos: …and often — a 3-minute brawl wants a steady supply rain
       g.dropT = g.mode === 'chaos' ? 7000 + Math.random() * 5000 : 24000 + Math.random() * 16000;
@@ -301,8 +320,9 @@ function tickRoom(room) {
     }
   }
 
-  // crate physics @10Hz + drive-over collection (server knows all positions)
-  if (T && g.crates.length) {
+  // crate physics @10Hz + drive-over collection (server knows all positions).
+  // ⏹️ frozen once the round is over — no events/broadcasts over the end screen
+  if (T && g.crates.length && tn.phase !== 'over') {
     for (const c of g.crates) {
       if (c.taken) continue;
       if (c.landed && surfOf(T, c.x) > c.y + 8) { c.landed = false; c.vy = 0; } // ground blown away
@@ -315,10 +335,10 @@ function tickRoom(room) {
           continue;
         }
       } else {
-        c.sway += 0.1;
-        c.vy = Math.min(150, c.vy + GRAV * 0.35 * 0.1);
-        c.x = Math.max(40, Math.min(T.width - 40, c.x + Math.sin(c.sway * 2 + c.bob) * 14 * 0.1 + g.wind * 30 * 0.1));
-        c.y += c.vy * 0.1;
+        c.sway += dt;
+        c.vy = Math.min(150, c.vy + GRAV * 0.35 * dt);
+        c.x = Math.max(40, Math.min(T.width - 40, c.x + Math.sin(c.sway * 2 + c.bob) * 14 * dt + g.wind * 30 * dt));
+        c.y += c.vy * dt;
         if (c.y >= surfOf(T, c.x)) {
           c.y = surfOf(T, c.x);
           c.landed = true;
@@ -350,6 +370,25 @@ function tickRoom(room) {
     if (g.crates.length !== before) dirty = true;
   }
 
+  // 🤖 bots have no client to stream their footing — re-ground them as blasts
+  //    carve the terrain, or they hover over fresh craters and blast damage is
+  //    computed at a stale y (they'd dodge hits they visibly shouldn't)
+  if (T && tn.phase !== 'over') {
+    for (const t of g.tanks) {
+      if (!t.ai || t.dead || t.para) continue;
+      const gy = surfOf(T, t.x);
+      if (Math.abs(gy - t.y) > 1) { t.y = gy; dirty = true; }
+    }
+  }
+
+  // 🤖 CPU tanks (vs-AI games): think → (teleport/drive) → aim-sweep → fire →
+  //    server-simmed shells → authoritative blasts → settle. Classic only.
+  //    ⏹️ gated on a live round — no bot turns over the end screen
+  if (AI && g.mode !== 'chaos' && tn.phase !== 'over') {
+    try { AI.tickRoomAI(room, io, { applyBlast, broadcast: (r) => broadcastGame(r.id), SETTLE_MS, dt }); }
+    catch (err) { console.error(`[room ${room.id}] ai tick error:`, err); }
+  }
+
   if (dirty) broadcastGame(room.id);
 }
 
@@ -360,16 +399,26 @@ async function startGame(socket, payload) {
   // {dev:true} = solo/hot-seat bypass — only valid in a 1-player room, so a
   // non-host can't use it to force-start a real multiplayer game
   const dev = !!payload?.dev && room.players.size === 1;
-  if (socket.id !== room.hostId && !dev) return; // 👑 only the room master starts games
-  if (room.players.size < MIN_PLAYERS && !dev) return;
-  if (room.game) return; // already running
+  // 🤖 vs-AI: the client pins the bot roster on a dev start; it then persists
+  // for rematches/lobby restarts (bots count toward MIN_PLAYERS for those)
+  const ai = ['easy', 'medium', 'hard'].includes(payload?.ai) ? payload.ai : null;
+  if (dev) room.aiBots = ai ? [{ difficulty: ai }] : [];
+  // 🖥️ solo/hot-seat dev games (no bots, classic) run fully client-side: the
+  // server hosts the roster + terrain seed but skips the whole tick sim.
+  // 🤖 vs-AI and ⚡ chaos dev games stay server-driven — those clients ARE online.
+  room.localOnly = dev && !ai && room.mode !== 'chaos';
+  // 🙅 no more silent rejections — every refusal tells the lobby why
+  const deny = (reason) => socket.emit('start-denied', { reason });
+  if (socket.id !== room.hostId && !dev) return deny('host-only'); // 👑 only the room master starts games
+  if (room.players.size + (room.aiBots?.length ?? 0) < MIN_PLAYERS && !dev) return deny('need-players');
+  if (room.game) return deny('already-running'); // already running
   startMatch(room); // fresh match: round 1 of roundsTotal, clean scoreboard
   try {
     room.game = await createGame(room);
   } catch (err) {
     console.error(`[room ${roomId}] failed to create game:`, err);
     room.match = null;
-    return;
+    return deny('create-failed');
   }
   console.log(`[room ${roomId}] 🎮 game started (${room.players.size} players, ${room.game.mode}${room.game.mode === 'chaos' ? ` ${Math.round(room.game.dur / 1000)}s clock` : `best of ${room.match.roundsTotal}`}${dev ? ', dev mode' : ''})`);
   io.to(roomId).emit('game-state', serializeGame(room, true));
@@ -382,6 +431,7 @@ function endGame(socket) {
   room.game = null;
   room.sim = null;
   room.match = null;
+  room.aiRt = null; // 🤖 bot runtime dies with the game (roster persists for rematches)
   console.log(`[room ${roomId}] 🏁 game ended`);
   broadcastGame(roomId); // null → clients fall back to the lobby
 }
@@ -434,6 +484,65 @@ async function regenTerrain(socket) {
   io.to(room.id).emit('game-state', serializeGame(room, true));
 }
 
+/** Apply a shell impact authoritatively: carve terrain, destroy crates caught
+ *  in the radius, compute + apply damage from last-known positions, broadcast.
+ *  Shared by the human 'blast' socket handler AND the 🤖 bot engine. */
+function applyBlast(room, me, p) {
+  const g = room.game;
+  if (!g || !room.sim?.T) return;
+  const tn = g.turn;
+  const chaos = g.mode === 'chaos';
+  const x = Number(p?.x), y = Number(p?.y);
+  if (!isFinite(x) || !isFinite(y)) return;
+  const r = Math.min(200, Math.max(8, Number(p?.r) || BLAST_R));
+  const scale = Math.min(6, Math.max(0.1, Number(p?.scale) || 1));
+  const big = !!p?.big;
+  const T = room.sim.T;
+  const cut = []; // 🌱 cleared cells → rim seeds for the floater scan
+  TERR.destroyCircle(T, x, y, r, cut);
+  TERR.cleanDebris(T, x, y, r + 16, cut);
+  TERR.removeFloaters(T, x, y, r + 190, cut);
+  TERR.reflowSky(T, x, y, r + 16);
+  g.blasts.push({ x, y, r }); // floats — late joiners replay exactly what was carved
+  if (g.blasts.length > 400) g.blasts.splice(0, g.blasts.length - 400);
+  // crates caught in the blast are destroyed (denial play)
+  for (const c of g.crates) {
+    if (c.taken) continue;
+    if (Math.hypot(c.x - x, (c.landed ? c.y - 14 : c.y) - y) < r + 18) {
+      c.taken = true;
+      io.to(room.id).emit('game-event', { kind: 'crate-boom', x: c.x, y: c.landed ? c.y - 14 : c.y });
+    }
+  }
+  g.crates = g.crates.filter((c) => !c.taken);
+  // authoritative damage (mirrors the client formula)
+  const range = r + 34;
+  const dmg = [];
+  for (const t of g.tanks) {
+    if (t.dead) continue;
+    // 🛡️ shielded tanks take nothing — report a 0-damage block instead
+    if (chaos && t.shieldUntil && Date.now() < t.shieldUntil) {
+      dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false });
+      continue;
+    }
+    const d = Math.hypot(t.x - x, (t.y - 18) - y);
+    if (d >= range) continue;
+    const direct = d < 30;
+    const dd = direct ? Math.round(50 * scale) : Math.max(2, Math.round(46 * scale * (1 - d / range)));
+    t.hp = Math.max(0, t.hp - dd);
+    if (t.hp <= 0) { t.dead = true; if (chaos) t.deadAt = Date.now(); } // ⚡ chaos: respawn timer starts
+    dmg.push({ id: t.id, hp: t.hp, d: dd, direct, dead: t.dead });
+  }
+  // ⚡ chaos scoreboard: damage dealt to OTHERS is the win metric
+  if (chaos && me) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
+  const alive = g.tanks.filter((t) => !t.dead);
+  // ⚡ chaos never ends on a wipeout — respawns keep the match rolling
+  if (!chaos && g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
+  // 🏷️ src lets the shooter recognize their own echo (they already carved the
+  //    crater locally) — everyone else's clients always carve what they're told
+  io.to(room.id).emit('blast', { x, y, r, scale, big, dmg, src: me?.id ?? null });
+  broadcastGame(room.id);
+}
+
 /** Leaving mid-game = your tank dies in place; the war goes on without you. */
 function handleGameLeave(socket, room) {
   const g = room?.game;
@@ -454,8 +563,13 @@ function handleGameLeave(socket, room) {
       }
     }
   }
-  if (g.players.length === 0) { room.game = null; room.sim = null; }
-  else broadcastGame(room.id);
+  if (g.players.length === 0) {
+    // nobody left to play — tear it ALL down and tell the room: spectators
+    // (sockets in the room but not in g.players) get null → back to the lobby
+    room.game = null; room.sim = null;
+    room.match = null; room.aiRt = null; // 🤖 scoreboard + bot runtime die with the game
+    broadcastGame(room.id);
+  } else broadcastGame(room.id);
 }
 // ═══════════════════════ END GAME HOOK ═══════════════════════════════
 
@@ -488,6 +602,7 @@ app.prepare().then(async () => {
   // game libs are pure ESM (shared with the client bundle) — dynamic import
   TERR = await import('./lib/terrain.mjs');
   BONUS = await import('./lib/bonus.mjs');
+  AI = await import('./lib/ai.mjs'); // 🤖 CPU opponents
 
   const httpServer = createServer((req, res) => handle(req, res));
 
@@ -521,7 +636,7 @@ app.prepare().then(async () => {
 
         let room = rooms.get(roomId);
         if (!room) {
-          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, hostCid: null, roundsTotal: 1, match: null, mode: 'classic' };
+          room = { id: roomId, createdAt: Date.now(), players: new Map(), game: null, sim: null, hostId: null, hostCid: null, roundsTotal: 1, match: null, mode: 'classic', aiBots: [], aiRt: null };
           rooms.set(roomId, room);
           console.log(`[room ${roomId}] created`);
         }
@@ -600,10 +715,11 @@ app.prepare().then(async () => {
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
       if (typeof p?.p === 'number' && isFinite(p.p)) t.power = Math.max(0, Math.min(1, p.p));
       if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
+      if (typeof p?.palette === 'number' && isFinite(p.palette)) t.palette = ((p.palette | 0) % 6 + 6) % 6; // 🎨 recolors are public
       if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
-        fuel: t.fuel, p: t.power ?? 0.5, para: t.para === true,
+        fuel: t.fuel, p: t.power ?? 0.5, para: t.para === true, palette: t.palette,
       });
     });
     // 🌀 teleport: spend a pending teleport to land at x (classic: this turn
@@ -616,11 +732,15 @@ app.prepare().then(async () => {
       const tn = g.turn;
       const chaos = g.mode === 'chaos';
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
-      if (!me || me.dead || tn.phase === 'over' || !me.tele) return;
-      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return;
+      // 🙅 every refusal is nacked — the client waits for the relayed jump and
+      //    must never keep a move the server rejected (#16: no free teleports)
+      const deny = (reason) => socket.emit('teleport-denied', { reason });
+      if (!me || me.dead || tn.phase === 'over') return deny('not-live');
+      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return deny('not-your-turn');
+      if (!me.tele) return deny('no-teleport');
       const x = Math.max(30, Math.min(T.width - 30, Math.round(Number(p?.x) || 0)));
       const y = surfOf(T, x);
-      if (y > T.waterY - 6) return; // no watery graves — pick dry land
+      if (y > T.waterY - 6) return deny('wet'); // no watery graves — pick dry land
       me.tele = false;
       me.x = x; me.y = y;
       io.to(room.id).emit('game-event', { kind: 'teleport', id: me.id, x, y });
@@ -634,12 +754,20 @@ app.prepare().then(async () => {
       if (!g) return;
       const tn = g.turn;
       const chaos = g.mode === 'chaos';
+      // 🙅 every refusal is nacked — the shooter fired OPTIMISTICALLY and must
+      //    roll back (dud the shell, refund the ammo) or the screens diverge
+      const deny = (reason, extra) => socket.emit('fire-denied', { reason, ...extra });
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
-      if (!me || me.dead || me.para || tn.phase === 'over') return; // 🪂 guns stay packed until touchdown
-      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return;
+      if (!me || me.dead || me.para || tn.phase === 'over') return deny('not-live'); // 🪂 guns stay packed until touchdown
+      if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return deny('not-your-turn');
       if (chaos) { // ⚡ reload gate — server is the referee
         const nowF = Date.now();
-        if (nowF - (me.cdAt || 0) < CHAOS_COOLDOWN_MS) return;
+        // 🎬 the countdown is a client-side artifact — without this gate a crafted
+        //    client pre-fires while honest players are still watching "3, 2, 1"
+        const grace = g.startedAt + CHAOS_FIRE_GRACE_MS - nowF;
+        if (grace > 0) return deny('grace', { retryIn: grace });
+        const wait = CHAOS_COOLDOWN_MS - (nowF - (me.cdAt || 0));
+        if (wait > 0) return deny('reload', { retryIn: wait }); // ⏳ client adopts the server's clock
         me.cdAt = nowF;
       }
       let kind = ['cluster', 'guided', 'tomahawk'].includes(p?.kind) ? p.kind : 'normal';
@@ -669,52 +797,7 @@ app.prepare().then(async () => {
       // ⚡ chaos: a shell you fired while alive may land after you die — allow a
       //    short ghost window so the shared terrain/damage stays consistent
       if (chaos && me.dead && Date.now() - (me.cdAt || 0) > CHAOS_GHOST_MS) return;
-      const x = Number(p?.x), y = Number(p?.y);
-      if (!isFinite(x) || !isFinite(y)) return;
-      const r = Math.min(200, Math.max(8, Number(p?.r) || BLAST_R));
-      const scale = Math.min(6, Math.max(0.1, Number(p?.scale) || 1));
-      const big = !!p?.big;
-      const T = room.sim.T;
-      TERR.destroyCircle(T, x, y, r);
-      TERR.cleanDebris(T, x, y, r + 16);
-      TERR.removeFloaters(T, x, y, r + 190);
-      TERR.reflowSky(T, x, y, r + 16);
-      g.blasts.push({ x: Math.round(x), y: Math.round(y), r });
-      if (g.blasts.length > 400) g.blasts.splice(0, g.blasts.length - 400);
-      // crates caught in the blast are destroyed (denial play)
-      for (const c of g.crates) {
-        if (c.taken) continue;
-        if (Math.hypot(c.x - x, (c.landed ? c.y - 14 : c.y) - y) < r + 18) {
-          c.taken = true;
-          io.to(room.id).emit('game-event', { kind: 'crate-boom', x: c.x, y: c.landed ? c.y - 14 : c.y });
-        }
-      }
-      g.crates = g.crates.filter((c) => !c.taken);
-      // authoritative damage (mirrors the client formula)
-      const range = r + 34;
-      const dmg = [];
-      for (const t of g.tanks) {
-        if (t.dead) continue;
-        // 🛡️ shielded tanks take nothing — report a 0-damage block instead
-        if (chaos && t.shieldUntil && Date.now() < t.shieldUntil) {
-          dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false });
-          continue;
-        }
-        const d = Math.hypot(t.x - x, (t.y - 18) - y);
-        if (d >= range) continue;
-        const direct = d < 30;
-        const dd = direct ? Math.round(50 * scale) : Math.max(2, Math.round(46 * scale * (1 - d / range)));
-        t.hp = Math.max(0, t.hp - dd);
-        if (t.hp <= 0) { t.dead = true; if (chaos) t.deadAt = Date.now(); } // ⚡ chaos: respawn timer starts
-        dmg.push({ id: t.id, hp: t.hp, d: dd, direct, dead: t.dead });
-      }
-      // ⚡ chaos scoreboard: damage dealt to OTHERS is the win metric
-      if (chaos) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
-      const alive = g.tanks.filter((t) => !t.dead);
-      // ⚡ chaos never ends on a wipeout — respawns keep the match rolling
-      if (!chaos && g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
-      io.to(room.id).emit('blast', { x, y, r, scale, big, dmg });
-      broadcastGame(room.id);
+      applyBlast(room, me, p);
     });
     // shooter: all shells resolved → brief settle → next turn (classic only)
     socket.on('shot-done', () => {

@@ -10,7 +10,9 @@ import { writeFileSync } from 'node:fs';
 const [, , url, out, waitMs = '9000'] = process.argv;
 if (!url) { console.error('usage: node scripts/screenshot.mjs <url> <outfile> [waitMs] | \'<json pages>\''); process.exit(2); }
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const CHROME = process.env.CHROME_PATH
+  || (process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 const PORT = 9222;
 
 // 1) launch headless chrome with a debug port (ignore if already running)

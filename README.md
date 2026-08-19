@@ -11,6 +11,7 @@ Built on the multiplayer-room-starter session layer (rooms, lobby, reconnects, s
 | **Online rooms — ⚔️ Classic** | Create a room, send the invite link, 2+ players, server-authoritative turn-based match |
 | **Online rooms — ⚡ Chaos** | Same room, host picks ⚡ in the lobby: real-time free-for-all — no turns, everyone moves at once, infinite shells behind a 1s reload, fuel refills in 3s, dead tanks respawn in 5s, 3-minute match clock. Most damage dealt wins. Works with best-of-N rounds too |
 | **Solo practice** | One click from the home page (`?solo=1`) |
+| **🤖 vs AI** | Duel a server-driven CPU tank (`?solo=1&ai=easy\|medium\|hard`) — the bot searches real ballistic firing solutions against the authoritative terrain + wind, then applies a per-difficulty aim error: 😊 easy is partially accurate, 😐 medium accurate sometimes, 😈 hard accurate most of the time (plus smart target/weapon picks, repositioning, crate runs and teleports) |
 | **Hot-seat 2–4P** | One screen, shared keyboard/mouse (`?solo=1&local=N`) |
 | **Spectating** | Join a room mid-game — you watch until the next rematch |
 

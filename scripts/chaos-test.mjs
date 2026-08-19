@@ -1,6 +1,7 @@
 /**
  * ⚡ Chaos-mode protocol test — run against a server started with fast clocks:
- *   CHAOS_DURATION_MS=12000 CHAOS_COOLDOWN_MS=1500 CHAOS_WIND_MS=3000 CHAOS_RESPAWN_MS=2500 node server.js
+ *   CHAOS_DURATION_MS=12000 CHAOS_COOLDOWN_MS=1500 CHAOS_WIND_MS=3000 CHAOS_RESPAWN_MS=2500 CHAOS_FIRE_GRACE_MS=1 node server.js
+ *   (FIRE_GRACE≈0 disables the anti-pre-fire countdown gate — this suite fires seconds after start)
  *
  * Room 1 (respawn): non-host can't set-mode → host sets chaos → game-state
  * carries mode/dur/endsAt → BOTH players tank-move at once (no turn gate) →
