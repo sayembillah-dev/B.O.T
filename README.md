@@ -2,6 +2,8 @@
 
 Worms-style artillery on fully destructible terrain - wind, supply drops, special shells, hot-seat or online rooms. Everything is procedural: terrain, tanks, particles, even the sound effects. Zero art assets, zero accounts, zero database.
 
+Play at: <a>https://battleoftanks.up.railway.app/<a/>
+
 <img width="1852" height="984" alt="SCR-20260819-ktyg" src="https://github.com/user-attachments/assets/63965314-b8da-4bae-a33b-eb770bf61d53" />
 
 
