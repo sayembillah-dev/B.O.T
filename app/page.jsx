@@ -7,11 +7,11 @@ import { newRoomId } from '@/lib/roomId';
 // ── main-menu entries: Multiplayer / Hot Seat / vs AI ─────────────────
 const DIFFS = [
   { id: 'easy',   emoji: '😊', label: 'Easy',   cls: 'diff-easy',
-    hint: 'partially accurate — learns to aim, often misses' },
+    hint: 'partially accurate - learns to aim, often misses' },
   { id: 'medium', emoji: '😐', label: 'Medium', cls: 'diff-medium',
-    hint: 'accurate sometimes — a fair fight' },
+    hint: 'accurate sometimes - a fair fight' },
   { id: 'hard',   emoji: '😈', label: 'Hard',   cls: 'diff-hard',
-    hint: 'accurate most of the time — repositions, grabs crates, finishes kills' },
+    hint: 'accurate most of the time - repositions, grabs crates, finishes kills' },
 ];
 
 export default function Home() {
@@ -36,7 +36,7 @@ export default function Home() {
   // 🤖 vs AI: solo room + a server-driven CPU tank of the chosen difficulty
   const vsAi = (diff) => router.push(`/room/${newRoomId()}?solo=1&ai=${diff}`);
 
-  // 🛠️ dev shortcut — skip everything, straight into a practice game
+  // 🛠️ dev shortcut - skip everything, straight into a practice game
   const soloDev = () => router.push(`/room/${newRoomId()}?solo=1`);
 
   const Row = ({ k, emoji, title, sub }) => (
@@ -60,14 +60,14 @@ export default function Home() {
       <div className="card hero">
         <h1 className="logo">🛡️ B.O.T - battle of tanks</h1>
         <p className="tagline">
-          Worms-style artillery on destructible terrain — wind, supply drops, special shells.
+          Worms-style artillery on destructible terrain - wind, supply drops, special shells.
           <br />
           Online rooms, one-screen hot-seat, or a duel vs the CPU. No accounts.
         </p>
 
         <div className="menu">
           {/* 1️⃣ MULTIPLAYER */}
-          <Row k="mp" emoji="🌐" title="Multiplayer" sub="online room — share a link, up to 8 players" />
+          <Row k="mp" emoji="🌐" title="Multiplayer" sub="online room - share a link, up to 8 players" />
           {open === 'mp' && (
             <div className="menu-panel">
               <button className="btn btn-primary btn-lg" onClick={createRoom}>
@@ -100,7 +100,7 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <p className="hint" style={{ marginTop: '0.5rem' }}>pass the keyboard — every turn is live</p>
+              <p className="hint" style={{ marginTop: '0.5rem' }}>pass the keyboard - every turn is live</p>
             </div>
           )}
 
@@ -122,14 +122,14 @@ export default function Home() {
                 ))}
               </div>
               <p className="hint" style={{ marginTop: '0.5rem' }}>
-                🤖 the CPU aims with real ballistics, repositions, uses pickups — pick your poison
+                🤖 the CPU aims with real ballistics, repositions, uses pickups - pick your poison
               </p>
             </div>
           )}
         </div>
 
         <button className="btn btn-ghost" style={{ marginTop: '1.1rem' }} onClick={soloDev}>
-          🛠️ solo practice <span className="hint">(dev shortcut)</span>
+          🛠️ solo practice
         </button>
       </div>
     </main>

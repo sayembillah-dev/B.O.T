@@ -10,7 +10,7 @@
 import { io } from 'socket.io-client';
 
 const URL = process.env.URL || 'http://localhost:3000';
-const ROOM = 'tele' + Math.floor(Math.random() * 100000); // alnum only — ROOM_ID_RE
+const ROOM = 'tele' + Math.floor(Math.random() * 100000); // alnum only - ROOM_ID_RE
 const fail = (m) => { console.error('❌ ' + m); process.exit(1); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -59,13 +59,13 @@ for (let i = 0; i < 600 && !crate; i++) { // up to 90s (first drop ~10s + fall)
   crate = state.crates?.find((c) => c.landed && !c.taken) ?? null;
 }
 if (!crate) fail('no landed crate within 90s');
-// 🎁 mystery crates: the type stays secret until pickup — the crate-taken
+// 🎁 mystery crates: the type stays secret until pickup - the crate-taken
 //    assert below is what verifies the server runs FORCE_DROP=teleport
-console.log(`📦 mystery crate landed at x=${Math.round(crate.x)} — driving the active tank onto it`);
+console.log(`📦 mystery crate landed at x=${Math.round(crate.x)} - driving the active tank onto it`);
 
 let taken = null;
 for (let i = 0; i < 100 && !taken; i++) {
-  const me = activeOf(); // track turn rotation — whoever is active goes for it
+  const me = activeOf(); // track turn rotation - whoever is active goes for it
   sockOf(me.id).emit('tank-move', { x: crate.x, y: crate.y - 2, aim: -1, s: 0, fuel: 50, p: 0.5 });
   await sleep(120);
   taken = events.find((e) => e.kind === 'crate-taken') ?? null;
@@ -75,7 +75,7 @@ if (taken.type !== 'teleport') fail(`picked up ${taken.type}, expected teleport`
 await sleep(400); // let the broadcast game-state arrive
 const charged = state.tanks.find((t) => t.id === taken.by);
 if (!charged?.tele) fail('server did not set tele=true after pickup');
-console.log(`✅ ${charged.name} absorbed the teleport — tele=true`);
+console.log(`✅ ${charged.name} absorbed the teleport - tele=true`);
 
 // 3️⃣ spend it: land back on own spawn (guaranteed dry)
 const targetX = Math.max(60, Math.min(state.terrain.width - 60, Math.round(charged.x > 960 ? 300 : state.terrain.width - 300)));
@@ -90,5 +90,5 @@ await sleep(400);
 const after = state.tanks.find((t) => t.id === charged.id);
 if (after.tele) fail('tele not cleared after use');
 if (Math.abs(after.x - targetX) > 2) fail(`game-state x=${after.x}, expected ${targetX}`);
-console.log(`🎉 TELEPORT OK — ${charged.name} jumped to x=${tele.x}, charge consumed`);
+console.log(`🎉 TELEPORT OK - ${charged.name} jumped to x=${tele.x}, charge consumed`);
 process.exit(0);

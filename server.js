@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  🛡️ B.O.T — battle of tanks · server (Next.js + Socket.IO in one process)
+//  🛡️ B.O.T - battle of tanks · server (Next.js + Socket.IO in one process)
 //  Room state lives in memory. The server is AUTHORITATIVE for online
 //  games: terrain seed + bitmap, tank spawns, HP/inventory/buffs, turn
 //  rotation + 20s timer, wind, supply-drop schedule + crate physics,
@@ -7,7 +7,7 @@
 //  physics locally for feel; the active player streams their tank and
 //  reports shot impacts; the server validates, applies, broadcasts.
 //
-//  Solo dev (?solo=1) / hot-seat (?local=N) games run client-side only —
+//  Solo dev (?solo=1) / hot-seat (?local=N) games run client-side only -
 //  they start via start-game {dev:true} which bypasses MIN_PLAYERS.
 // ════════════════════════════════════════════════════════════════════
 const { createServer } = require('http');
@@ -27,7 +27,7 @@ const handle = app.getRequestHandler();
 
 // ── Room config ───────────────────────────────────────────────────────
 const MAX_PLAYERS = 8;
-const MIN_PLAYERS = 2; // online games need 2+ — solo/hot-seat bypass with {dev:true}
+const MIN_PLAYERS = 2; // online games need 2+ - solo/hot-seat bypass with {dev:true}
 const EMOJIS = ['😀','😎','🤖','👾','🐸','🦊','🐼','🐯','🦁','🐙','🦄','🐲','👻','💀','🤠','😺','🙉','🦖','🍕','⚡','🔥','🌵','🥷','🧙'];
 const ROOM_ID_RE = /^[a-z0-9]{4,24}$/;
 
@@ -47,7 +47,7 @@ function pickEmoji(room) {
   return (pool.length ? pool : EMOJIS)[Math.floor(Math.random() * (pool.length ? pool.length : EMOJIS.length))];
 }
 
-// ═════════════════ GAME HOOK — 🛡️ B.O.T - battle of tanks ═════════════════
+// ═════════════════ GAME HOOK - 🛡️ B.O.T - battle of tanks ═════════════════
 // Server-authoritative online state. Clients render + simulate locally;
 // discrete events (fire/blast/pass/collect) flow through here.
 // ─────────────────────────────────────────────────────────────────────
@@ -57,26 +57,26 @@ const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
 const GRAV = 850;
 const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
-const START_GRACE_MS = 4000;  // 🎬 turn-1 runway: clients freeze their clock during "3,2,1,FIGHT!" — the server must too
+const START_GRACE_MS = 4000;  // 🎬 turn-1 runway: clients freeze their clock during "3,2,1,FIGHT!" - the server must too
 const FORCE_DROP = process.env.FORCE_DROP || null; // 🧪 tests/dev: pin every crate to one type
-// ⚡ CHAOS mode — real-time free-for-all: no turns, everyone drives and shoots
+// ⚡ CHAOS mode - real-time free-for-all: no turns, everyone drives and shoots
 // at once. Infinite normal shells behind a 1s per-tank reload, dead tanks
-// respawn in 5s — one 3:00 match clock: MOST DAMAGE DEALT wins.
+// respawn in 5s - one 3:00 match clock: MOST DAMAGE DEALT wins.
 const CHAOS_DURATION_MS = Number(process.env.CHAOS_DURATION_MS || 180000); // 3:00 match clock
 const CHAOS_COOLDOWN_MS = Number(process.env.CHAOS_COOLDOWN_MS || 1000);   // per-tank reload
 const CHAOS_RESPAWN_MS = Number(process.env.CHAOS_RESPAWN_MS || 5000);     // dead tank → back in 5s
 const CHAOS_WIND_MS = Number(process.env.CHAOS_WIND_MS || 18000);          // wind re-roll (no turns)
 const CHAOS_GHOST_MS = 12000; // a dead tank's in-flight shells may still land
 const CHAOS_GRACE_MS = 8000;  // terrain-gen + countdown runway before the clock truly bites
-const CHAOS_FIRE_GRACE_MS = Number(process.env.CHAOS_FIRE_GRACE_MS || 3400); // 🎬 no fire during the client's "3,2,1" (3.6s from state receipt, 200ms slack) — crafted-client pre-fires get nacked
-// ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
+const CHAOS_FIRE_GRACE_MS = Number(process.env.CHAOS_FIRE_GRACE_MS || 3400); // 🎬 no fire during the client's "3,2,1" (3.6s from state receipt, 200ms slack) - crafted-client pre-fires get nacked
+// ⚖️ fair spawns - N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
 const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
   n === 1 ? 0.5 : 0.12 + (i * 0.76) / (n - 1));
 
 let TERR = null;  // lib/terrain.mjs (ESM, imported dynamically below)
 let BONUS = null; // lib/bonus.mjs
-let AI = null;    // lib/ai.mjs — 🤖 turn-based CPU opponents (vs-AI games)
+let AI = null;    // lib/ai.mjs - 🤖 turn-based CPU opponents (vs-AI games)
 
 /** Worms wind ∈ [-1,1], biased toward useful strengths. */
 function rollWind() {
@@ -93,7 +93,7 @@ function surfOf(T, x) {
 function findSpawn(T, ideal, placed, maxR) {
   const ok = (x) =>
     x >= 40 && x <= T.width - 40 &&
-    Math.abs(surfOf(T, x + 8) - surfOf(T, x - 8)) <= 20 && // ~51° max — tanks handle slopes
+    Math.abs(surfOf(T, x + 8) - surfOf(T, x - 8)) <= 20 && // ~51° max - tanks handle slopes
     surfOf(T, x) <= T.waterY - 40 &&                       // dry
     placed.every((px) => Math.abs(px - x) >= 90);          // never on top of a teammate
   for (let d = 0; d <= maxR; d += 12) {
@@ -107,7 +107,7 @@ async function createGame(room) {
   const seed = randomBytes(4).toString('hex');
   const mode = room.mode === 'chaos' ? 'chaos' : 'classic';
   // 🤖 vs-AI: synthetic CPU players ride along in the game roster (not in
-  // room.players — they have no socket). Stable ids keep match wins sane.
+  // room.players - they have no socket). Stable ids keep match wins sane.
   const bots = (room.aiBots ?? []).map((b, i) => ({
     id: `ai-${b.difficulty}-${i}`,
     name: `CPU · ${AI?.DIFFS?.[b.difficulty]?.label ?? b.difficulty}`,
@@ -119,7 +119,7 @@ async function createGame(room) {
   room.aiRt = new Map(); // 🤖 per-turn bot runtime (think/drive/aim/shells)
   const players = [...room.players.values(), ...bots];
   const slots = spawnSlots(players.length); // ⚖️ equal, symmetric positions for all
-  // 🎲 shuffled assignment — which player parks in which slot is re-rolled every
+  // 🎲 shuffled assignment - which player parks in which slot is re-rolled every
   //    round, so spawn position NEVER follows the join order
   for (let i = slots.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -137,9 +137,9 @@ async function createGame(room) {
       aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
       hp: 100, fuel: 100, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
       cdAt: 0,   // ⚡ chaos reload bookkeeping
-      dmg: 0,    // ⚡ chaos scoreboard — total damage dealt to OTHERS (the win metric)
+      dmg: 0,    // ⚡ chaos scoreboard - total damage dealt to OTHERS (the win metric)
       deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
-      shieldUntil: 0, // 🛡️ chaos shield pickup — invulnerable until this stamp
+      shieldUntil: 0, // 🛡️ chaos shield pickup - invulnerable until this stamp
     };
   });
   const now = Date.now();
@@ -171,7 +171,7 @@ function serializeGame(room, full = false) {
   if (!g) return null;
   const out = full ? { ...g } : (({ blasts, ...rest }) => rest)(g);
   // 🎁 mystery crates: classic never broadcasts the contents (revealed on
-  //    pickup/expiry) — ⚡ chaos crates are UNCOVERED: type rides along
+  //    pickup/expiry) - ⚡ chaos crates are UNCOVERED: type rides along
   if (out.crates && g.mode !== 'chaos') out.crates = out.crates.map(({ type, ...pub }) => pub);
   out.hostId = room.hostId;               // clients gate host-only UI on this
   out.match = room.match ? { ...room.match } : null; // round/wins scoreboard
@@ -200,7 +200,7 @@ function broadcastGame(roomId) {
   if (room) io.to(roomId).emit('game-state', serializeGame(room));
 }
 
-/** ⚡ chaos time-out: the match clock hit 0:00 — MOST DAMAGE DEALT wins
+/** ⚡ chaos time-out: the match clock hit 0:00 - MOST DAMAGE DEALT wins
  *  (exact top-tie = draw). Even a tank that's mid-respawn can take it:
  *  damage is the score, survival just keeps you dealing it. */
 function endChaosByScore(room) {
@@ -214,7 +214,7 @@ function endChaosByScore(room) {
   const winnerId = top && !tie && (top.dmg | 0) > 0 ? top.id : null;
   finishRound(room, winnerId);
   broadcastGame(room.id);
-  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over — winner: ${winnerId ? `${top.name} (${top.dmg | 0} dmg)` : 'draw'}`);
+  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over - winner: ${winnerId ? `${top.name} (${top.dmg | 0} dmg)` : 'draw'}`);
 }
 
 /** Rotate to the next living tank; ends the game when ≤1 remains. */
@@ -226,12 +226,12 @@ function advanceTurnServer(room) {
   if (ts.length > 1 && alive.length <= 1) {
     finishRound(room, alive[0]?.id ?? null);
     broadcastGame(room.id);
-    console.log(`[room ${room.id}] 🏆 round ${room.match?.round ?? 1} over — winner: ${alive[0]?.name ?? 'draw'}`);
+    console.log(`[room ${room.id}] 🏆 round ${room.match?.round ?? 1} over - winner: ${alive[0]?.name ?? 'draw'}`);
     return;
   }
   if (g.mode === 'chaos') return; // ⚡ chaos has no turns to rotate
   const prev = g.tanks[g.turn.activeIdx];
-  if (prev?.tele) { // 🌀 teleport not used in time — the turn eats it
+  if (prev?.tele) { // 🌀 teleport not used in time - the turn eats it
     prev.tele = false;
     io.to(room.id).emit('game-event', { kind: 'tele-fizzle', id: prev.id, x: prev.x, y: prev.y });
   }
@@ -251,19 +251,19 @@ function tickRoom(room) {
   const g = room.game;
   if (!g || g.phase !== 'playing') return;
   // 🖥️ solo/hot-seat sandbox (dev start, no bots, not chaos): the game runs
-  // fully client-side — no phantom turn auto-pass, supply drops, or crate events
+  // fully client-side - no phantom turn auto-pass, supply drops, or crate events
   if (room.localOnly) return;
   const now = Date.now();
-  // ⏱ real elapsed time, not the nominal 100ms — setInterval jitter (event-loop
+  // ⏱ real elapsed time, not the nominal 100ms - setInterval jitter (event-loop
   //    stalls, busy ticks) would otherwise compound into sim drift
   const dt = Math.min(0.5, Math.max(0.02, (now - (room.tickAt ?? now - 100)) / 1000));
   room.tickAt = now;
   const tn = g.turn;
   if (tn.phase !== 'over') {
     if (g.mode === 'chaos') {
-      if (now > g.endsAt) return endChaosByScore(room); // ⏳ 0:00 — most HP wins
+      if (now > g.endsAt) return endChaosByScore(room); // ⏳ 0:00 - most HP wins
     } else {
-      // 🎬 turn 1 gets START_GRACE_MS extra — everyone's client is still in "3,2,1,FIGHT!"
+      // 🎬 turn 1 gets START_GRACE_MS extra - everyone's client is still in "3,2,1,FIGHT!"
       if (tn.phase === 'open' && now > tn.endsAt + (tn.num === 1 ? START_GRACE_MS : 0)) return advanceTurnServer(room);
       if (tn.phase === 'settle' && now > tn.settleEnd) return advanceTurnServer(room);
       if (tn.phase === 'shot' && now - tn.fireAt > SHOT_TIMEOUT_MS) return advanceTurnServer(room);
@@ -280,7 +280,7 @@ function tickRoom(room) {
   }
 
   // ⚡ chaos respawns: a dead tank is back after CHAOS_RESPAWN_MS at a fresh
-  // random spot with full HP + fuel — death is a timeout, not an elimination
+  // random spot with full HP + fuel - death is a timeout, not an elimination
   if (g.mode === 'chaos' && tn.phase !== 'over' && T) {
     for (const t of g.tanks) {
       if (!t.dead || !t.deadAt || now - t.deadAt < CHAOS_RESPAWN_MS) continue;
@@ -298,11 +298,11 @@ function tickRoom(room) {
   if (tn.phase !== 'over' && T) {
     g.dropT -= dt * 1000;
     if (g.dropT <= 0) {
-      // ⚡ chaos: …and often — a 3-minute brawl wants a steady supply rain
+      // ⚡ chaos: …and often - a 3-minute brawl wants a steady supply rain
       g.dropT = g.mode === 'chaos' ? 7000 + Math.random() * 5000 : 24000 + Math.random() * 16000;
       if (g.crates.filter((c) => !c.taken).length < (g.mode === 'chaos' ? 5 : 3)) {
         // ⚖️ fair drop: sample candidate spots, keep the one that maximizes the
-        // distance to the NEAREST live tank — equal opportunity for everyone
+        // distance to the NEAREST live tank - equal opportunity for everyone
         const aliveTanks = g.tanks.filter((t) => !t.dead);
         let bx = null, bScore = -1;
         for (let k = 0; k < 28; k++) {
@@ -321,7 +321,7 @@ function tickRoom(room) {
   }
 
   // crate physics @10Hz + drive-over collection (server knows all positions).
-  // ⏹️ frozen once the round is over — no events/broadcasts over the end screen
+  // ⏹️ frozen once the round is over - no events/broadcasts over the end screen
   if (T && g.crates.length && tn.phase !== 'over') {
     for (const c of g.crates) {
       if (c.taken) continue;
@@ -356,7 +356,7 @@ function tickRoom(room) {
           if (c.type === 'hp10' || c.type === 'hp15') t.hp = Math.min(100, t.hp + (c.type === 'hp10' ? 10 : 15));
           else if (c.type === 'x2') t.buff += 2;
           else if (c.type === 'x3') t.buff += 3;
-          else if (c.type === 'teleport') t.tele = true; // 🌀 pending — use it this turn or lose it
+          else if (c.type === 'teleport') t.tele = true; // 🌀 pending - use it this turn or lose it
           else if (c.type === 'shield') t.shieldUntil = now + 10000; // 🛡️ 10s of invulnerability
           else t.inv[c.type] = (t.inv[c.type] | 0) + 1;
           io.to(room.id).emit('game-event', { kind: 'crate-taken', crateId: c.id, type: c.type, x: c.x, y: c.y, by: t.id });
@@ -370,7 +370,7 @@ function tickRoom(room) {
     if (g.crates.length !== before) dirty = true;
   }
 
-  // 🤖 bots have no client to stream their footing — re-ground them as blasts
+  // 🤖 bots have no client to stream their footing - re-ground them as blasts
   //    carve the terrain, or they hover over fresh craters and blast damage is
   //    computed at a stale y (they'd dodge hits they visibly shouldn't)
   if (T && tn.phase !== 'over') {
@@ -383,7 +383,7 @@ function tickRoom(room) {
 
   // 🤖 CPU tanks (vs-AI games): think → (teleport/drive) → aim-sweep → fire →
   //    server-simmed shells → authoritative blasts → settle. Classic only.
-  //    ⏹️ gated on a live round — no bot turns over the end screen
+  //    ⏹️ gated on a live round - no bot turns over the end screen
   if (AI && g.mode !== 'chaos' && tn.phase !== 'over') {
     try { AI.tickRoomAI(room, io, { applyBlast, broadcast: (r) => broadcastGame(r.id), SETTLE_MS, dt }); }
     catch (err) { console.error(`[room ${room.id}] ai tick error:`, err); }
@@ -396,7 +396,7 @@ async function startGame(socket, payload) {
   const roomId = socket.data.roomId;
   const room = rooms.get(roomId);
   if (!room) return;
-  // {dev:true} = solo/hot-seat bypass — only valid in a 1-player room, so a
+  // {dev:true} = solo/hot-seat bypass - only valid in a 1-player room, so a
   // non-host can't use it to force-start a real multiplayer game
   const dev = !!payload?.dev && room.players.size === 1;
   // 🤖 vs-AI: the client pins the bot roster on a dev start; it then persists
@@ -405,9 +405,9 @@ async function startGame(socket, payload) {
   if (dev) room.aiBots = ai ? [{ difficulty: ai }] : [];
   // 🖥️ solo/hot-seat dev games (no bots, classic) run fully client-side: the
   // server hosts the roster + terrain seed but skips the whole tick sim.
-  // 🤖 vs-AI and ⚡ chaos dev games stay server-driven — those clients ARE online.
+  // 🤖 vs-AI and ⚡ chaos dev games stay server-driven - those clients ARE online.
   room.localOnly = dev && !ai && room.mode !== 'chaos';
-  // 🙅 no more silent rejections — every refusal tells the lobby why
+  // 🙅 no more silent rejections - every refusal tells the lobby why
   const deny = (reason) => socket.emit('start-denied', { reason });
   if (socket.id !== room.hostId && !dev) return deny('host-only'); // 👑 only the room master starts games
   if (room.players.size + (room.aiBots?.length ?? 0) < MIN_PLAYERS && !dev) return deny('need-players');
@@ -449,7 +449,7 @@ async function nextRound(socket) {
     console.error(`[room ${room.id}] next round failed:`, err);
     return;
   }
-  console.log(`[room ${room.id}] ⚔️ round ${m.round}/${m.roundsTotal} — new terrain (${room.game.terrain.seed})`);
+  console.log(`[room ${room.id}] ⚔️ round ${m.round}/${m.roundsTotal} - new terrain (${room.game.terrain.seed})`);
   io.to(room.id).emit('game-state', serializeGame(room, true));
 }
 /** Rematch after a completed match: clean scoreboard, back to round 1 (host only). */
@@ -465,7 +465,7 @@ async function newMatch(socket) {
     room.match = null;
     return;
   }
-  console.log(`[room ${room.id}] 🏆 new match — best of ${room.match.roundsTotal}`);
+  console.log(`[room ${room.id}] 🏆 new match - best of ${room.match.roundsTotal}`);
   io.to(room.id).emit('game-state', serializeGame(room, true));
 }
 /** Restart the current round on fresh terrain (host only); scoreboard untouched. */
@@ -480,7 +480,7 @@ async function regenTerrain(socket) {
     return;
   }
   if (room.match) room.match.lastWinner = null;
-  console.log(`[room ${room.id}] 🎲 round restarted — new terrain (${room.game.terrain.seed})`);
+  console.log(`[room ${room.id}] 🎲 round restarted - new terrain (${room.game.terrain.seed})`);
   io.to(room.id).emit('game-state', serializeGame(room, true));
 }
 
@@ -503,7 +503,7 @@ function applyBlast(room, me, p) {
   TERR.cleanDebris(T, x, y, r + 16, cut);
   TERR.removeFloaters(T, x, y, r + 190, cut);
   TERR.reflowSky(T, x, y, r + 16);
-  g.blasts.push({ x, y, r }); // floats — late joiners replay exactly what was carved
+  g.blasts.push({ x, y, r }); // floats - late joiners replay exactly what was carved
   if (g.blasts.length > 400) g.blasts.splice(0, g.blasts.length - 400);
   // crates caught in the blast are destroyed (denial play)
   for (const c of g.crates) {
@@ -519,7 +519,7 @@ function applyBlast(room, me, p) {
   const dmg = [];
   for (const t of g.tanks) {
     if (t.dead) continue;
-    // 🛡️ shielded tanks take nothing — report a 0-damage block instead
+    // 🛡️ shielded tanks take nothing - report a 0-damage block instead
     if (chaos && t.shieldUntil && Date.now() < t.shieldUntil) {
       dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false });
       continue;
@@ -535,10 +535,10 @@ function applyBlast(room, me, p) {
   // ⚡ chaos scoreboard: damage dealt to OTHERS is the win metric
   if (chaos && me) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
   const alive = g.tanks.filter((t) => !t.dead);
-  // ⚡ chaos never ends on a wipeout — respawns keep the match rolling
+  // ⚡ chaos never ends on a wipeout - respawns keep the match rolling
   if (!chaos && g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
   // 🏷️ src lets the shooter recognize their own echo (they already carved the
-  //    crater locally) — everyone else's clients always carve what they're told
+  //    crater locally) - everyone else's clients always carve what they're told
   io.to(room.id).emit('blast', { x, y, r, scale, big, dmg, src: me?.id ?? null });
   broadcastGame(room.id);
 }
@@ -552,19 +552,19 @@ function handleGameLeave(socket, room) {
   if (t && !t.dead) {
     t.dead = true; t.hp = 0; // ⚡ chaos: no deadAt → leavers never respawn
     if (g.mode === 'chaos') {
-      // ⚡ no eliminations in chaos — but if nobody's left to fight, score it now
+      // ⚡ no eliminations in chaos - but if nobody's left to fight, score it now
       if (g.players.length <= 1) endChaosByScore(room);
     } else {
       const alive = g.tanks.filter((tk) => !tk.dead);
       if (g.tanks.length > 1 && alive.length <= 1) {
         finishRound(room, alive[0]?.id ?? null);
       } else if (g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
-        advanceTurnServer(room); // was their turn — move on
+        advanceTurnServer(room); // was their turn - move on
       }
     }
   }
   if (g.players.length === 0) {
-    // nobody left to play — tear it ALL down and tell the room: spectators
+    // nobody left to play - tear it ALL down and tell the room: spectators
     // (sockets in the room but not in g.players) get null → back to the lobby
     room.game = null; room.sim = null;
     room.match = null; room.aiRt = null; // 🤖 scoreboard + bot runtime die with the game
@@ -584,10 +584,10 @@ function leaveCurrentRoom(socket) {
   room.players.delete(socket.id);
   if (room.players.size === 0) {
     rooms.delete(roomId);
-    console.log(`[room ${roomId}] empty — deleted`);
+    console.log(`[room ${roomId}] empty - deleted`);
   } else {
     // host left → crown the longest-standing survivor (Map keeps join order) as
-    // CARETAKER — the crown returns to the creator (hostCid) when they rejoin
+    // CARETAKER - the crown returns to the creator (hostCid) when they rejoin
     if (room.hostId === socket.id) {
       room.hostId = room.players.keys().next().value ?? null;
       console.log(`[room ${roomId}] 👑 host transferred to ${room.players.get(room.hostId)?.name} (caretaker)`);
@@ -599,14 +599,14 @@ function leaveCurrentRoom(socket) {
 let io;
 
 app.prepare().then(async () => {
-  // game libs are pure ESM (shared with the client bundle) — dynamic import
+  // game libs are pure ESM (shared with the client bundle) - dynamic import
   TERR = await import('./lib/terrain.mjs');
   BONUS = await import('./lib/bonus.mjs');
   AI = await import('./lib/ai.mjs'); // 🤖 CPU opponents
 
   const httpServer = createServer((req, res) => handle(req, res));
 
-  // Next dev HMR uses its own websocket on /_next/* — forward those upgrades
+  // Next dev HMR uses its own websocket on /_next/* - forward those upgrades
   const upgradeHandler = typeof app.getUpgradeHandler === 'function' ? app.getUpgradeHandler() : null;
   if (upgradeHandler) {
     httpServer.on('upgrade', (req, socket, head) => {
@@ -646,9 +646,9 @@ app.prepare().then(async () => {
         const player = { id: socket.id, name, emoji: pickEmoji(room), joinedAt: Date.now(), cid };
         room.players.set(socket.id, player);
         if (!room.hostId) room.hostId = socket.id; // first joiner is the room master 👑
-        if (!room.hostCid && cid && room.hostId === socket.id) room.hostCid = cid; // remember the creator's identity — set once
+        if (!room.hostCid && cid && room.hostId === socket.id) room.hostCid = cid; // remember the creator's identity - set once
         if (cid && room.hostCid === cid && room.hostId !== socket.id) { // 👑 the crown ALWAYS returns to the creator
-          room.hostId = socket.id; //        on (re)join — reloads/reconnects never switch the master
+          room.hostId = socket.id; //        on (re)join - reloads/reconnects never switch the master
           console.log(`[room ${roomId}] 👑 crown returned to creator ${name}`);
         }
         socket.data.roomId = roomId;
@@ -693,7 +693,7 @@ app.prepare().then(async () => {
     });
 
     // ── 🛡️ tank battle events ──
-    // active player passes their turn early (Enter) — classic mode only
+    // active player passes their turn early (Enter) - classic mode only
     socket.on('pass-turn', () => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
@@ -711,14 +711,14 @@ app.prepare().then(async () => {
       if (typeof p?.x === 'number' && isFinite(p.x)) t.x = Math.max(0, Math.min(g.terrain.width, p.x));
       if (typeof p?.y === 'number' && isFinite(p.y)) t.y = Math.max(-60, Math.min(g.terrain.height + 80, p.y));
       if (typeof p?.aim === 'number' && isFinite(p.aim)) t.aim = p.aim;
-      // 👀 shared intel: everyone sees everyone's fuel gauge — aim power stays the shooter's SECRET
+      // 👀 shared intel: everyone sees everyone's fuel gauge - aim power stays the shooter's SECRET
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
       if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
       if (typeof p?.palette === 'number' && isFinite(p.palette)) t.palette = ((p.palette | 0) % 6 + 6) % 6; // 🎨 recolors are public
       if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
-        fuel: t.fuel, para: t.para === true, palette: t.palette, // 🕵️ no power — that's the shooter's secret
+        fuel: t.fuel, para: t.para === true, palette: t.palette, // 🕵️ no power - that's the shooter's secret
       });
     });
     // 🌀 teleport: spend a pending teleport to land at x (classic: this turn
@@ -726,12 +726,12 @@ app.prepare().then(async () => {
     socket.on('teleport', (p) => {
       const room = rooms.get(socket.data.roomId);
       const g = room?.game;
-      const T = room?.sim?.T; // full bitmap (surface/waterY) — g.terrain is just a descriptor
+      const T = room?.sim?.T; // full bitmap (surface/waterY) - g.terrain is just a descriptor
       if (!g || !T) return;
       const tn = g.turn;
       const chaos = g.mode === 'chaos';
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
-      // 🙅 every refusal is nacked — the client waits for the relayed jump and
+      // 🙅 every refusal is nacked - the client waits for the relayed jump and
       //    must never keep a move the server rejected (#16: no free teleports)
       const deny = (reason) => socket.emit('teleport-denied', { reason });
       if (!me || me.dead || tn.phase === 'over') return deny('not-live');
@@ -739,13 +739,13 @@ app.prepare().then(async () => {
       if (!me.tele) return deny('no-teleport');
       const x = Math.max(30, Math.min(T.width - 30, Math.round(Number(p?.x) || 0)));
       const y = surfOf(T, x);
-      if (y > T.waterY - 6) return deny('wet'); // no watery graves — pick dry land
+      if (y > T.waterY - 6) return deny('wet'); // no watery graves - pick dry land
       me.tele = false;
       me.x = x; me.y = y;
       io.to(room.id).emit('game-event', { kind: 'teleport', id: me.id, x, y });
       broadcastGame(room.id);
     });
-    // fire — classic: the active player, turn ends; chaos: ANY living tank,
+    // fire - classic: the active player, turn ends; chaos: ANY living tank,
     // infinite shells behind a per-tank 1s reload, match keeps rolling
     socket.on('fire', (p) => {
       const room = rooms.get(socket.data.roomId);
@@ -753,15 +753,15 @@ app.prepare().then(async () => {
       if (!g) return;
       const tn = g.turn;
       const chaos = g.mode === 'chaos';
-      // 🙅 every refusal is nacked — the shooter fired OPTIMISTICALLY and must
+      // 🙅 every refusal is nacked - the shooter fired OPTIMISTICALLY and must
       //    roll back (dud the shell, refund the ammo) or the screens diverge
       const deny = (reason, extra) => socket.emit('fire-denied', { reason, ...extra });
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
       if (!me || me.dead || me.para || tn.phase === 'over') return deny('not-live'); // 🪂 guns stay packed until touchdown
       if (!chaos && (me.id !== socket.id || tn.phase !== 'open')) return deny('not-your-turn');
-      if (chaos) { // ⚡ reload gate — server is the referee
+      if (chaos) { // ⚡ reload gate - server is the referee
         const nowF = Date.now();
-        // 🎬 the countdown is a client-side artifact — without this gate a crafted
+        // 🎬 the countdown is a client-side artifact - without this gate a crafted
         //    client pre-fires while honest players are still watching "3, 2, 1"
         const grace = g.startedAt + CHAOS_FIRE_GRACE_MS - nowF;
         if (grace > 0) return deny('grace', { retryIn: grace });
@@ -782,7 +782,7 @@ app.prepare().then(async () => {
       io.to(room.id).emit('fire', { id: me.id, a, p: pw, kind, dmgScale });
       broadcastGame(room.id);
     });
-    // shooter reports an impact — server applies it to the bitmap, computes
+    // shooter reports an impact - server applies it to the bitmap, computes
     // authoritative damage from last-known positions, relays to everyone
     socket.on('blast', (p) => {
       const room = rooms.get(socket.data.roomId);
@@ -793,7 +793,7 @@ app.prepare().then(async () => {
       const me = chaos ? g.tanks.find((tk) => tk.id === socket.id) : g.tanks[tn.activeIdx];
       if (!me || tn.phase === 'over') return;
       if (!chaos && (me.id !== socket.id || (tn.phase !== 'shot' && tn.phase !== 'settle'))) return;
-      // ⚡ chaos: a shell you fired while alive may land after you die — allow a
+      // ⚡ chaos: a shell you fired while alive may land after you die - allow a
       //    short ghost window so the shared terrain/damage stays consistent
       if (chaos && me.dead && Date.now() - (me.cdAt || 0) > CHAOS_GHOST_MS) return;
       applyBlast(room, me, p);

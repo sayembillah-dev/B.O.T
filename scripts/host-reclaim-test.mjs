@@ -1,5 +1,5 @@
 /**
- * 👑 Host-crown stability test — the lobby master must NEVER switch away from
+ * 👑 Host-crown stability test - the lobby master must NEVER switch away from
  * the room creator:
  *   1. creator A joins → host
  *   2. member B joins → A stays host
@@ -116,5 +116,5 @@ console.log('✅ mid-game drop/rejoin: crown still returns to the creator');
 
 await sleep(200);
 [b2, a3].forEach((s) => s.disconnect());
-console.log('\n🎉 HOST CROWN STABLE — creator keeps the master role through drops, rejoins and matches');
+console.log('\n🎉 HOST CROWN STABLE - creator keeps the master role through drops, rejoins and matches');
 process.exit(0);

@@ -1,5 +1,5 @@
 /**
- * 🌐 Multiplayer game-protocol probe — exercises the authoritative flow:
+ * 🌐 Multiplayer game-protocol probe - exercises the authoritative flow:
  * join ×2 → start → (tanks, turn, wind present) → tank-move relay →
  * fire → blast with server-computed damage → shot-done → settle → turn
  * rotates → pass-turn → turn rotates back → regen-terrain → end-game.
@@ -33,13 +33,13 @@ await join(a, 'Ana');
 await join(b, 'Bo');
 ok('both joined room ' + ROOM);
 
-// start (2 players — no dev flag needed)
+// start (2 players - no dev flag needed)
 let aGs = null, bGs = null;
 const aP = nextGameState(a, (g) => g.phase === 'playing').then((g) => (aGs = g));
 const bP = nextGameState(b, (g) => g.phase === 'playing').then((g) => (bGs = g));
 a.emit('start-game');
 await Promise.all([aP, bP]);
-ok(`game started — ${aGs.tanks.length} tanks, turn ${aGs.turn.num} phase=${aGs.turn.phase}, wind=${aGs.wind}`);
+ok(`game started - ${aGs.tanks.length} tanks, turn ${aGs.turn.num} phase=${aGs.turn.phase}, wind=${aGs.wind}`);
 if (aGs.tanks.length !== 2) fail('expected 2 tanks');
 if (typeof aGs.wind !== 'number') fail('wind missing');
 if (JSON.stringify(aGs.tanks.map(t => t.x)) !== JSON.stringify(bGs.tanks.map(t => t.x))) fail('spawn positions differ between clients');
@@ -49,7 +49,7 @@ const activeSock = aGs.tanks[aGs.turn.activeIdx].id === aGs.tanks[0].id && aGs.p
 // figure out which socket owns the active tank
 const activeId = aGs.tanks[aGs.turn.activeIdx].id;
 // whoAmI: check join replies? simpler: each socket emits tank-move and sees if accepted via relay
-// deterministic: ask both — the one whose id matches is active. We know ids from gs.players order == join order.
+// deterministic: ask both - the one whose id matches is active. We know ids from gs.players order == join order.
 const aId = (await new Promise((res) => a.emit('join-room', { roomId: ROOM, name: 'Ana' }, res))).you.id;
 const bId = (await new Promise((res) => b.emit('join-room', { roomId: ROOM, name: 'Bo' }, res))).you.id;
 const shooter = activeId === aId ? a : b;
@@ -85,7 +85,7 @@ shooter.emit('blast', { x: foeTank.x, y: foeTank.y - 14, r: 58, scale: 1, big: f
 const bl = await blastP;
 const hit = bl.dmg?.find((d) => d.id === foeId);
 if (!hit) fail('blast did not damage the foe: ' + JSON.stringify(bl.dmg));
-else ok(`blast applied — foe took ${hit.d} dmg (hp ${hit.hp}, direct=${hit.direct})`);
+else ok(`blast applied - foe took ${hit.d} dmg (hp ${hit.hp}, direct=${hit.direct})`);
 
 // shot-done → settle → turn rotates to the other player
 const rotP = nextGameState(a, (g) => g.turn.phase === 'open' && g.turn.num === 2);
@@ -113,5 +113,5 @@ await sleep(300);
 a.close(); b.close();
 await sleep(200);
 if (failed) { console.error('\n💥 probe failed'); process.exit(1); }
-console.log('\n🎉 multiplayer probe passed — full protocol works');
+console.log('\n🎉 multiplayer probe passed - full protocol works');
 process.exit(0);

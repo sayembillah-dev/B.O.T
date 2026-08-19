@@ -28,7 +28,7 @@ export default function Room({ roomId }) {
   const autoStartedRef = useRef(false);
   const modeParamRef = useRef(null);   // 🧪 dev: ?mode=chaos pre-picks the game mode
   const manualRef = useRef(false);     // 🧪 dev: ?manual=1 disables the solo auto-start
-  const aiRef = useRef(null);          // 🤖 ?ai=easy|medium|hard — server-driven CPU opponent
+  const aiRef = useRef(null);          // 🤖 ?ai=easy|medium|hard - server-driven CPU opponent
   const [aiDiff, setAiDiff] = useState(null); // React mirror for lobby UI
   const [localCount, setLocalCount] = useState(0); // hot-seat: ?local=N (2-4) on one screen
 
@@ -58,7 +58,7 @@ export default function Room({ roomId }) {
     }
   }, []);
 
-  // 🧪 dev: ?mode=chaos — the host pre-picks the mode before anyone starts
+  // 🧪 dev: ?mode=chaos - the host pre-picks the mode before anyone starts
   useEffect(() => {
     if (joined && myId && modeParamRef.current) {
       getSocket()?.emit('set-mode', modeParamRef.current);
@@ -68,7 +68,7 @@ export default function Room({ roomId }) {
 
   useEffect(() => {
     if (soloRef.current && joined && myId && gs === null && !autoStartedRef.current && !manualRef.current) {
-      autoStartedRef.current = true; // once per mount — don't restart after end-game
+      autoStartedRef.current = true; // once per mount - don't restart after end-game
       // 🤖 vs-AI rides the same dev start; the server adds a CPU tank to the roster
       getSocket()?.emit('start-game', { dev: true, ...(aiRef.current ? { ai: aiRef.current } : {}) });
     }
@@ -120,9 +120,9 @@ export default function Room({ roomId }) {
     const onStartDenied = (m) => {
       const why = {
         'host-only': 'Only the room master can start the game.',
-        'need-players': 'Need at least 2 players — share the link, or open a solo / vs-CPU game.',
+        'need-players': 'Need at least 2 players - share the link, or open a solo / vs-CPU game.',
         'already-running': 'A game is already running in this room.',
-        'create-failed': 'The server failed to create the game — try again.',
+        'create-failed': 'The server failed to create the game - try again.',
       }[m?.reason] ?? 'The server refused to start the game.';
       setError(why);
     };
@@ -195,7 +195,7 @@ export default function Room({ roomId }) {
     return <Game gs={gs} myId={myId} local={localCount} />;
   }
 
-  // 🖥️ solo / vs-CPU are dev starts — legal only in a 1-player room. With a
+  // 🖥️ solo / vs-CPU are dev starts - legal only in a 1-player room. With a
   //    2nd human aboard, fall back to a normal start (the CPU sits that one
   //    out) instead of firing a dev payload the server has to reject.
   const devStart = players.length < 2 && (soloRef.current || !!aiDiff);
@@ -236,7 +236,7 @@ export default function Room({ roomId }) {
                 {p.id === myId && <span className="you-badge">you</span>}
               </li>
             ))}
-            {aiDiff && ( // 🤖 the CPU doesn't sit in the lobby — but it's in the game
+            {aiDiff && ( // 🤖 the CPU doesn't sit in the lobby - but it's in the game
               <li className="player">
                 <span className="player-emoji">🤖</span>
                 <span className="player-name">CPU · {aiDiff[0].toUpperCase() + aiDiff.slice(1)}</span>
@@ -253,7 +253,7 @@ export default function Room({ roomId }) {
               <button
                 type="button"
                 className={`round-chip ${mode === 'classic' ? 'active' : ''}`}
-                title="Turn-based artillery — aim, charge, fire, next player"
+                title="Turn-based artillery - aim, charge, fire, next player"
                 onClick={() => getSocket()?.emit('set-mode', 'classic')}
               >
                 ⚔️ Classic
@@ -261,7 +261,7 @@ export default function Room({ roomId }) {
               <button
                 type="button"
                 className={`round-chip ${mode === 'chaos' ? 'active' : ''}`}
-                title="Real-time free-for-all — everyone moves at once, infinite shells, 1s reload, 5s respawn, 3-minute clock, most damage wins"
+                title="Real-time free-for-all - everyone moves at once, infinite shells, 1s reload, 5s respawn, 3-minute clock, most damage wins"
                 onClick={() => getSocket()?.emit('set-mode', 'chaos')}
               >
                 ⚡ Chaos
@@ -290,24 +290,24 @@ export default function Room({ roomId }) {
             </button>
             <p className="hint">
               {players.length < 2 && !devStart
-                ? 'Share the link — you need at least 2 players to start.'
+                ? 'Share the link - you need at least 2 players to start.'
                 : aiDiff && devStart
-                  ? `🤖 You vs CPU · ${aiDiff[0].toUpperCase() + aiDiff.slice(1)}${roundsTotal > 1 ? ` — best of ${roundsTotal}` : ''}. Start when ready.`
-                : aiDiff // 🤖 2+ humans in a ?ai room — normal start, the CPU sits it out
-                  ? `Two humans aboard — this starts a normal game (the CPU sits it out).${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
+                  ? `🤖 You vs CPU · ${aiDiff[0].toUpperCase() + aiDiff.slice(1)}${roundsTotal > 1 ? ` - best of ${roundsTotal}` : ''}. Start when ready.`
+                : aiDiff // 🤖 2+ humans in a ?ai room - normal start, the CPU sits it out
+                  ? `Two humans aboard - this starts a normal game (the CPU sits it out).${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
                 : soloRef.current && players.length < 2
-                  ? '🖥️ Solo sandbox — start when ready. It all runs on this screen.'
+                  ? '🖥️ Solo sandbox - start when ready. It all runs on this screen.'
                 : mode === 'chaos'
-                  ? `⚡ Chaos: everyone moves at once — infinite shells, 1s reload, 5s respawn, fast fuel refill, 3-minute clock. Most damage dealt wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
+                  ? `⚡ Chaos: everyone moves at once - infinite shells, 1s reload, 5s respawn, fast fuel refill, 3-minute clock. Most damage dealt wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
                   : roundsTotal > 1
-                    ? `Best of ${roundsTotal} — most round wins takes the match.`
+                    ? `Best of ${roundsTotal} - most round wins takes the match.`
                     : 'Everyone is in! Start when ready.'}
             </p>
           </>
         ) : (
           <p className="hint" style={{ marginTop: '1.25rem' }}>
             👑 <strong>{players.find((p) => p.id === hostId)?.name ?? 'The host'}</strong> is the room master
-            {mode === 'chaos' ? ' — ⚡ CHAOS mode' : ''}{roundsTotal > 1 ? ` — best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
+            {mode === 'chaos' ? ' - ⚡ CHAOS mode' : ''}{roundsTotal > 1 ? ` - best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
           </p>
         )}
 

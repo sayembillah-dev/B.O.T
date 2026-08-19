@@ -62,7 +62,7 @@ try {
   // next-round rejected while round 2 is still running
   alice.emit('next-round');
   await sleep(400);
-  // (silent reject — no crash, still playing round 2)
+  // (silent reject - no crash, still playing round 2)
   console.log('✅ next-round mid-game ignored (no crash)');
 
   alice.emit('end-game');

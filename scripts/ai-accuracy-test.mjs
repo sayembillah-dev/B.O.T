@@ -26,7 +26,7 @@ for (const d of Object.keys(DIFFS)) {
   stats[d] = { shots: 0, hits: 0, directs: 0, dmg: 0, self: 0, kills: 0, guided: 0, specials: 0, solv: 0, solvHits: 0 };
 }
 
-// deterministic seeds — reproducible difficulty curve across runs
+// deterministic seeds - reproducible difficulty curve across runs
 let terrains = [];
 for (let i = 0; i < 6; i++) {
   const dims = terrainDims(2);
@@ -57,7 +57,7 @@ for (const difficulty of Object.keys(DIFFS)) {
     const solvable = (plan.expect ?? 0) >= 25; // a real firing solution existed
     if (solvable) S.solv++;
 
-    // the REAL shell — whatever the error model did to the perfect solution
+    // the REAL shell - whatever the error model did to the perfect solution
     const impacts = simulateShot(T, [you, me], me, plan.a, plan.p, plan.kind, wind);
     let dealt = 0, direct = false;
     for (const imp of impacts) {
@@ -81,7 +81,7 @@ for (const [d, S] of Object.entries(stats)) {
     `  ${d.padEnd(8)} │ ${pct(S.hits, S.shots)}  │ ${pct(S.directs, S.shots)} │     ${pct(S.solvHits, S.solv)} (${Math.round((S.solv / Math.max(1, S.shots)) * 100)}%) │ ${(S.dmg / Math.max(1, S.shots)).toFixed(1).padStart(7)} │ ${String(S.self).padStart(8)} │ ${S.shots}`,
   );
 }
-console.log('\n  (solvable-hit = accuracy when a real firing solution existed — isolates');
+console.log('\n  (solvable-hit = accuracy when a real firing solution existed - isolates');
 console.log('   aim quality from terrain luck; in-game the bot also repositions/unblocks)');
 
 const e = stats.easy.hits / stats.easy.shots;
@@ -104,4 +104,4 @@ else if (selfRate('hard') > 0.011 || selfRate('medium') > 0.03 || selfRate('easy
   fail = `self-bomb rate too high (easy ${(selfRate('easy') * 100).toFixed(0)}%, medium ${(selfRate('medium') * 100).toFixed(0)}%, hard ${(selfRate('hard') * 100).toFixed(0)}%)`;
 }
 if (fail) { console.error(`\n❌ ${fail}`); process.exit(1); }
-console.log('\n✅ difficulty curve is precisely engineered — bots never self-bomb');
+console.log('\n✅ difficulty curve is precisely engineered - bots never self-bomb');

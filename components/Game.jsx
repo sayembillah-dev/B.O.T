@@ -9,89 +9,89 @@ import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
 import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
 
 /**
- * 🛡️ B.O.T — battle of tanks. Worms-style, side-view destructible terrain, zero sprites.
+ * 🛡️ B.O.T - battle of tanks. Worms-style, side-view destructible terrain, zero sprites.
  * mouse aims (free, live), scroll to set power, click to fire.
  *
- * 🔁 TURNS + FUEL — a turn is OPEN (act) → shot → settle → next player.
+ * 🔁 TURNS + FUEL - a turn is OPEN (act) → shot → settle → next player.
  * Power carries across the turn (scroll to adjust any time); firing only
  * requires being parked (grounded, near-zero speed) at the moment you click.
- * 💾 Your last missile power is persisted (localStorage) — it carries across
+ * 💾 Your last missile power is persisted (localStorage) - it carries across
  * turns, rounds, respawns, and every match until you scroll it again.
- * (⚡ chaos: run-and-gun — fire while driving AND mid-jump; spawns/respawns
+ * (⚡ chaos: run-and-gun - fire while driving AND mid-jump; spawns/respawns
  * parachute in from the sky, and YOUR tank wears the hero marker: a soft sky beam + ONE ground ring that doubles as the reload meter.)
  * Firing ends the turn; Enter passes. Fuel burns while driving/jumping and
  * regenerates slowly; empty tank = engine dead.
  *
- * 🌬️ WIND (milestone 9) — rolled fresh every turn, shown in the top bar.
+ * 🌬️ WIND (milestone 9) - rolled fresh every turn, shown in the top bar.
  * Pushes shells sideways (guided resists), sways parachuting crates, and
  * drifts smoke. Online the server rolls it; locally it's per-turn random.
  *
- * 🛋️ HOT-SEAT — one screen, 2–4 local players (?solo=1&local=N).
- * 🌐 ONLINE (milestone 9) — real multiplayer rooms: the server is authoritative
+ * 🛋️ HOT-SEAT - one screen, 2–4 local players (?solo=1&local=N).
+ * 🌐 ONLINE (milestone 9) - real multiplayer rooms: the server is authoritative
  * (turn order + timer, wind, HP/inventory, supply drops, blasts). The active
  * player streams their tank and reports shot impacts; everyone else watches
  * the same sim. Late joiners replay the blast log and spectate until rematch.
  *
- * 🎁 SUPPLY DROPS — crates parachute in every 24–40s (max 3) at the spot most
+ * 🎁 SUPPLY DROPS - crates parachute in every 24–40s (max 3) at the spot most
  * equally distant from every tank, and vanish 60s after landing. ×2/×3 = double
  * damage for the next 2/3 hits; 💥 cluster lands, THEN bursts into 3 bomblets;
  * ❤ repairs; 🎯 guided locks the nearest opponent, hugs the terrain and cannot
  * miss; 🪓 tomahawk = slow heavy shell → MASSIVE blast + mushroom + white flash.
  * Keys 1–4 pick the shell for the next shot (1 = normal).
  *
- * ⚡ CHAOS MODE (online) — real-time free-for-all: no turns, everyone drives
+ * ⚡ CHAOS MODE (online) - real-time free-for-all: no turns, everyone drives
  * and shoots at once. Infinite normal shells behind a 1s reload (specials still
  * come from crates), fuel refills from empty in 3s, wind re-rolls on a
- * wall-clock timer, one 3:00 match clock. Death is a 5s timeout — tanks
+ * wall-clock timer, one 3:00 match clock. Death is a 5s timeout - tanks
  * respawn, and MOST DAMAGE DEALT at 0:00 wins.
  * Shells from every tank fly simultaneously (projsRef array).
  *
- * 🔊 SFX — procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
+ * 🔊 SFX - procedural WebAudio (lib/sfx.mjs), zero assets. 🔊 button mutes.
  */
 const GRAV = 850;
 const POWER_SCROLL = 0.0009;       // power change per wheel-delta unit
-// 💾 last missile power persists per browser — across turns, rounds, and matches
+// 💾 last missile power persists per browser - across turns, rounds, and matches
 const POWER_KEY = 'bot:last-power';
 const loadPower = () => {
-  if (typeof window === 'undefined') return 0.5; // SSR — no storage yet
+  if (typeof window === 'undefined') return 0.5; // SSR - no storage yet
   const raw = window.localStorage.getItem(POWER_KEY);
   if (raw == null) return 0.5;
   const v = Number(raw);
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
 };
-const savePower = (p) => { try { window.localStorage.setItem(POWER_KEY, String(Math.round(p * 1000) / 1000)); } catch { /* storage blocked — play on */ } };
-const SPEED = (p) => 300 + p * 1200; // more push — full power really launches
+const savePower = (p) => { try { window.localStorage.setItem(POWER_KEY, String(Math.round(p * 1000) / 1000)); } catch { /* storage blocked - play on */ } };
+const SPEED = (p) => 300 + p * 1200; // more push - full power really launches
 const BLAST_R = 58;
 const FUEL_BURN = (s) => 3.5 + 15 * (Math.abs(s) / 175); // per-second while driving
 const FUEL_REGEN = 1.8;  // per-second while not driving
-const FUEL_JUMP = 14;    // one-off jump cost (hefty — hopping is expensive)
+const FUEL_JUMP = 14;    // one-off jump cost (hefty - hopping is expensive)
 const TURN_TIME = 20;    // seconds per turn, then it auto-passes
 const WIND_MAX = 95;     // px/s² sideways push on shells at full strength
-// 🎯 guided missile — a powered cruise missile, not a lobbed shell. It locks the
+// 🎯 guided missile - a powered cruise missile, not a lobbed shell. It locks the
 // nearest opponent, hugs the terrain to clear ridges, then dives straight onto
 // them with a proximity fuse and doubled endgame pitch authority: it ALWAYS hits.
-const GUIDED_SPEED = 900;  // constant motor speed (px/s) — charge power is irrelevant
+const GUIDED_SPEED = 900;  // constant motor speed (px/s) - charge power is irrelevant
 const GUIDED_TURN = 10;    // rad/s pitch authority at cruise (×2.2 in the terminal dive)
 const GUIDED_CLEAR = 95;   // px it tries to stay above the ridgeline ahead
 const GUIDED_LOOK = 420;   // px of terrain look-ahead when picking a cruise altitude
-const GUIDED_FUEL = 12;    // s of motor burn — far more than any map crossing needs
-const GUIDED_FUSE = 28;    // px proximity fuse — this close already counts as a direct hit
-const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell — flies far slower than a normal shot
+const GUIDED_FUEL = 12;    // s of motor burn - far more than any map crossing needs
+const GUIDED_FUSE = 28;    // px proximity fuse - this close already counts as a direct hit
+const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell - flies far slower than a normal shot
 const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
-const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload — seconds between shots (server enforces too)
-const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn — seconds dead before you're back
-const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) — gentle drop-in
-const PARA_DRIFT = 95;     // 🪂 steering speed (px/s) — A/D glides you to a new landing spot
-// ⚡ chaos crates are UNCOVERED — badge shows the contents, not a mystery '?'
+const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload - seconds between shots (server enforces too)
+const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn - seconds dead before you're back
+const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) - gentle drop-in
+const PARA_DRIFT = 95;     // 🪂 steering speed (px/s) - A/D glides you to a new landing spot
+// ⚡ chaos crates are UNCOVERED - badge shows the contents, not a mystery '?'
 const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️' };
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
-// ⏳ pre-round countdown — "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
+// ⏳ pre-round countdown - "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
 const NET_HZ = 12;       // own-tank position stream rate (online)
 
 const LOCAL_EMOJI = ['🐯', '🦊', '🐸', '🐵'];
 const LOCAL_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
-// ⚖️ fair spawns — N players get N evenly-spaced slots, symmetric about the map
+// ⚖️ fair spawns - N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
 const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
   n === 1 ? 0.5 : 0.12 + (i * 0.76) / (n - 1));
@@ -103,7 +103,7 @@ const spawnSlots = (n) => Array.from({ length: n }, (_, i) =>
 const findSpawn = (surf, terrain, ideal, placed, maxR) => {
   const ok = (x) =>
     x >= 40 && x <= terrain.width - 40 &&
-    Math.abs(surf(x + 8) - surf(x - 8)) <= 20 &&   // ~51° max — tanks handle slopes
+    Math.abs(surf(x + 8) - surf(x - 8)) <= 20 &&   // ~51° max - tanks handle slopes
     surf(x) <= terrain.waterY - 40 &&              // dry
     placed.every((px) => Math.abs(px - x) >= 90);  // never on top of a teammate
   for (let d = 0; d <= maxR; d += 12) {
@@ -120,7 +120,7 @@ const rollWind = () => {
   return Math.sign(w) * Math.pow(Math.abs(w), 0.7);
 };
 
-/** Small name tag floating above a tank (world-space) — stroked for legibility over any terrain. */
+/** Small name tag floating above a tank (world-space) - stroked for legibility over any terrain. */
 const drawNameTag = (ctx, x, y, t) => {
   const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
   if (!label) return;
@@ -139,17 +139,17 @@ export default function Game({ gs, myId, local = 0 }) {
   const terrainCanvasRef = useRef(null);
   const terrainRef = useRef(null);
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 });
-  // ⏳ pre-round "3, 2, 1, FIGHT!" — remaining seconds; input/turn-timer freeze while > 0
+  // ⏳ pre-round "3, 2, 1, FIGHT!" - remaining seconds; input/turn-timer freeze while > 0
   const countdownRef = useRef(0);
   const cdLabelRef = useRef(null); // last shown label, so the tick/FIGHT sfx fires once per beat
   const tanksRef = useRef([]);
   const aimRef = useRef(-0.6);
   const mouseRef = useRef({ x: 0, y: 0 });
   const chargeRef = useRef({ power: loadPower() }); // 💾 your last missile power rides in with you
-  const powerFlashRef = useRef(-9999);   // ⚡ last power-scroll time (rAF clock) — drives the brief turret charge arc
-  const teleRef = useRef(null);              // 🌀 null | { targeting: bool } — pending teleport (owner only)
-  const [teleUi, setTeleUi] = useState(null); // null | 'pending' | 'targeting' — React mirror for UI chips
-  const projsRef = useRef([]);       // shells in flight — classic: at most 1; chaos: everyone's at once
+  const powerFlashRef = useRef(-9999);   // ⚡ last power-scroll time (rAF clock) - drives the brief turret charge arc
+  const teleRef = useRef(null);              // 🌀 null | { targeting: bool } - pending teleport (owner only)
+  const [teleUi, setTeleUi] = useState(null); // null | 'pending' | 'targeting' - React mirror for UI chips
+  const projsRef = useRef([]);       // shells in flight - classic: at most 1; chaos: everyone's at once
   const subsRef = useRef([]);        // cluster sub-munitions
   const bonusRef = useRef([]);       // supply-drop crates (falling + landed)
   const streaksRef = useRef([]);     // 🌬️ ambient wind streaks in the sky
@@ -158,19 +158,19 @@ export default function Game({ gs, myId, local = 0 }) {
   const selRef = useRef('normal');   // selected shell for the next shot
   const whiteRef = useRef(0);        // tomahawk white-screen flash (1 → 0)
   const repaintQRef = useRef([]);    // 🧱 chunked terrain-repaint bands (mega-blasts, #14)
-  const windRef = useRef(0);         // 🌬️ wind ∈ [-1,1] — server-owned online
+  const windRef = useRef(0);         // 🌬️ wind ∈ [-1,1] - server-owned online
   const fxRef = useRef(new FX());
   const shakeRef = useRef(0);
   const keysRef = useRef(new Set());
-  const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' — mirrored from server online
+  const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' - mirrored from server online
   const gsRef = useRef(null);        // latest game-state prop (read inside effects)
   const onlineRef = useRef(false);   // online multiplayer mode flag
   const chaosRef = useRef(false);    // ⚡ chaos mode flag (online only)
   const myIdRef = useRef(null);
   const netAccRef = useRef(0);       // own-tank stream accumulator
   const lastShotMineRef = useRef(false); // online: I fired the in-flight shot
-  const shotSeqRef = useRef(0);        // 🏷️ per-shot id — lets a server nack find MY shell
-  const lastFireRef = useRef(null);    // 🧾 { shot, kind, buff } — what the last optimistic fire consumed
+  const shotSeqRef = useRef(0);        // 🏷️ per-shot id - lets a server nack find MY shell
+  const lastFireRef = useRef(null);    // 🧾 { shot, kind, buff } - what the last optimistic fire consumed
   const numRef = useRef(1);          // last turn number seen (turn-change sfx)
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
@@ -224,7 +224,7 @@ export default function Game({ gs, myId, local = 0 }) {
     bonusRef.current = [];
     dropTRef.current = 10;
     streaksRef.current = []; // 🌬️ fresh sky for a fresh battle
-    // 💾 power is NOT reset — your last missile power carries into the new battle
+    // 💾 power is NOT reset - your last missile power carries into the new battle
     selRef.current = 'normal';
     teleRef.current = null; setTeleUi(null); // 🌀 fresh game, no pending teleports
     whiteRef.current = 0;
@@ -262,7 +262,7 @@ export default function Game({ gs, myId, local = 0 }) {
         const srvTanks = local > 0 ? null : (gsRef.current?.tanks ?? null);
         const placed = []; // ⚖️ fairness: each new spawn keeps its distance from these
         const slotGap = roster.length > 1 ? terrain.width * 0.76 / (roster.length - 1) : terrain.width;
-        // 🎲 shuffled assignment — spawn slot per player is re-rolled every
+        // 🎲 shuffled assignment - spawn slot per player is re-rolled every
         //    game, so position never follows the join/roster order
         const slotList = spawnSlots(roster.length);
         for (let i = slotList.length - 1; i > 0; i--) {
@@ -285,7 +285,7 @@ export default function Game({ gs, myId, local = 0 }) {
             ...p, x, y, s: 0, rot: 0, susOff: 0, susVel: 0,
             wheelRot: 0, grounded: !st?.para, airVy: 0, dustT: 0, // 🪂 chute drops start airborne
             para: !!st?.para,
-            hp: st?.hp ?? 100, fuel: st?.fuel ?? 100, // ⛽ server-owned online — a reload no longer refills the tank
+            hp: st?.hp ?? 100, fuel: st?.fuel ?? 100, // ⛽ server-owned online - a reload no longer refills the tank
             driving: false, dead: !!st?.dead,
             inv: st?.inv ? { ...st.inv } : { cluster: 0, guided: 0, tomahawk: 0 }, // special shells in stock
             tele: !!st?.tele,                                       // 🌀 pending teleport (visible to all)
@@ -341,7 +341,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (gs.turn.num !== numRef.current) {
         numRef.current = gs.turn.num;
         sfx('turn');
-        // 🔄 same rule as local advanceTurn: weapon back to normal (power persists — 💾 your last charge is remembered)
+        // 🔄 same rule as local advanceTurn: weapon back to normal (power persists - 💾 your last charge is remembered)
         selRef.current = 'normal'; setSelUi('normal');
         const nt = tanksRef.current[gs.turn.activeIdx];
         if (nt) setColorName(TANK_PALETTES[(nt.palette ?? 0) % TANK_PALETTES.length].name);
@@ -358,7 +358,7 @@ export default function Game({ gs, myId, local = 0 }) {
       t.hp = st.hp;
       t.inv = { ...st.inv };
       t.buff = st.buff;
-      t.dmg = st.dmg | 0; // ⚡ chaos scoreboard — damage dealt
+      t.dmg = st.dmg | 0; // ⚡ chaos scoreboard - damage dealt
       t.shieldUntil = st.shieldUntil ?? 0; // 🛡️ chaos shield bubble
       if (st.para) t.para = true; // 🪂 one-way: touchdown clears it locally
       t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
@@ -366,13 +366,13 @@ export default function Game({ gs, myId, local = 0 }) {
         t.palette = st.palette;
         if (st.id === myIdRef.current) setColorName(TANK_PALETTES[st.palette % TANK_PALETTES.length].name);
       }
-      // 🤖 off-turn bots don't stream footing — adopt the server's re-grounded y
+      // 🤖 off-turn bots don't stream footing - adopt the server's re-grounded y
       if (st.ai && !st.dead && typeof st.y === 'number' && Math.abs((t.y ?? st.y) - st.y) > 2) t.y = st.y;
       if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
         teleRef.current = null; setTeleUi(null);
       }
       if (st.dead && !t.dead) { t.dead = true; t.driving = false; t.deadAtMs = performance.now(); } // 💀 chaos: respawn countdown starts
-      else if (!st.dead && t.dead) { // ⚡ chaos respawn — server revived this tank at a fresh spot
+      else if (!st.dead && t.dead) { // ⚡ chaos respawn - server revived this tank at a fresh spot
         t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
         t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100; t.aim = st.aim ?? t.aim;
         t.para = !!st.para; // 🪂 ride the chute down again
@@ -381,7 +381,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (st.id === myIdRef.current) { aimRef.current = t.aim; sfx('turn'); } // 💾 power survives respawn too
       }
     }
-    // crates mirror — positions eased toward server targets in update()
+    // crates mirror - positions eased toward server targets in update()
     const prev = bonusRef.current;
     bonusRef.current = (gs.crates ?? []).map((c) => {
       const ex = prev.find((b) => b.id === c.id);
@@ -392,7 +392,7 @@ export default function Game({ gs, myId, local = 0 }) {
   }, [gs, online]);
 
   const activeTank = () => tanksRef.current[turnRef.current.activeIdx] ?? null;
-  // the tank THIS screen steers — ⚡ chaos: always mine; classic: whose turn it is
+  // the tank THIS screen steers - ⚡ chaos: always mine; classic: whose turn it is
   const controlTank = () => chaosRef.current
     ? (tanksRef.current.find((t) => t.id === myIdRef.current) ?? null)
     : activeTank();
@@ -406,7 +406,7 @@ export default function Game({ gs, myId, local = 0 }) {
     return { x: p.x + Math.cos(a) * (TANK.barrelLen + 7), y: p.y + Math.sin(a) * (TANK.barrelLen + 7) };
   };
 
-  // ── turn rotation (local modes only — server advances online) ──
+  // ── turn rotation (local modes only - server advances online) ──
   const checkGameOver = useCallback(() => {
     const ts = tanksRef.current;
     if (ts.length <= 1) return false; // solo: respawn instead, never "over"
@@ -425,11 +425,11 @@ export default function Game({ gs, myId, local = 0 }) {
     const tn = turnRef.current;
     const ts = tanksRef.current;
     if (!ts.length || tn.phase === 'over') return;
-    // 💾 power carries across turns — your last missile power is remembered
+    // 💾 power carries across turns - your last missile power is remembered
     selRef.current = 'normal'; // weapon pick doesn't carry across turns
     setSelUi('normal');
     if (checkGameOver()) return;
-    if (teleRef.current) { // 🌀 teleport not used in time — the turn eats it
+    if (teleRef.current) { // 🌀 teleport not used in time - the turn eats it
       const prev = ts[tn.activeIdx];
       if (prev) { prev.tele = false; fxRef.current.text(prev.x, (prev.y ?? 0) - 56, '🌀 fizzled…', '#b48cff'); }
       teleRef.current = null; setTeleUi(null);
@@ -459,16 +459,16 @@ export default function Game({ gs, myId, local = 0 }) {
     const cut = []; // 🌱 cleared cells → rim seeds for the floater scan (#14)
     destroyCircle(terrain, x, y, r, cut);
     cleanDebris(terrain, x, y, r + 16, cut); // no invisible slivers to stand on
-    const floaters = removeFloaters(terrain, x, y, r + 190, cut); // NOTHING floats — any size island goes
-    reflowSky(terrain, x, y, r + 16); // craters are open to the sky — no black
+    const floaters = removeFloaters(terrain, x, y, r + 190, cut); // NOTHING floats - any size island goes
+    reflowSky(terrain, x, y, r + 16); // craters are open to the sky - no black
     // 🧱 fbm-heavy region repaints hitch the frame on big blasts: anything past
-    //    ~60k px (☢️ tomahawk ≈ 190k) is sliced into ≤48px bands — crater-centre
-    //    first — and paid down over the next frames from the main loop (#14)
+    //    ~60k px (☢️ tomahawk ≈ 190k) is sliced into ≤48px bands - crater-centre
+    //    first - and paid down over the next frames from the main loop (#14)
     const regions = floaters.map((fl) => ({ x: fl.x, y: fl.y, w: fl.w, h: fl.h }));
     regions.push({ x: x - r - 16, y: y - r - 16, w: (r + 16) * 2, h: (r + 16) * 2 });
     let px = 0;
     for (const rg of regions) px += rg.w * rg.h;
-    if (px <= 60000) { // small blast — repaint instantly, as always
+    if (px <= 60000) { // small blast - repaint instantly, as always
       const c2d = off.getContext('2d');
       for (const rg of regions) {
         const reg = renderTerrainRegion(terrain, rg.x, rg.y, rg.w, rg.h);
@@ -486,12 +486,12 @@ export default function Game({ gs, myId, local = 0 }) {
       bands.sort((a2, b2) => a2.d - b2.d); // the crater bowl appears first
       repaintQRef.current.push(...bands);
     }
-    if (opts.big) { // ☢️ tomahawk: SLOW mega-blast — huge mushroom, rolling shock rings, long white flash, lingering ground fire, mega shake
+    if (opts.big) { // ☢️ tomahawk: SLOW mega-blast - huge mushroom, rolling shock rings, long white flash, lingering ground fire, mega shake
       fxRef.current.mushroom(x, y);
       fxRef.current.add({ t: 'ring', x, y, size: 26, grow: 1400, life: 0.8, color: 'rgba(255,255,255,0.95)' });
       fxRef.current.add({ t: 'ring', x, y, size: 14, grow: 900, life: 1.4, color: 'rgba(255,250,235,0.9)' });
       fxRef.current.add({ t: 'ring', x, y, size: 8, grow: 520, life: 1.9, color: 'rgba(255,190,120,0.8)' });
-      // lingering ground fire — the crater keeps burning long after the hit
+      // lingering ground fire - the crater keeps burning long after the hit
       for (let i = 0; i < 10; i++) {
         fxRef.current.add({ t: 'fire', x: x + (Math.random() - 0.5) * 260, y: y - Math.random() * 10,
           vx: (Math.random() - 0.5) * 20, vy: -30 - Math.random() * 50,
@@ -555,7 +555,7 @@ export default function Game({ gs, myId, local = 0 }) {
         fxRef.current.boom(tx, ty);
         died = true;
         if (tanksRef.current.length > 1) {
-          t.dead = true; t.hp = 0; t.driving = false; // eliminated — out of the rotation
+          t.dead = true; t.hp = 0; t.driving = false; // eliminated - out of the rotation
           fxRef.current.text(tx, ty - 40, 'ELIMINATED', '#ff5a4e');
         } else { // solo: wreck pop + instant respawn
           let rx = 60 + Math.round(Math.random() * (terrain.width - 180));
@@ -577,7 +577,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
   // ── 🌐 online: apply the server's authoritative blast report ──
   const applyServerBlast = useCallback((m) => {
-    // clear the visual shell(s) this boom belongs to — the server is the truth.
+    // clear the visual shell(s) this boom belongs to - the server is the truth.
     // 🏷️ only the SHOOTER'S shells are candidates: a nearby shell of someone
     //    else's must survive this impact (was: nearest-remote-within-120px)
     const owns = (p) => !m.src || p.src?.id === m.src;
@@ -595,7 +595,7 @@ export default function Game({ gs, myId, local = 0 }) {
       projsRef.current = projsRef.current.filter((p) => p.mine || !owns(p));
       subsRef.current = subsRef.current.filter((p) => p.mine || !owns(p));
     }
-    // my own echo: I already carved the terrain locally at impact — skip the
+    // my own echo: I already carved the terrain locally at impact - skip the
     // re-carve but DO take the server's authoritative damage below. Matched by
     // shooter id, so a real blast from anyone else (e.g. cluster bomblets
     // landing close together, or a ⚡ chaos neighbour) is never swallowed.
@@ -607,7 +607,7 @@ export default function Game({ gs, myId, local = 0 }) {
     for (const d of m.dmg ?? []) {
       const t = tanksRef.current.find((k) => k.id === d.id);
       if (!t) continue;
-      if (d.d === 0) { // 🛡️ shield ate the blast — no damage, no knockback
+      if (d.d === 0) { // 🛡️ shield ate the blast - no damage, no knockback
         fxRef.current.text(t.x, (t.y ?? groundY(t.x)) - 60, '🛡️ BLOCKED', '#8fd0ff');
         continue;
       }
@@ -663,12 +663,12 @@ export default function Game({ gs, myId, local = 0 }) {
       selRef.current = 'normal';
       setSelUi('normal');
     }
-    const v = SPEED(p) * (kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell — slow, hangs in the air
+    const v = SPEED(p) * (kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell - slow, hangs in the air
     // ×2 / ×3 pickup: double damage for the next N hits
     let dmgScale = 1;
     if ((me.buff | 0) > 0) { me.buff--; dmgScale = 2; }
     if (kind !== 'normal' || dmgScale > 1) setInvUi((n) => n + 1);
-    // 🏷️ online shots carry an id — a server nack can then find THIS shell
+    // 🏷️ online shots carry an id - a server nack can then find THIS shell
     //    (⚡ chaos can have several of my shells in flight at once)
     const shot = onlineRef.current ? ++shotSeqRef.current : 0;
     lastFireRef.current = { shot, kind, buff: dmgScale > 1 }; // 🧾 in case of a refund
@@ -681,7 +681,7 @@ export default function Game({ gs, myId, local = 0 }) {
     sfx('shoot');
     shakeRef.current = Math.max(shakeRef.current, 0.45);
     if (chaosNow) {
-      me.cd = CHAOS_COOLDOWN; // ⏳ reload begins — movement/fuel unaffected
+      me.cd = CHAOS_COOLDOWN; // ⏳ reload begins - movement/fuel unaffected
     } else {
       turnRef.current.phase = 'shot'; // firing ends your action
       setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
@@ -718,13 +718,13 @@ export default function Game({ gs, myId, local = 0 }) {
     const surfAt = (x) => t.surface[Math.max(0, Math.min(t.width - 1, Math.round(x)))];
     const x = Math.max(30, Math.min(t.width - 30, Math.round(wx)));
     const gy = surfAt(x);
-    if (gy > t.waterY - 6) { // no watery graves — stay in targeting mode
-      fxRef.current.text(x, gy - 46, 'TOO DEEP — pick dry land', '#ff9b5e');
+    if (gy > t.waterY - 6) { // no watery graves - stay in targeting mode
+      fxRef.current.text(x, gy - 46, 'TOO DEEP - pick dry land', '#ff9b5e');
       sfx('deny');
       return;
     }
     if (onlineRef.current) { // 🌐 server-confirmed (#16): never move ahead of the
-      //    referee — the relayed event poofs + moves EVERYONE (us included), and
+      //    referee - the relayed event poofs + moves EVERYONE (us included), and
       //      a 'teleport-denied' nack re-arms targeting instead of a free jump
       teleRef.current = { awaiting: true };
       setTeleUi(null);
@@ -753,21 +753,21 @@ export default function Game({ gs, myId, local = 0 }) {
       if (typeof m.aim === 'number') t.netAim = m.aim;
       if (typeof m.s === 'number') t.netS = m.s;
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
-      // 🕵️ no m.p handling — rival aim power is secret and never rides the stream
+      // 🕵️ no m.p handling - rival aim power is secret and never rides the stream
       if (typeof m.para === 'boolean') t.para = m.para;     // 🪂 touchdown signal from the owner
       if (typeof m.palette === 'number') t.palette = m.palette; // 🎨 live recolor
     };
-    const onFire = (m) => { // another player fired — spawn the same shell visually
+    const onFire = (m) => { // another player fired - spawn the same shell visually
       if (!m || m.id === myIdRef.current) return;
       const t = tanksRef.current.find((k) => k.id === m.id);
       if (!t || t.dead) return;
       lastShotMineRef.current = false;
       t.aim = m.a;
       const tip = muzzleOf(t, m.a);
-      const v = SPEED(m.p) * (m.kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell — slow
+      const v = SPEED(m.p) * (m.kind === 'tomahawk' ? TOMAHAWK_SLOW : 1); // ☢️ heavy shell - slow
       // 🎯 remote guided shells re-steer against OUR local tank positions every
       //    frame, so their flight path is only an approximation of the shooter's
-      //    (#23) — harmless: the server's 'blast' event is the truth for terrain + damage
+      //    (#23) - harmless: the server's 'blast' event is the truth for terrain + damage
       projsRef.current.push({
         x: tip.x, y: tip.y, vx: Math.cos(m.a) * v, vy: Math.sin(m.a) * v,
         src: t, armed: 0, kind: m.kind, dmgScale: m.dmgScale || 1, mine: false,
@@ -780,7 +780,7 @@ export default function Game({ gs, myId, local = 0 }) {
         setTurnInfo((ti) => ({ ...ti, phase: 'shot' }));
       }
     };
-    // 🖥️ solo/hot-seat: not online — server 'blast'/'game-event' traffic belongs
+    // 🖥️ solo/hot-seat: not online - server 'blast'/'game-event' traffic belongs
     // to a room we're not really playing in; never let it touch the canvas
     const onBlast = (m) => { if (m && onlineRef.current) applyServerBlast(m); };
     const onEvent = (e) => {
@@ -797,10 +797,10 @@ export default function Game({ gs, myId, local = 0 }) {
             fxRef.current.text(e.x, e.y - 46, 'click where to land!', '#b48cff');
           }
         }
-      } else if (e.kind === 'teleport') { // 🌀 a tank jumped — poof at both ends
+      } else if (e.kind === 'teleport') { // 🌀 a tank jumped - poof at both ends
         const t = tanksRef.current.find((k) => k.id === e.id);
         if (t) {
-          // server-confirmed jump — the owner's client waits for this echo too
+          // server-confirmed jump - the owner's client waits for this echo too
           // (#16: no optimistic move, so a rejected teleport never happened here)
           teleFX(t.x, t.y ?? 0);
           t.x = e.x; t.y = e.y; t.netX = e.x; t.netY = e.y; t.s = 0; t.grounded = true;
@@ -809,14 +809,14 @@ export default function Game({ gs, myId, local = 0 }) {
           if (e.id === myIdRef.current) { teleRef.current = null; setTeleUi(null); }
           sfx('teleport');
         }
-      } else if (e.kind === 'tele-fizzle') { // 🌀 turn ended before they clicked — wasted
+      } else if (e.kind === 'tele-fizzle') { // 🌀 turn ended before they clicked - wasted
         const t = tanksRef.current.find((k) => k.id === e.id);
         if (t) { t.tele = false; fxRef.current.text(t.x, (t.y ?? 0) - 56, '🌀 fizzled…', '#b48cff'); }
         if (e.id === myIdRef.current) { teleRef.current = null; setTeleUi(null); }
       } else if (e.kind === 'crate-boom') {
         fxRef.current.text(e.x, e.y - 16, '📦 destroyed', '#ffb45e');
         sfx('crunch');
-      } else if (e.kind === 'crate-expire') { // ⏳ sat on the ground for 60s — reveal what was inside
+      } else if (e.kind === 'crate-expire') { // ⏳ sat on the ground for 60s - reveal what was inside
         fxRef.current.text(e.x, e.y - 16, def ? `📦 was ${def.label} ${def.name}!` : '📦 expired', def?.color ?? '#9fb08f');
         for (let i = 0; i < 7; i++) {
           fxRef.current.smoke(e.x + (Math.random() - 0.5) * 18, e.y - 12,
@@ -830,7 +830,7 @@ export default function Game({ gs, myId, local = 0 }) {
         sfx('drop');
       }
     };
-    // 🙅 the server refused our optimistic shot — roll it back: the in-flight
+    // 🙅 the server refused our optimistic shot - roll it back: the in-flight
     //    shell becomes a dud (no crater, no blast report), the consumed ammo
     //    and buff are refunded, and ⚡ chaos adopts the server's reload clock
     const onFireDenied = (m) => {
@@ -851,9 +851,9 @@ export default function Game({ gs, myId, local = 0 }) {
       }
       if (m?.reason === 'not-your-turn') sfx('deny');
     };
-    // 🌀 the server refused our teleport (#16) — the turn raced past, the charge
+    // 🌀 the server refused our teleport (#16) - the turn raced past, the charge
     //    was already eaten, or ITS bitmap says the spot is wet. We never moved
-    //    (no optimistic jump) — just re-arm targeting or let it go.
+    //    (no optimistic jump) - just re-arm targeting or let it go.
     const onTeleDenied = (m) => {
       if (!onlineRef.current) return;
       const me = controlTank();
@@ -862,8 +862,8 @@ export default function Game({ gs, myId, local = 0 }) {
       setTeleUi(rearm ? 'targeting' : null);
       if (me) {
         fxRef.current.text(me.x, (me.y ?? 0) - 56,
-          m?.reason === 'wet' ? 'TOO DEEP — pick dry land'
-            : m?.reason === 'not-your-turn' ? 'too late — the turn moved on'
+          m?.reason === 'wet' ? 'TOO DEEP - pick dry land'
+            : m?.reason === 'not-your-turn' ? 'too late - the turn moved on'
             : '🌀 fizzled…', '#ff9b5e');
       }
       if (m?.reason !== 'wet') sfx('deny');
@@ -897,7 +897,7 @@ export default function Game({ gs, myId, local = 0 }) {
       const onlineNow = onlineRef.current;
       fxRef.current.wind = windRef.current; // 🌬️ smoke drifts with the wind
 
-      // ⏳ pre-round countdown — ticks down once, freezes input + the turn timer
+      // ⏳ pre-round countdown - ticks down once, freezes input + the turn timer
       if (countdownRef.current > 0) {
         countdownRef.current = Math.max(0, countdownRef.current - dt);
         const cd = countdownRef.current;
@@ -910,12 +910,12 @@ export default function Game({ gs, myId, local = 0 }) {
       const K = keysRef.current;
 
       // ── ALL tanks simulate (gravity/footing/knockback); input drives only
-      //    the active one — and online, only when it's YOUR tank ──
+      //    the active one - and online, only when it's YOUR tank ──
       for (const me of tanksRef.current) {
         if (me.dead) continue;
 
         // 🪂 parachute descent (⚡ chaos spawns/respawns): gentle fixed-rate
-        //    drop, STEERABLE with A/D — glide left/right to pick your landing
+        //    drop, STEERABLE with A/D - glide left/right to pick your landing
         //    spot. You land, THEN you fight (brief spawn cover).
         if (me.para) {
           me.grounded = false; me.driving = false; me.airVy = 0;
@@ -929,7 +929,7 @@ export default function Game({ gs, myId, local = 0 }) {
           }
           me.y = (me.y ?? -60) + PARA_FALL * dt;
           const gyP = surf(me.x);
-          if (me.y >= gyP) { // touchdown — stow the chute, kick up dust
+          if (me.y >= gyP) { // touchdown - stow the chute, kick up dust
             me.y = gyP; me.para = false; me.grounded = true;
             me.s = 0;
             me.susVel += 10;
@@ -987,7 +987,7 @@ export default function Game({ gs, myId, local = 0 }) {
           continue;
         }
 
-        // act only while the turn is OPEN — ⚡ chaos: YOUR tank is always live
+        // act only while the turn is OPEN - ⚡ chaos: YOUR tank is always live
         const mine = chaosRef.current
           ? me.id === myIdRef.current && turn.phase !== 'over' && countdownRef.current <= 0
           : me === active && turn.phase === 'open' && countdownRef.current <= 0
@@ -995,7 +995,7 @@ export default function Game({ gs, myId, local = 0 }) {
         const dir = mine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
         me.driving = false; // proves itself below when the engine actually pushes
 
-        // jump — Worms-style escape hatch (active tank, not while charging, costs fuel)
+        // jump - Worms-style escape hatch (active tank, not while charging, costs fuel)
         if (mine && me.grounded && me.fuel >= FUEL_JUMP && (K.has('w') || K.has('arrowup') || K.has(' '))) {
           me.grounded = false;
           me.airVy = -400;
@@ -1030,7 +1030,7 @@ export default function Game({ gs, myId, local = 0 }) {
             const ns = surf(nx);
             const nth = slope(nx);
             const uphill = me.s * Math.sin(nth) < 0;
-            // 🛡️ other tanks are SOLID — bumper-to-bumper, never through
+            // 🛡️ other tanks are SOLID - bumper-to-bumper, never through
             const tankBlock = tanksRef.current.some((o) =>
               o !== me && !o.dead && Math.abs(nx - o.x) < 46 && Math.abs((o.y ?? me.y) - me.y) < 32);
             const hardBlock = nx < 26 || nx > terrain.width - 26 || (ns > terrain.waterY - 4 && ns < me.y + 4) || tankBlock;
@@ -1090,7 +1090,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
 
         // fuel: burn while driving, regenerate otherwise (empty tank = engine dead)
-        // ⚡ chaos: pit-stop refill — bone dry → full tank in 3 seconds
+        // ⚡ chaos: pit-stop refill - bone dry → full tank in 3 seconds
         const wasFuel = me.fuel;
         if (me.driving) me.fuel = Math.max(0, me.fuel - FUEL_BURN(me.s) * dt);
         else me.fuel = Math.min(100, me.fuel + (chaosRef.current ? 100 / 3 : FUEL_REGEN) * dt);
@@ -1117,7 +1117,7 @@ export default function Game({ gs, myId, local = 0 }) {
               aim: me === active ? aimRef.current : me.aim,
               s: Math.round(me.s || 0),
               fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
-              // 🕵️ no p — your missile power is YOUR secret (persisted locally only)
+              // 🕵️ no p - your missile power is YOUR secret (persisted locally only)
               para: me.para === true,                                 // 🪂 chute stowed = touchdown
             });
           }
@@ -1126,7 +1126,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
       // ── 🛡️ tank↔tank collision: bodies are solid, overlaps get pushed apart.
       //    Offline: both move. Online: only MY tank yields (the remote one is
-      //    stream-owned) — so an enemy landing on you shoves YOU aside. ──
+      //    stream-owned) - so an enemy landing on you shoves YOU aside. ──
       {
         const ts = tanksRef.current;
         for (let i = 0; i < ts.length; i++) {
@@ -1150,7 +1150,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
 
-      // ── supply drops (LOCAL modes only — online the server owns drops and
+      // ── supply drops (LOCAL modes only - online the server owns drops and
       //    broadcasts crate state + events) ──
       if (!onlineNow && turn.phase !== 'over') {
         dropTRef.current -= dt;
@@ -1158,7 +1158,7 @@ export default function Game({ gs, myId, local = 0 }) {
           dropTRef.current = 24 + Math.random() * 16; // not frequent
           if (bonusRef.current.filter((b) => !b.taken).length < 3) {
             // ⚖️ fair drop: sample candidate spots and keep the one that maximizes
-            // the distance to the NEAREST living tank — equally far from everyone
+            // the distance to the NEAREST living tank - equally far from everyone
             let bx = null, bScore = -1;
             const aliveTanks = tanksRef.current.filter((t) => !t.dead);
             for (let k = 0; k < 28; k++) {
@@ -1171,7 +1171,7 @@ export default function Game({ gs, myId, local = 0 }) {
               bonusRef.current.push({
                 id: crateIdRef.current++, type: pickDropType(),
                 x: bx, y: -40, vy: 0, sway: 0, landed: false, taken: false, bob: Math.random() * 6.28,
-                expire: -1, // s left once landed (-1 = still falling) — crates despawn after CRATE_TTL
+                expire: -1, // s left once landed (-1 = still falling) - crates despawn after CRATE_TTL
               });
               fxRef.current.text(bx, 26, '📦 supply drop inbound', '#cfd8c3');
               sfx('drop');
@@ -1185,7 +1185,7 @@ export default function Game({ gs, myId, local = 0 }) {
           if (b.landed && surf(b.x) > b.y + 8) { b.landed = false; b.vy = 0; }
           if (b.landed) {
             b.y = surf(b.x);
-            // ⏳ landed crates don't wait forever — gone after CRATE_TTL seconds
+            // ⏳ landed crates don't wait forever - gone after CRATE_TTL seconds
             if (b.expire < 0) b.expire = CRATE_TTL;
             b.expire -= dt;
             if (b.expire <= 0) {
@@ -1215,7 +1215,7 @@ export default function Game({ gs, myId, local = 0 }) {
           }
         }
       } else if (onlineNow) {
-        // 🌐 crates mirror the server — ease toward the 10Hz targets
+        // 🌐 crates mirror the server - ease toward the 10Hz targets
         for (const b of bonusRef.current) {
           if (b.tx == null) continue;
           b.x += (b.tx - b.x) * Math.min(1, 10 * dt);
@@ -1264,26 +1264,26 @@ export default function Game({ gs, myId, local = 0 }) {
 
       // ── projectiles (main shell + cluster sub-munitions) ──
       const explodeProj = (p) => {
-        if (p.dud) { // 🧨 the server refused this shot (turn raced past) — fizzle, carve nothing
+        if (p.dud) { // 🧨 the server refused this shot (turn raced past) - fizzle, carve nothing
           fxRef.current.smoke(p.x, p.y - 4, 0, -24, 6, 0.7, 'rgb(150,152,160)');
           fxRef.current.text(p.x, p.y - 26, 'dud…', '#9aa08f');
           return;
         }
         const ds = p.dmgScale || 1;
-        const spec = p.kind === 'tomahawk' ? { r: 200, scale: Math.min(6, 3.2 * ds), big: true } // ☢️ MASSIVE (server clamps r at 200, scale at 6 — show what it will do)
+        const spec = p.kind === 'tomahawk' ? { r: 200, scale: Math.min(6, 3.2 * ds), big: true } // ☢️ MASSIVE (server clamps r at 200, scale at 6 - show what it will do)
           : p.kind === 'sub' ? { r: 40, scale: 0.75 * ds }
           : p.kind === 'guided' ? { r: BLAST_R, scale: 1.25 * ds }
           : { r: BLAST_R, scale: ds };
         if (!onlineNow) { explode(p.x, p.y, spec.r, spec); return; }
         if (p.mine) {
           // instant local terrain+FX; the server's 'blast' echo brings damage.
-          // The echo is matched by shooter id — no coordinate-window guessing.
+          // The echo is matched by shooter id - no coordinate-window guessing.
           explodeTerrain(p.x, p.y, spec.r, spec);
           getSocket()?.emit('blast', { x: p.x, y: p.y, r: spec.r, scale: spec.scale, big: !!spec.big, shot: p.shot ?? 0 });
         }
-        // remote shell: visual only — the server's 'blast' event makes the boom
+        // remote shell: visual only - the server's 'blast' event makes the boom
       };
-      // 💥 cluster: the shell never explodes itself — ON IMPACT it bursts into
+      // 💥 cluster: the shell never explodes itself - ON IMPACT it bursts into
       // 3 independent bomblets that pop up and out, then each explodes on landing
       const splitCluster = (p) => {
         const gy = surf(p.x);
@@ -1307,8 +1307,8 @@ export default function Game({ gs, myId, local = 0 }) {
         // 🎯 guided: powered cruise missile that CANNOT miss. It locks the nearest
         // living opponent every frame; with a clear line it homes straight in
         // (doubled pitch authority in the endgame + a proximity fuse), otherwise
-        // it hugs the terrain — riding GUIDED_CLEAR above the ridgeline between
-        // it and the target — until the line opens. Gravity and wind don't apply.
+        // it hugs the terrain - riding GUIDED_CLEAR above the ridgeline between
+        // it and the target - until the line opens. Gravity and wind don't apply.
         let powered = false;
         if (p.kind === 'guided' && (p.armed || 0) < GUIDED_FUEL) {
           let best = null, bd = Infinity;
@@ -1322,7 +1322,7 @@ export default function Game({ gs, myId, local = 0 }) {
             const tgx = best.x, tgy = (best.y ?? 0) - 14;
             const dx = tgx - p.x, dy = tgy - p.y;
             const dist = Math.hypot(dx, dy) || 1;
-            if (dist < GUIDED_FUSE) { explodeProj(p); return false; } // proximity fuse — dead on
+            if (dist < GUIDED_FUSE) { explodeProj(p); return false; } // proximity fuse - dead on
             // clear shot at the target? sample the straight line for solid ground
             let los = true;
             for (let i = 1; i < 32; i++) {
@@ -1332,9 +1332,9 @@ export default function Game({ gs, myId, local = 0 }) {
             }
             let want;
             if (los) {
-              want = Math.atan2(dy, dx); // clear line — home straight onto them
+              want = Math.atan2(dy, dx); // clear line - home straight onto them
             } else {
-              // blocked — follow the terrain: cruise above the highest ground in
+              // blocked - follow the terrain: cruise above the highest ground in
               // the corridor toward the target until the line of sight opens up
               const dir = Math.sign(dx) || 1;
               let crest = Infinity;
@@ -1351,14 +1351,14 @@ export default function Game({ gs, myId, local = 0 }) {
             let dAng = want - cur;
             while (dAng > Math.PI) dAng -= Math.PI * 2;
             while (dAng < -Math.PI) dAng += Math.PI * 2;
-            // pitch authority doubles in the endgame — the dive cannot overshoot
+            // pitch authority doubles in the endgame - the dive cannot overshoot
             const maxTurn = GUIDED_TURN * (dist < 260 ? 2.2 : 1) * dt;
             cur += Math.max(-maxTurn, Math.min(maxTurn, dAng));
-            if (!los) { // emergency pull-up while cruising — never plow into a ridge
+            if (!los) { // emergency pull-up while cruising - never plow into a ridge
               const ex = p.x + Math.cos(cur) * 46, ey = p.y + Math.sin(cur) * 46;
               if (ex >= 0 && ex < terrain.width && ey >= 0 && isSolid(terrain, ex, ey)) cur = -Math.PI / 2;
             }
-            p.vx = Math.cos(cur) * GUIDED_SPEED; // motor holds speed — no stall, no drop
+            p.vx = Math.cos(cur) * GUIDED_SPEED; // motor holds speed - no stall, no drop
             p.vy = Math.sin(cur) * GUIDED_SPEED;
           }
         }
@@ -1372,9 +1372,9 @@ export default function Game({ gs, myId, local = 0 }) {
         for (let s = 0; s < steps; s++) {
           p.x += (p.vx * dt) / steps;
           p.y += (p.vy * dt) / steps;
-          // tank hit — checked every 4px substep, no bypass/tunneling possible.
+          // tank hit - checked every 4px substep, no bypass/tunneling possible.
           // 🎯 PROPER collision mask: the tank's rotated hull box (tracks, turret
-          // and barrel root — 58×46 covers the whole visible body), so even a
+          // and barrel root - 58×46 covers the whole visible body), so even a
           // graze registers instead of the shell ghosting through the edges.
           let hitTank = null;
           for (const t of tanksRef.current) {
@@ -1390,7 +1390,7 @@ export default function Game({ gs, myId, local = 0 }) {
           const inX = p.x >= 0 && p.x < terrain.width;
           if (hitTank || (inX && p.y >= 0 && isSolid(terrain, p.x, p.y))) {
             // 💥 cluster falls from the sky, lands, and only THEN becomes 3 bombs
-            //    (a dud cluster never splits — it just fizzles out)
+            //    (a dud cluster never splits - it just fizzles out)
             if (p.kind === 'cluster' && !p.dud) { splitCluster(p); return false; }
             explodeProj(p); return false;
           }
@@ -1406,12 +1406,12 @@ export default function Game({ gs, myId, local = 0 }) {
         fxRef.current.trail(q.x - Math.cos(ang) * 8, q.y - Math.sin(ang) * 8, q.vx, q.vy);
       }
 
-      // turn timer — 20s to act (online the server passes the turn at 0).
+      // turn timer - 20s to act (online the server passes the turn at 0).
       // Frozen during the pre-round countdown so it isn't eaten by "3, 2, 1".
       if (turn.phase === 'open' && countdownRef.current <= 0) {
         turn.time -= dt;
         if (turn.time <= 0) {
-          // ⚡ chaos (even solo dev): the SERVER owns the match clock — clamp at
+          // ⚡ chaos (even solo dev): the SERVER owns the match clock - clamp at
           // 0 and let the next gs mirror correct us; never run hot-seat turns
           if (onlineNow || chaosRef.current) turn.time = 0;
           else advanceTurn();
@@ -1432,7 +1432,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (turn.settle <= 0) advanceTurn();
       }
 
-      // ── 🌬️ wind streaks: ambient speed-lines in the sky — density, speed
+      // ── 🌬️ wind streaks: ambient speed-lines in the sky - density, speed
       //    and direction all follow this turn's wind (calm air = none) ──
       {
         const w = windRef.current, aw = Math.abs(w);
@@ -1456,7 +1456,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
 
-      // 🧱 pay down chunked terrain repaints — a few ms of fbm painting per
+      // 🧱 pay down chunked terrain repaints - a few ms of fbm painting per
       //    frame instead of one multi-frame hitch on a mega-blast (#14)
       {
         const q = repaintQRef.current, offC = terrainCanvasRef.current;
@@ -1501,7 +1501,7 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#0a0d09';
       ctx.fillRect(0, 0, cw, chh);
-      // ── fixed whole-map view — no zoom, no follow cam; the entire
+      // ── fixed whole-map view - no zoom, no follow cam; the entire
       //    battlefield is always fully visible ──
       const scale = Math.min(cw / off.width, chh / off.height) * 0.985;
       const ox = cw / 2 - (off.width / 2) * scale;
@@ -1515,7 +1515,7 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.translate(ox, oy);
       ctx.scale(scale, scale);
 
-      // ☀️ living sun — a soft halo that breathes over the baked disc
+      // ☀️ living sun - a soft halo that breathes over the baked disc
       {
         const sx = terrain.width * 0.78, sy = terrain.height * 0.15;
         const pr = terrain.height * 0.30 * (1 + Math.sin(now * 0.0006) * 0.045);
@@ -1527,7 +1527,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(sx - pr, sy - pr, pr * 2, pr * 2);
       }
 
-      // 🌬️ wind streaks — faint speed-lines drifting across the sky; you read
+      // 🌬️ wind streaks - faint speed-lines drifting across the sky; you read
       //    direction, strength and gusts at a glance while aiming
       {
         const w = windRef.current, aw = Math.abs(w);
@@ -1553,14 +1553,14 @@ export default function Game({ gs, myId, local = 0 }) {
       const active = activeTank();
       const turn = turnRef.current;
 
-      // supply crates — parachuting in (canopy + cords) or sitting on the
+      // supply crates - parachuting in (canopy + cords) or sitting on the
       // ground (pulsing glow box), always visible
       for (const b of bonusRef.current) {
         if (b.taken) continue;
-        // 🎁 mystery crate — contents hidden until pickup or expiry
+        // 🎁 mystery crate - contents hidden until pickup or expiry
         const MC = '#ffcf6e';
         const pulse = 0.6 + 0.4 * Math.sin(now * 0.006 + b.bob);
-        // ⏳ expiry blink — landed crates flash during their last 5s (local crates
+        // ⏳ expiry blink - landed crates flash during their last 5s (local crates
         // count down b.expire; online crates carry the server's expiresAt stamp)
         const expIn = b.expiresAt ? (b.expiresAt - Date.now()) / 1000
           : (b.landed && (b.expire ?? -1) >= 0 ? b.expire : Infinity);
@@ -1627,7 +1627,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.textAlign = 'center';
           ctx.fillText('💀', t.x, gyD - 26 + bob);
           ctx.globalAlpha = 1;
-          if (chaosRef.current && turn.phase !== 'over' && t.deadAtMs) { // ⚡ respawn countdown — tidy pill under the skull
+          if (chaosRef.current && turn.phase !== 'over' && t.deadAtMs) { // ⚡ respawn countdown - tidy pill under the skull
             const back = Math.max(0, CHAOS_RESPAWN - (performance.now() - t.deadAtMs) / 1000);
             const rLabel = back > 0 ? `⏱ ${back.toFixed(1)}s` : '⏱ …';
             ctx.font = 'bold 11px system-ui';
@@ -1654,13 +1654,13 @@ export default function Game({ gs, myId, local = 0 }) {
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
         const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
         const swayX = t.para ? Math.sin(now * 0.003 + t.x) * 5 : 0; // 🪂 chute sway
-        const stackX = t.x + dx + swayX, stackY = gy + dy; // ONE centre line — every overlay hangs from it
-        if (spot && !t.dead && turn.phase !== 'over') { // ⚡ chaos: the HERO MARKER — one aligned system for YOUR tank
+        const stackX = t.x + dx + swayX, stackY = gy + dy; // ONE centre line - every overlay hangs from it
+        if (spot && !t.dead && turn.phase !== 'over') { // ⚡ chaos: the HERO MARKER - one aligned system for YOUR tank
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
           if (chaosR) {
             const hot = `hsla(${pal.h} ${Math.min(100, pal.s + 55)}% 68%`; // vivid team hue
-            const pulse = 0.5 + 0.5 * Math.sin(now * 0.0045); // ONE shared breath — every layer in phase
-            // sky beam — soft horizontal falloff, no hard rectangle edges
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.0045); // ONE shared breath - every layer in phase
+            // sky beam - soft horizontal falloff, no hard rectangle edges
             const beamH = 150;
             const bg = ctx.createLinearGradient(stackX - 15, 0, stackX + 15, 0);
             bg.addColorStop(0, `${hot} / 0)`);
@@ -1674,7 +1674,7 @@ export default function Game({ gs, myId, local = 0 }) {
             core.addColorStop(1, `${hot} / 0)`);
             ctx.fillStyle = core;
             ctx.fillRect(stackX - 4, stackY - beamH, 8, beamH);
-            // motes rising through the beam — alive, but cheap
+            // motes rising through the beam - alive, but cheap
             for (let k = 0; k < 3; k++) {
               const rise = (now * 0.045 + k * 53) % beamH;
               ctx.globalAlpha = (1 - rise / beamH) * 0.45;
@@ -1689,7 +1689,7 @@ export default function Game({ gs, myId, local = 0 }) {
             gg.addColorStop(1, `${hot} / 0)`);
             ctx.fillStyle = gg;
             ctx.beginPath(); ctx.arc(stackX, stackY, 44, 0, Math.PI * 2); ctx.fill();
-            // THE ring — one ground ellipse = selection marker AND reload meter (no second ring anywhere)
+            // THE ring - one ground ellipse = selection marker AND reload meter (no second ring anywhere)
             const rx = 37, ry = 9.5, ey = stackY - 1;
             const fr = Math.max(0, Math.min(1, (t.cd || 0) / CHAOS_COOLDOWN));
             ctx.lineWidth = 3;
@@ -1748,7 +1748,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.strokeStyle = 'rgba(10,14,10,0.35)';
           ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.stroke();
           ctx.restore();
-          if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in —
+          if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in -
             // the held side lights up green LIVE: if pressing A/D doesn't light
             // it, the keypress never reached the game (window not focused?)
             const kL = keysRef.current.has('a') || keysRef.current.has('arrowleft');
@@ -1778,17 +1778,17 @@ export default function Game({ gs, myId, local = 0 }) {
 
 
 
-        // active-tank marker: bobbing ▼ (whose turn) — ⚡ chaos: steady gold "▼ YOU" tag
+        // active-tank marker: bobbing ▼ (whose turn) - ⚡ chaos: steady gold "▼ YOU" tag
         if (spot && tanksRef.current.length > 1 && turn.phase !== 'over') {
           ctx.save();
-          if (chaosR) { // ⚡ bright, readable, ZERO flicker — sits above the name tag
+          if (chaosR) { // ⚡ bright, readable, ZERO flicker - sits above the name tag
             ctx.font = 'bold 11px system-ui';
             const youLabel = '▼ YOU';
             const yw = ctx.measureText(youLabel).width;
             const yx = stackX - yw / 2 - 9, yy = stackY - 112, yh = 17;
             ctx.fillStyle = 'rgba(6,8,6,0.6)'; // dark offset backplate → crisp contrast edge
             ctx.beginPath(); ctx.roundRect(yx + 1.5, yy + 1.5, yw + 18, yh, 8.5); ctx.fill();
-            ctx.fillStyle = '#ffd75e'; // solid bright gold — steady on purpose
+            ctx.fillStyle = '#ffd75e'; // solid bright gold - steady on purpose
             ctx.beginPath(); ctx.roundRect(yx, yy, yw + 18, yh, 8.5); ctx.fill();
             ctx.fillStyle = '#241a05';
             ctx.textAlign = 'center';
@@ -1807,7 +1807,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
         drawNameTag(ctx, stackX, stackY - (chaosR ? 66 : 82), t);
 
-        // status line above the name — pending teleport and/or shield timer, one tidy row
+        // status line above the name - pending teleport and/or shield timer, one tidy row
         const shieldLeft = Math.max(0, ((t.shieldUntil ?? 0) - Date.now()) / 1000);
         if (t.tele || shieldLeft > 0) {
           const status = `${t.tele ? '🌀 ' : ''}${shieldLeft > 0 ? `🛡 ${Math.ceil(shieldLeft)}s` : ''}`.trim();
@@ -1822,7 +1822,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.globalAlpha = 1;
         }
 
-        if (shieldLeft > 0) { // 🛡️ energy shield — one clean bubble centred on the hull, not another ring
+        if (shieldLeft > 0) { // 🛡️ energy shield - one clean bubble centred on the hull, not another ring
           const shY = stackY - 19;
           ctx.save();
           const sg = ctx.createRadialGradient(stackX, shY, 26, stackX, shY, 37);
@@ -1834,7 +1834,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.lineWidth = 2;
           ctx.strokeStyle = 'rgba(143,208,255,0.55)';
           ctx.beginPath(); ctx.arc(stackX, shY, 36, 0, Math.PI * 2); ctx.stroke();
-          const sweep = now * 0.0028; // twin rotating specular highlights — energy, not dashes
+          const sweep = now * 0.0028; // twin rotating specular highlights - energy, not dashes
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(190,228,255,0.9)';
           ctx.beginPath(); ctx.arc(stackX, shY, 36, sweep, sweep + 0.85); ctx.stroke();
@@ -1843,15 +1843,15 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.restore();
         }
 
-        // dotted aim guide — classic: YOUR active tank gets the full power ring + %.
-        // 🕵️ rival power is never shown — no ring, no %; their dots are direction-only.
-        // ⚡ chaos: NO pivot rings — power rides the crosshair, reload lives on the ground ring.
+        // dotted aim guide - classic: YOUR active tank gets the full power ring + %.
+        // 🕵️ rival power is never shown - no ring, no %; their dots are direction-only.
+        // ⚡ chaos: NO pivot rings - power rides the crosshair, reload lives on the ground ring.
         const aiming = !t.dead && turn.phase !== 'over' && countdownRef.current <= 0
           && (chaosR || (isActive && turn.phase === 'open'));
         if (aiming) {
-          const p = mineT ? chargeRef.current.power : 0.5; // 🕵️ rival power secret — hint dots fly a nominal arc
+          const p = mineT ? chargeRef.current.power : 0.5; // 🕵️ rival power secret - hint dots fly a nominal arc
           const a = mineT ? aimRef.current : (t.aim ?? -0.6); // remote: streamed barrel angle
-          if (!chaosR && mineT) { // classic pivot ring + % readout — YOUR power only
+          if (!chaosR && mineT) { // classic pivot ring + % readout - YOUR power only
             const pv = pivotOf(t);
             ctx.lineWidth = 5;
             ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1873,8 +1873,8 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.beginPath(); ctx.arc(pv.x, pv.y, 24, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke();
             ctx.globalAlpha = 1;
           }
-          // short dotted arc hint — 4 dots (3 for rivals) tracing the parabola, fading downrange
-          // ✨ YOUR dots: bright white, bigger, high alpha — easy to read against any sky
+          // short dotted arc hint - 4 dots (3 for rivals) tracing the parabola, fading downrange
+          // ✨ YOUR dots: bright white, bigger, high alpha - easy to read against any sky
           const tip = muzzleOf(t, a);
           const v = SPEED(Math.max(0.06, p));
           const vx = Math.cos(a) * v, vy0 = Math.sin(a) * v;
@@ -1883,7 +1883,7 @@ export default function Game({ gs, myId, local = 0 }) {
             const dt2 = i * 0.11;
             const dx2 = vx * dt2;
             const dy2 = vy0 * dt2 + 0.5 * GRAV * dt2 * dt2;
-            ctx.globalAlpha = (mineT ? 0.95 : 0.55) * (1 - i / (dots + 3)); // slower fade — stays visible downrange
+            ctx.globalAlpha = (mineT ? 0.95 : 0.55) * (1 - i / (dots + 3)); // slower fade - stays visible downrange
             ctx.fillStyle = mineT ? '#ffffff' : 'rgb(255,120,90)'; // enemy aim = red tint
             ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, mineT ? 2.4 : 1.7, 0, Math.PI * 2); ctx.fill();
           }
@@ -1909,7 +1909,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.textAlign = 'center';
         ctx.fillText(`${hp}`, stackX, by - 2.5);
 
-        // fuel bar (amber) — burns while driving, regens slowly; flashes red when low
+        // fuel bar (amber) - burns while driving, regens slowly; flashes red when low
         const fuel = t.fuel ?? 100;
         const fy = by + 10;
         const lowFuel = fuel < 18;
@@ -1937,7 +1937,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (proj.kind === 'sub') ctx.scale(0.78, 0.78);       // cluster children are smaller
         if (proj.kind === 'tomahawk') ctx.scale(1.35, 1.35);  // ☢️ big boy
         const fl = 10 + flick * 6;
-        // additive glow halo — shells read as hot tracers at any zoom
+        // additive glow halo - shells read as hot tracers at any zoom
         ctx.globalCompositeOperation = 'lighter';
         const glowR = proj.kind === 'tomahawk' ? 24 : 16;
         const gc = proj.kind === 'guided' ? '255,90,208' : '255,170,70';
@@ -1965,7 +1965,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
       fxRef.current.draw(ctx, 'front');
 
-      // crosshair — bright while the turn is open, dim otherwise; ⚡ red-hot while reloading
+      // crosshair - bright while the turn is open, dim otherwise; ⚡ red-hot while reloading
       const m = mouseRef.current;
       const myTankX = chaosRef.current ? tanksRef.current.find((tk) => tk.id === myIdRef.current) : null;
       const cooling = !!myTankX && (myTankX.cd || 0) > 0;
@@ -1981,7 +1981,7 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.stroke();
       ctx.globalAlpha = 1;
 
-      // ⚡ chaos: power / reload readout rides the crosshair — exactly where you're aiming
+      // ⚡ chaos: power / reload readout rides the crosshair - exactly where you're aiming
       if (chaosRef.current && myTankX && !myTankX.dead && turn.phase === 'open') {
         const xLabel = cooling ? `${myTankX.cd.toFixed(1)}s` : `${Math.round(chargeRef.current.power * 100)}%`;
         ctx.font = 'bold 11.5px system-ui';
@@ -1993,10 +1993,10 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillText(xLabel, m.x + 13, m.y + 16);
       }
 
-      // 🌀 teleport targeting — ghost landing pad under the cursor
+      // 🌀 teleport targeting - ghost landing pad under the cursor
       if (teleRef.current?.targeting && turn.phase === 'open') {
         const lx = Math.max(30, Math.min(terrain.width - 30, m.x));
-        const lgy = groundY(lx); // 🐛 was surf() — undefined in render scope, froze the whole rAF loop
+        const lgy = groundY(lx); // 🐛 was surf() - undefined in render scope, froze the whole rAF loop
         const okSpot = lgy <= terrain.waterY - 6;
         const col = okSpot ? '#b48cff' : '#ff6b4e';
         ctx.save();
@@ -2008,7 +2008,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.globalAlpha = 0.85;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(lx, lgy - 20, 20 + Math.sin(now * 0.008) * 3, 0, Math.PI * 2); ctx.stroke();
-        ctx.globalAlpha = 0.3; // ghost tank footprint — exactly where you'll stand
+        ctx.globalAlpha = 0.3; // ghost tank footprint - exactly where you'll stand
         ctx.beginPath(); ctx.roundRect(lx - 25, lgy - 36, 50, 36, 6); ctx.fill();
         ctx.globalAlpha = 0.95;
         ctx.font = 'bold 12px system-ui';
@@ -2025,12 +2025,12 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(0, 0, cw, chh);
       }
 
-      // ⏱ timer — classic: per-turn seconds; ⚡ chaos: the sudden-death match
+      // ⏱ timer - classic: per-turn seconds; ⚡ chaos: the sudden-death match
       //    clock (mm:ss). Glass pill with a draining track, green → amber → red.
       if (turn.phase === 'open') {
         const chaosR = chaosRef.current;
         const total = chaosR ? ((gsRef.current?.dur ?? CHAOS_TIME * 1000) / 1000) : TURN_TIME;
-        // ⚡ the server's match clock includes the gen/countdown runway — pin the
+        // ⚡ the server's match clock includes the gen/countdown runway - pin the
         //    pill at full while "3,2,1" plays instead of draining from 3:0X (#17)
         const tSec = chaosR ? Math.min(total, Math.max(0, turn.time)) : Math.max(0, turn.time);
         const cs = Math.ceil(tSec);
@@ -2078,25 +2078,25 @@ export default function Game({ gs, myId, local = 0 }) {
         const alive = tanksRef.current.filter((t) => !t.dead);
         const m = gsRef.current?.match;
         const inMatch = onlineRef.current && m && m.roundsTotal > 1;
-        // ⚡ chaos: the winner may be mid-respawn at 0:00 — trust the server's verdict
+        // ⚡ chaos: the winner may be mid-respawn at 0:00 - trust the server's verdict
         const wt = chaosRef.current && onlineRef.current
           ? tanksRef.current.find((tk) => tk.id === gsRef.current?.winner)
           : alive[0];
         banner = wt
-          ? '🏆 ' + (wt.emoji ?? '') + ' ' + (wt.name ?? '') + (chaosRef.current ? ` — ${wt.dmg | 0} 💥` : '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
-          : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' — DRAW' : '🏳️ DRAW');
+          ? '🏆 ' + (wt.emoji ?? '') + ' ' + (wt.name ?? '') + (chaosRef.current ? ` - ${wt.dmg | 0} 💥` : '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
+          : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' - DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
         const ct = controlTank();
         const targeting = teleRef.current?.targeting && ct && (!onlineRef.current || ct.id === myIdRef.current);
-        if (targeting) { // 🌀 teleport mode owns the banner — in classic the turn clock is ticking!
+        if (targeting) { // 🌀 teleport mode owns the banner - in classic the turn clock is ticking!
           banner = chaosRef.current
-            ? '🌀 TELEPORT — click where to land!  (T / Esc to cancel)'
-            : '🌀 TELEPORT — click where to land!  (T / Esc to cancel · turn ends = wasted)';
+            ? '🌀 TELEPORT - click where to land!  (T / Esc to cancel)'
+            : '🌀 TELEPORT - click where to land!  (T / Esc to cancel · turn ends = wasted)';
           bCol = '#b48cff';
-        } else if (chaosRef.current) { // ⚡ chaos: respawns forever — most DAMAGE at 0:00
+        } else if (chaosRef.current) { // ⚡ chaos: respawns forever - most DAMAGE at 0:00
           const meT = tanksRef.current.find((tk) => tk.id === myIdRef.current);
-          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS — most DAMAGE wins at 0:00${meT ? ` · your 💥 ${meT.dmg | 0}` : ''}`;
+          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS - most DAMAGE wins at 0:00${meT ? ` · your 💥 ${meT.dmg | 0}` : ''}`;
           bCol = turn.time <= 30 ? '#ff6b4e' : '#ffb45e';
         } else {
           banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
@@ -2124,9 +2124,9 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.textAlign = 'center';
       ctx.fillText(banner, cw / 2 + 4, 77.5);
 
-      // 🏆 realtime leaderboard — top-right glass panel, redrawn live every frame.
+      // 🏆 realtime leaderboard - top-right glass panel, redrawn live every frame.
       // ⚡ chaos ranks by DAMAGE DEALT (self-splash excluded, dead tanks keep their
-      // score — they can still win at 0:00); classic ranks the living by HP.
+      // score - they can still win at 0:00); classic ranks the living by HP.
       {
         const board = tanksRef.current;
         if (board.length > 1) {
@@ -2146,7 +2146,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.strokeStyle = 'rgba(255,255,255,0.14)';
           ctx.lineWidth = 1;
           ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.stroke();
-          ctx.textAlign = 'left'; // header — metric + round chip
+          ctx.textAlign = 'left'; // header - metric + round chip
           ctx.font = '600 9.5px system-ui';
           ctx.globalAlpha = 0.85;
           ctx.fillStyle = '#e8ece4';
@@ -2161,7 +2161,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ranked.forEach((tk, i) => {
             const ry = by + 24 + i * rowH;
             const mineRow = tk.id === myIdRef.current;
-            if (mineRow) { // YOU — gold wash + gold name
+            if (mineRow) { // YOU - gold wash + gold name
               ctx.fillStyle = 'rgba(255,215,94,0.16)';
               ctx.beginPath(); ctx.roundRect(bx + 4, ry + 1.5, panelW - 8, rowH - 1, 6); ctx.fill();
             }
@@ -2183,7 +2183,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
 
-      // ⏳ pre-round countdown — "3, 2, 1, FIGHT!" dead centre, on top of everything
+      // ⏳ pre-round countdown - "3, 2, 1, FIGHT!" dead centre, on top of everything
       const cd = countdownRef.current;
       if (cd > 0) {
         const segT = cd > 2.6 ? cd - 2.6 : cd > 1.6 ? cd - 1.6 : cd > 0.6 ? cd - 0.6 : cd; // s left in this beat
@@ -2209,7 +2209,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.restore();
       }
 
-      // ⚡ chaos: YOU died — centre-screen respawn countdown (damage still counts!)
+      // ⚡ chaos: YOU died - centre-screen respawn countdown (damage still counts!)
       if (chaosRef.current && turn.phase !== 'over' && countdownRef.current <= 0) {
         const meDead = tanksRef.current.find((tk) => tk.id === myIdRef.current && tk.dead);
         if (meDead?.deadAtMs) {
@@ -2229,7 +2229,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.fillText(`respawn in ${back.toFixed(1)}s`, cw / 2, chh / 2 + 6);
           ctx.font = '600 13px system-ui';
           ctx.fillStyle = 'rgba(232,236,228,0.75)';
-          ctx.fillText('your damage total still counts — get back in there!', cw / 2, chh / 2 + 34);
+          ctx.fillText('your damage total still counts - get back in there!', cw / 2, chh / 2 + 34);
           ctx.restore();
         }
       }
@@ -2267,7 +2267,7 @@ export default function Game({ gs, myId, local = 0 }) {
       const w = toWorld(e);
       mouseRef.current = w;
       const pv = pivotOf(me);
-      // full 360° aim — down-left/down-right allowed; assigned raw = instant follow on fast flicks
+      // full 360° aim - down-left/down-right allowed; assigned raw = instant follow on fast flicks
       aimRef.current = Math.atan2(w.y - pv.y, w.x - pv.x);
     };
     const onDown = (e) => {
@@ -2282,7 +2282,7 @@ export default function Game({ gs, myId, local = 0 }) {
         doTeleport(toWorld(e).x);
         return;
       }
-      if (me.para) { // 🪂 still descending — stow the chute first
+      if (me.para) { // 🪂 still descending - stow the chute first
         if ((me.stopT || 0) <= 0) {
           me.stopT = 1.5;
           fxRef.current.text(me.x, (me.y ?? 0) - 62, '🪂 LAND FIRST', '#8fd0ff');
@@ -2290,7 +2290,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return;
       }
-      // classic: parked on the ground to fire. ⚡ chaos: run-and-gun —
+      // classic: parked on the ground to fire. ⚡ chaos: run-and-gun -
       // shoot while driving, while jumping, whenever the reload allows
       if (!chaosNow && (!me.grounded || Math.abs(me.s) > 12)) {
         if ((me.stopT || 0) <= 0) {
@@ -2300,7 +2300,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         return;
       }
-      // ⚡ chaos reload — infinite shells, but the gun needs its 1 second
+      // ⚡ chaos reload - infinite shells, but the gun needs its 1 second
       if (chaosNow && (me.cd || 0) > 0) {
         if ((me.cdDenyT || 0) <= 0) {
           me.cdDenyT = 1;
@@ -2312,13 +2312,13 @@ export default function Game({ gs, myId, local = 0 }) {
       fire();
     };
     const onCtx = (e) => e.preventDefault();
-    const onWheel = (e) => { // scroll sets power — any time it's your turn, no need to hold
+    const onWheel = (e) => { // scroll sets power - any time it's your turn, no need to hold
       const me = controlTank();
       if (!me || me.dead || turnRef.current.phase !== 'open' || countdownRef.current > 0) return;
       if (onlineRef.current && me.id !== myIdRef.current) return;
       e.preventDefault();
       chargeRef.current.power = Math.max(0, Math.min(1, chargeRef.current.power - e.deltaY * POWER_SCROLL));
-      savePower(chargeRef.current.power); // 💾 persist every tweak — next turn/round/match starts here
+      savePower(chargeRef.current.power); // 💾 persist every tweak - next turn/round/match starts here
       powerFlashRef.current = performance.now(); // ⚡ flash the turret charge arc
     };
     const onKey = (e, down) => {
@@ -2382,7 +2382,7 @@ export default function Game({ gs, myId, local = 0 }) {
   // 🌬️ wind chip label: chevrons ∝ strength, direction = push direction
   const windLabel = (() => {
     const n = Math.round(Math.abs(windUi) * 5);
-    if (n === 0) return '—';
+    if (n === 0) return '-';
     return (windUi > 0 ? '▶' : '◀').repeat(n);
   })();
 
@@ -2413,7 +2413,7 @@ export default function Game({ gs, myId, local = 0 }) {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
         alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem',
-        // 🫥 no background strip — text floats over the battlefield, shadow keeps it readable
+        // 🫥 no background strip - text floats over the battlefield, shadow keeps it readable
         textShadow: '0 1px 3px rgba(0,0,0,0.85)',
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
@@ -2422,7 +2422,7 @@ export default function Game({ gs, myId, local = 0 }) {
           <span style={{
             background: 'transparent', border: '1px solid rgba(255,180,94,0.5)', color: '#ffb45e', borderRadius: 6,
             padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
-          }} title="real-time free-for-all — infinite shells, 1s reload, 5s respawn, most damage wins at 0:00">⚡ CHAOS</span>
+          }} title="real-time free-for-all - infinite shells, 1s reload, 5s respawn, most damage wins at 0:00">⚡ CHAOS</span>
         )}
         {ready && (
           <span
@@ -2488,7 +2488,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }}>terrain error: {error}</div>
       )}
 
-      {/* players — active turn highlighted, eliminated dimmed */}
+      {/* players - active turn highlighted, eliminated dimmed */}
       <div style={{
         position: 'absolute', left: '1rem', bottom: '1rem', display: 'flex',
         gap: '0.4rem', flexWrap: 'wrap', fontFamily: 'system-ui, sans-serif',
@@ -2496,7 +2496,7 @@ export default function Game({ gs, myId, local = 0 }) {
         {roster.map((p, i) => {
           const t = tanksRef.current[i];
           const isActive = !chaos && roster.length > 1 && turnInfo.idx === i && turnInfo.phase !== 'over'; // ⚡ chaos: nobody's turn
-          // ⚡ chaos: winner = most damage (server's call) — they might be mid-respawn
+          // ⚡ chaos: winner = most damage (server's call) - they might be mid-respawn
           const winner = turnInfo.phase === 'over' && roster.length > 1 && (chaos ? gs?.winner === p.id : t && !t.dead);
           const dead = !!t?.dead;
           return (
@@ -2517,7 +2517,7 @@ export default function Game({ gs, myId, local = 0 }) {
         })}
       </div>
 
-      {/* shell inventory — your tank's stock (⚡ chaos) / active tank's (classic), keys 1-4 to pick */}
+      {/* shell inventory - your tank's stock (⚡ chaos) / active tank's (classic), keys 1-4 to pick */}
       {ready && turnInfo.phase !== 'over' && (() => {
         const t = chaos ? tanksRef.current.find((k) => k.id === myId) : tanksRef.current[turnInfo.idx];
         if (!t) return null;
@@ -2535,14 +2535,14 @@ export default function Game({ gs, myId, local = 0 }) {
             borderRadius: 14, padding: '0.3rem 0.4rem',
             backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', // frosted dock
           }}>
-            {teleUi && ( // 🌀 pending teleport — only on the owner's screen; click or press T to aim
+            {teleUi && ( // 🌀 pending teleport - only on the owner's screen; click or press T to aim
               <span
                 onClick={() => {
                   if (!teleRef.current) return;
                   teleRef.current.targeting = !teleRef.current.targeting;
                   setTeleUi(teleRef.current.targeting ? 'targeting' : 'pending');
                 }}
-                title="teleport — click where to land (this turn only, or it's wasted!)"
+                title="teleport - click where to land (this turn only, or it's wasted!)"
                 style={{
                   background: teleUi === 'targeting' ? 'rgba(180,140,255,0.3)' : 'rgba(0,0,0,0.5)',
                   border: teleUi === 'targeting' ? '1px solid #b48cff' : '1px solid rgba(180,140,255,0.45)',
@@ -2563,7 +2563,7 @@ export default function Game({ gs, myId, local = 0 }) {
               const empty = s.n !== null && s.n <= 0;
               const selNow = selUi === s.k;
               return (
-                <span key={s.k} title={`${s.key} — ${s.k}`} style={{
+                <span key={s.k} title={`${s.key} - ${s.k}`} style={{
                   background: selNow ? 'rgba(143,208,255,0.25)' : 'rgba(0,0,0,0.5)',
                   border: selNow ? '1px solid #8fd0ff' : '1px solid rgba(255,255,255,0.14)',
                   borderRadius: 8, padding: '0.25rem 0.5rem', fontSize: '0.85rem',
@@ -2578,7 +2578,7 @@ export default function Game({ gs, myId, local = 0 }) {
         );
       })()}
 
-      {/* 🏆 game over — round result, match scoreboard, host controls */}
+      {/* 🏆 game over - round result, match scoreboard, host controls */}
       {ready && turnInfo.phase === 'over' && (() => {
         const roundWinner = online
           ? (gs?.winner ? roster.find((p) => p.id === gs.winner) ?? null : null)

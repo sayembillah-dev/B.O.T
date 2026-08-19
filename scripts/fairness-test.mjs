@@ -20,7 +20,7 @@ const join = (s, roomId, name) => new Promise((res) => s.emit('join-room', { roo
 let allOk = true;
 for (const n of [2, 3, 4]) {
   for (let trial = 0; trial < 3; trial++) {
-    const room = `fz${n}x${trial}x${Math.floor(Math.random() * 100000)}`; // alnum only — ROOM_ID_RE
+    const room = `fz${n}x${trial}x${Math.floor(Math.random() * 100000)}`; // alnum only - ROOM_ID_RE
     const socks = [];
     for (let i = 0; i < n; i++) {
       const s = await connect();
@@ -35,7 +35,7 @@ for (const n of [2, 3, 4]) {
       });
       socks[0].emit('start-game');
     });
-    const xs = g.tanks.map((t) => t.x).sort((a, b) => a - b); // 🎲 assignment is shuffled — sort before measuring gaps
+    const xs = g.tanks.map((t) => t.x).sort((a, b) => a - b); // 🎲 assignment is shuffled - sort before measuring gaps
     const gaps = xs.slice(1).map((x, i) => x - xs[i]);
     const minGap = Math.min(...gaps);
     const ok = minGap >= 90 && xs.every((x) => x >= 26 && x <= g.terrain.width - 26);

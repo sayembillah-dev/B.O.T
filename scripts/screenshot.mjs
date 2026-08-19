@@ -1,8 +1,8 @@
-// 📸 dev-only screenshot harness — drives headless Chrome over CDP.
+// 📸 dev-only screenshot harness - drives headless Chrome over CDP.
 // Single page:  node scripts/screenshot.mjs <url> <outfile> [waitMs=9000] [click=x,y,afterMs]
 // Multi-page:   node scripts/screenshot.mjs '<json>'
 //   pages: [{ "url", "out", "wait"=9000, "evals": [{ "at": ms, "js": "…" }] }]
-//   — all pages open in ONE Chrome (shared origin/session), navigate together,
+//   - all pages open in ONE Chrome (shared origin/session), navigate together,
 //     run their scheduled JS evals, and each gets captured after `wait` ms.
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -51,7 +51,7 @@ const listTargets = () => fetch(`http://127.0.0.1:${PORT}/json/list`).then((r) =
 
 if (url.startsWith('[')) {
   // ── multi-page mode: ONE Chrome instance per page (own port + profile), so
-  //    every page is the foreground tab — background rAF throttling would
+  //    every page is the foreground tab - background rAF throttling would
   //    otherwise freeze the game loop on all but one page ──
   const pages = JSON.parse(url);
   const t0 = Date.now();
@@ -79,15 +79,15 @@ if (url.startsWith('[')) {
       if (res?.exceptionDetails) console.log(`💥 [${tag}] eval failed:`, res.exceptionDetails.exception?.description ?? JSON.stringify(res.exceptionDetails).slice(0, 300));
       else if (ev.log) console.log(`ℹ️ [${tag}] eval →`, JSON.stringify(res?.result?.value));
     };
-    // absolute-time evals (t0-based) — e.g. clicking Start in the lobby
+    // absolute-time evals (t0-based) - e.g. clicking Start in the lobby
     for (const ev of pg.preEvals ?? []) await runEval(ev, t0);
     let base = t0;
-    if (pg.waitFor) { // poll until the page reports ready (e.g. terrain done) — then rebase
+    if (pg.waitFor) { // poll until the page reports ready (e.g. terrain done) - then rebase
       const deadline = Date.now() + (pg.waitForTimeout ?? 90000);
       for (;;) {
         const r = await send('Runtime.evaluate', { expression: pg.waitFor, returnByValue: true });
         if (r?.result?.value) { console.log(`✅ [${tag}] ready after ${((Date.now() - t0) / 1000).toFixed(1)}s`); break; }
-        if (Date.now() > deadline) { console.log(`⏳ [${tag}] waitFor timed out — shooting anyway`); break; }
+        if (Date.now() > deadline) { console.log(`⏳ [${tag}] waitFor timed out - shooting anyway`); break; }
         await new Promise((r) => setTimeout(r, 500));
       }
       base = Date.now();
@@ -119,7 +119,7 @@ const { send } = await attach(target, 'p0');
 await send('Page.navigate', { url });
 await new Promise((r) => setTimeout(r, Number(waitMs))); // let terrain gen + first turn settle
 
-// optional interaction: click=x,y,afterMs — aim at (x,y), click to fire, wait, then shoot
+// optional interaction: click=x,y,afterMs - aim at (x,y), click to fire, wait, then shoot
 const clickArg = process.argv.find((a) => a.startsWith('click='));
 if (clickArg) {
   const [cx, cy, afterMs = '1500'] = clickArg.slice(6).split(',');

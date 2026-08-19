@@ -2,7 +2,7 @@
   "name": "multiplayer-room-template",
   "version": "1.0.0",
   "private": true,
-  "description": "Starter template: Next.js + Socket.IO rooms with shareable invite links — bring your own game.",
+  "description": "Starter template: Next.js + Socket.IO rooms with shareable invite links - bring your own game.",
   "scripts": {
     "dev": "node server.js",
     "build": "next build",

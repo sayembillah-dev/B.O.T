@@ -3,7 +3,7 @@ import os from 'node:os';
 /**
  * Next dev blocks cross-origin requests to /_next/* by default.
  * Friends joining via your LAN IP (http://192.168.x.x:3000) count as
- * "cross-origin" and get blocked — which kills hydration in dev.
+ * "cross-origin" and get blocked - which kills hydration in dev.
  * Whitelist this machine's current LAN IPs automatically.
  */
 function lanIps() {

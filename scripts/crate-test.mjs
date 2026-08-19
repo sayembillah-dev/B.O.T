@@ -1,7 +1,7 @@
 /**
  * Supply-drop fairness + TTL check:
  *   1. 2P game starts; first crate drops ~10s in.
- *   2. Drop x should be fair — far from BOTH tanks (max-min placement).
+ *   2. Drop x should be fair - far from BOTH tanks (max-min placement).
  *   3. After landing, the crate must vanish ~60s later (crate-expire event).
  * Run the server first.  Usage: URL=http://localhost:3210 node scripts/crate-test.mjs
  */
@@ -41,7 +41,7 @@ b.on('game-event', (e) => {
     if (!e.type) fail('🎁 expire did not reveal the hidden crate contents (no type)');
     console.log(`🎁 revealed on expiry: it was a ${e.type} crate`);
     const secs = (Date.now() - landedAt) / 1000;
-    if (secs < 55 || secs > 66) fail(`crate lifetime ${secs}s — expected ~60s`);
+    if (secs < 55 || secs > 66) fail(`crate lifetime ${secs}s - expected ~60s`);
     console.log('🎉 crate TTL OK (~60s)');
     process.exit(0);
   }
@@ -57,6 +57,6 @@ if (dropX == null) fail('no drop within 50s');
 const d0 = Math.abs(tanks[0].x - dropX);
 const d1 = Math.abs(tanks[1].x - dropX);
 console.log(`✅ drop distances: ${Math.round(d0)}px / ${Math.round(d1)}px from the two tanks`);
-if (Math.min(d0, d1) < 150) fail('drop landed on a player — unfair');
+if (Math.min(d0, d1) < 150) fail('drop landed on a player - unfair');
 console.log('✅ drop is fair (far from everyone); waiting up to 75s for expiry…');
 setTimeout(() => fail('crate never expired'), 80000);

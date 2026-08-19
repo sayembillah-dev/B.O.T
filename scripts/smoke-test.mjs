@@ -72,13 +72,13 @@ try {
   const bobPlaying = waitGameState(bob, 'playing');
   alice.emit('start-game');
   const [ga] = await Promise.all([alicePlaying, bobPlaying]);
-  console.log(`✅ Game started — both clients got game-state (phase=${ga.phase}, ${ga.players.length} players)`);
+  console.log(`✅ Game started - both clients got game-state (phase=${ga.phase}, ${ga.players.length} players)`);
 
   const aliceLobby = waitGameState(alice, null);
   const bobLobby = waitGameState(bob, null);
   alice.emit('end-game');
   await Promise.all([aliceLobby, bobLobby]);
-  console.log('✅ Game ended — clients returned to lobby (game-state null)');
+  console.log('✅ Game ended - clients returned to lobby (game-state null)');
 
   const sawOne = waitPlayerCount(alice, 1);
   bob.emit('leave-room');

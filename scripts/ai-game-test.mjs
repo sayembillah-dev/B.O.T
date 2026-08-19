@@ -2,7 +2,7 @@
  * Live end-to-end test of a vs-AI game (server must be running):
  *   a human client joins, starts a dev game vs a HARD bot, passes every
  *   turn, and we verify the bot autonomously plays its turns:
- *   think → fire event → server-simmed blast(s) → settle → turn rotates —
+ *   think → fire event → server-simmed blast(s) → settle → turn rotates -
  *   until somebody wins (the bot usually wins; we never shoot back).
  *
  * Run the server first.  Usage: URL=http://localhost:3000 node scripts/ai-game-test.mjs
@@ -36,7 +36,7 @@ const finish = (ok, msg) => {
   process.exit(0);
 };
 
-setTimeout(() => finish(false, `timeout after ${TIMEOUT_MS / 1000}s — bot got stuck`), TIMEOUT_MS);
+setTimeout(() => finish(false, `timeout after ${TIMEOUT_MS / 1000}s - bot got stuck`), TIMEOUT_MS);
 
 socket.on('connect', () => {
   log(`connected → joining ${ROOM} vs CPU (${DIFF})`);
@@ -57,7 +57,7 @@ socket.on('game-state', (gs) => {
 
   if (gs.turn.phase === 'over') {
     const winner = gs.winner ? (gs.players ?? []).find((p) => p.id === gs.winner) : null;
-    return finish(true, `vs-AI game completed — winner: ${winner ? `${winner.emoji} ${winner.name}` : 'draw'} · ` +
+    return finish(true, `vs-AI game completed - winner: ${winner ? `${winner.emoji} ${winner.name}` : 'draw'} · ` +
       `bot fired ${state.botFires}×, ${state.botBlasts} blast(s), tester hp ${state.myHp}`);
   }
 
@@ -68,11 +68,11 @@ socket.on('game-state', (gs) => {
     state.firedThisTurn = false;
     if (state.lastLoggedTurn !== gs.turn.num) { // log once per turn, not per echo
       state.lastLoggedTurn = gs.turn.num;
-      log(`bot turn #${gs.turn.num} (${bot.name}) — thinking… hp me ${state.myHp}, bot ${bot.hp}`);
+      log(`bot turn #${gs.turn.num} (${bot.name}) - thinking… hp me ${state.myHp}, bot ${bot.hp}`);
     }
   }
 
-  // I pass my turn 0.8s in — the bot never waits on me
+  // I pass my turn 0.8s in - the bot never waits on me
   if (active.id === state.myId && gs.turn.phase === 'open' && !state.passT) {
     if (prev?.turn?.num !== gs.turn.num || prev?.turn?.activeIdx !== gs.turn.activeIdx || prev?.turn?.phase !== 'open') {
       if (state.firedThisTurn === false && state.botId && prev?.turn?.phase === 'open') { /* noop */ }
@@ -87,7 +87,7 @@ socket.on('game-state', (gs) => {
   if (state.firedThisTurn && active.id !== state.botId && gs.turn.phase === 'open') {
     state.firedThisTurn = false;
     state.botTurnsDone++;
-    log(`turn rotated away — bot turn complete (${state.botTurnsDone}/${MAX_BOT_TURNS})`);
+    log(`turn rotated away - bot turn complete (${state.botTurnsDone}/${MAX_BOT_TURNS})`);
     if (state.botTurnsDone >= MAX_BOT_TURNS) {
       finish(true, `bot played ${MAX_BOT_TURNS} full turns autonomously (fires ${state.botFires}, blasts ${state.botBlasts}, tester hp ${state.myHp})`);
     }
@@ -102,7 +102,7 @@ socket.on('fire', (m) => {
   state.botFires++;
   state.firedThisTurn = true;
   const deg = Math.round((-m.a * 180) / Math.PI);
-  log(`🔥 bot fired — ${m.kind} shell, ${deg}° ${m.a < -Math.PI / 2 ? '←' : '→'}, power ${(m.p * 100).toFixed(0)}%${m.dmgScale > 1 ? ` ×${m.dmgScale} buff` : ''}`);
+  log(`🔥 bot fired - ${m.kind} shell, ${deg}° ${m.a < -Math.PI / 2 ? '←' : '→'}, power ${(m.p * 100).toFixed(0)}%${m.dmgScale > 1 ? ` ×${m.dmgScale} buff` : ''}`);
 });
 
 socket.on('blast', (m) => {

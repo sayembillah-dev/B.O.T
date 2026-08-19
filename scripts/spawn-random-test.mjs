@@ -8,7 +8,7 @@
 import { io } from 'socket.io-client';
 
 const URL = process.env.URL || 'http://localhost:3000';
-const ROOM = 'rand' + Math.random().toString(36).slice(2, 8); // alnum only — ROOM_ID_RE
+const ROOM = 'rand' + Math.random().toString(36).slice(2, 8); // alnum only - ROOM_ID_RE
 const N = 3;
 const TRIALS = 14;
 const fail = (msg) => { console.error('❌ ' + msg); process.exit(1); };
@@ -71,8 +71,8 @@ for (let i = 1; i < TRIALS; i++) {
   checkGaps(g, `regen ${i}`);
 }
 console.log(`▶ ${TRIALS} rounds produced ${perms.size} distinct permutations: ${[...perms].join(' | ')}`);
-if (perms.size < 2) fail(`spawn assignment never changed across ${TRIALS} rounds — still following join order!`);
+if (perms.size < 2) fail(`spawn assignment never changed across ${TRIALS} rounds - still following join order!`);
 
 socks.forEach((s) => s.close());
-console.log('🎉 SPAWNS RANDOMIZED — join order does not decide position');
+console.log('🎉 SPAWNS RANDOMIZED - join order does not decide position');
 process.exit(0);

@@ -115,7 +115,7 @@ body {
 .btn-lg { padding: 0.9rem 1.4rem; font-size: 1.05rem; width: 100%; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--muted); width: 100%; margin-top: 1rem; }
 .btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
-/* in-game HUD action buttons — small, borderless-bg, hairline outline, no emojis */
+/* in-game HUD action buttons - small, borderless-bg, hairline outline, no emojis */
 .btn-hud {
   display: inline-flex;
   align-items: center;
