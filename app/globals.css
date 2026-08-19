@@ -115,6 +115,25 @@ body {
 .btn-lg { padding: 0.9rem 1.4rem; font-size: 1.05rem; width: 100%; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--muted); width: 100%; margin-top: 1rem; }
 .btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+/* in-game HUD action buttons — small, borderless-bg, hairline outline, no emojis */
+.btn-hud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #e8ece4;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-hud:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.65); }
+.btn-hud:active:not(:disabled) { transform: scale(0.97); }
 
 .divider {
   display: flex;

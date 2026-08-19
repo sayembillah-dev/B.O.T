@@ -135,7 +135,7 @@ async function createGame(room) {
       x, y: mode === 'chaos' ? -60 : surfOf(T, x), // 🪂 chaos drops in by parachute
       para: mode === 'chaos',
       aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
-      hp: 100, fuel: 100, power: 0.5, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
+      hp: 100, fuel: 100, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
       cdAt: 0,   // ⚡ chaos reload bookkeeping
       dmg: 0,    // ⚡ chaos scoreboard — total damage dealt to OTHERS (the win metric)
       deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
@@ -711,15 +711,14 @@ app.prepare().then(async () => {
       if (typeof p?.x === 'number' && isFinite(p.x)) t.x = Math.max(0, Math.min(g.terrain.width, p.x));
       if (typeof p?.y === 'number' && isFinite(p.y)) t.y = Math.max(-60, Math.min(g.terrain.height + 80, p.y));
       if (typeof p?.aim === 'number' && isFinite(p.aim)) t.aim = p.aim;
-      // 👀 shared intel: everyone sees everyone's fuel gauge + the active player's aim power
+      // 👀 shared intel: everyone sees everyone's fuel gauge — aim power stays the shooter's SECRET
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
-      if (typeof p?.p === 'number' && isFinite(p.p)) t.power = Math.max(0, Math.min(1, p.p));
       if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
       if (typeof p?.palette === 'number' && isFinite(p.palette)) t.palette = ((p.palette | 0) % 6 + 6) % 6; // 🎨 recolors are public
       if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
-        fuel: t.fuel, p: t.power ?? 0.5, para: t.para === true, palette: t.palette,
+        fuel: t.fuel, para: t.para === true, palette: t.palette, // 🕵️ no power — that's the shooter's secret
       });
     });
     // 🌀 teleport: spend a pending teleport to land at x (classic: this turn

@@ -1,9 +1,9 @@
 /**
- * Shared-intel check: players can see EACH OTHER's fuel + aim power.
+ * Shared-intel check: players can see EACH OTHER's fuel — but NEVER aim power.
  *   1. 2P game starts; find the active player from game-state.
  *   2. Active client streams tank-move with fuel=42, p=0.77.
- *   3. The OTHER client must receive the relay with those exact values.
- *   4. A late-joining spectator's game-state must carry fuel + power too.
+ *   3. The OTHER client must receive fuel + aim — and NO power (🕵️ secret).
+ *   4. A late-joining spectator's game-state must carry fuel, never power.
  * Run the server first.  Usage: URL=http://localhost:3210 node scripts/visibility-test.mjs
  */
 import { io } from 'socket.io-client';
@@ -56,9 +56,9 @@ while (!got && Date.now() - t1 < 5000) await new Promise((r) => setTimeout(r, 50
 if (!got) fail('no tank-move relay received');
 if (got.id !== activeId) fail(`relay from wrong tank: ${got.id}`);
 if (got.fuel !== 42) fail(`fuel not shared — got ${got.fuel}, expected 42`);
-if (got.p !== 0.77) fail(`power not shared — got ${got.p}, expected 0.77`);
+if (got.p !== undefined) fail(`power LEAKED in relay — got ${got.p}, expected it to stay secret`);
 if (got.aim !== -1.1) fail(`aim not shared — got ${got.aim}, expected -1.1`);
-console.log('✅ rival received live stream: fuel=42, p=0.77, aim=-1.1');
+console.log('✅ rival received live stream: fuel=42, aim=-1.1, power withheld');
 
 // late joiner: fresh game-state snapshot must carry fuel + power as well
 const c = await connect('Spectator');
@@ -72,8 +72,8 @@ if (!snap) fail('spectator got no game-state');
 const snapTank = snap.tanks.find((tk) => tk.id === activeId);
 if (!snapTank) fail('active tank missing from snapshot');
 if (snapTank.fuel !== 42) fail(`snapshot fuel ${snapTank.fuel} — expected 42`);
-if (snapTank.power !== 0.77) fail(`snapshot power ${snapTank.power} — expected 0.77`);
-console.log('✅ late joiner snapshot carries fuel=42, power=0.77');
+if (snapTank.power !== undefined) fail(`snapshot power LEAKED: ${snapTank.power} — power must never be serialized`);
+console.log('✅ late joiner snapshot carries fuel=42, no power');
 
-console.log('🎉 VISIBILITY OK — fuel + trajectory power are public to all players');
+console.log('🎉 VISIBILITY OK — fuel is public, trajectory power stays secret');
 process.exit(0);

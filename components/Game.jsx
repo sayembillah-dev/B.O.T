@@ -15,6 +15,8 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  * 🔁 TURNS + FUEL — a turn is OPEN (act) → shot → settle → next player.
  * Power carries across the turn (scroll to adjust any time); firing only
  * requires being parked (grounded, near-zero speed) at the moment you click.
+ * 💾 Your last missile power is persisted (localStorage) — it carries across
+ * turns, rounds, respawns, and every match until you scroll it again.
  * (⚡ chaos: run-and-gun — fire while driving AND mid-jump; spawns/respawns
  * parachute in from the sky, and YOUR tank wears the hero marker: a soft sky beam + ONE ground ring that doubles as the reload meter.)
  * Firing ends the turn; Enter passes. Fuel burns while driving/jumping and
@@ -48,6 +50,16 @@ import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
  */
 const GRAV = 850;
 const POWER_SCROLL = 0.0009;       // power change per wheel-delta unit
+// 💾 last missile power persists per browser — across turns, rounds, and matches
+const POWER_KEY = 'bot:last-power';
+const loadPower = () => {
+  if (typeof window === 'undefined') return 0.5; // SSR — no storage yet
+  const raw = window.localStorage.getItem(POWER_KEY);
+  if (raw == null) return 0.5;
+  const v = Number(raw);
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+};
+const savePower = (p) => { try { window.localStorage.setItem(POWER_KEY, String(Math.round(p * 1000) / 1000)); } catch { /* storage blocked — play on */ } };
 const SPEED = (p) => 300 + p * 1200; // more push — full power really launches
 const BLAST_R = 58;
 const FUEL_BURN = (s) => 3.5 + 15 * (Math.abs(s) / 175); // per-second while driving
@@ -133,7 +145,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const tanksRef = useRef([]);
   const aimRef = useRef(-0.6);
   const mouseRef = useRef({ x: 0, y: 0 });
-  const chargeRef = useRef({ power: 0.5 });
+  const chargeRef = useRef({ power: loadPower() }); // 💾 your last missile power rides in with you
   const powerFlashRef = useRef(-9999);   // ⚡ last power-scroll time (rAF clock) — drives the brief turret charge arc
   const teleRef = useRef(null);              // 🌀 null | { targeting: bool } — pending teleport (owner only)
   const [teleUi, setTeleUi] = useState(null); // null | 'pending' | 'targeting' — React mirror for UI chips
@@ -212,7 +224,7 @@ export default function Game({ gs, myId, local = 0 }) {
     bonusRef.current = [];
     dropTRef.current = 10;
     streaksRef.current = []; // 🌬️ fresh sky for a fresh battle
-    chargeRef.current = { power: 0.5 };
+    // 💾 power is NOT reset — your last missile power carries into the new battle
     selRef.current = 'normal';
     teleRef.current = null; setTeleUi(null); // 🌀 fresh game, no pending teleports
     whiteRef.current = 0;
@@ -280,7 +292,7 @@ export default function Game({ gs, myId, local = 0 }) {
             buff: st?.buff ?? 0,                                     // ×2-damage hits remaining
             palette: st?.palette ?? (i % TANK_PALETTES.length),
             aim: st?.aim ?? (x < terrain.width / 2 ? -0.6 : -2.54), // face the enemy side
-            netX: null, netY: null, netAim: null, netS: 0, netPower: null, // online: streamed targets
+            netX: null, netY: null, netAim: null, netS: 0, // online: streamed targets (🕵️ power is never shared)
           };
         });
         // ⚡ chaos: start looking down MY barrel, not tank #0's
@@ -329,8 +341,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (gs.turn.num !== numRef.current) {
         numRef.current = gs.turn.num;
         sfx('turn');
-        // 🔄 same rule as local advanceTurn: fresh charge, weapon back to normal
-        chargeRef.current = { power: 0.5 };
+        // 🔄 same rule as local advanceTurn: weapon back to normal (power persists — 💾 your last charge is remembered)
         selRef.current = 'normal'; setSelUi('normal');
         const nt = tanksRef.current[gs.turn.activeIdx];
         if (nt) setColorName(TANK_PALETTES[(nt.palette ?? 0) % TANK_PALETTES.length].name);
@@ -367,7 +378,7 @@ export default function Game({ gs, myId, local = 0 }) {
         t.para = !!st.para; // 🪂 ride the chute down again
         fxRef.current.text(st.x, st.y - 56, 'RESPAWN', '#8fd0ff');
         fxRef.current.add({ t: 'ring', x: st.x, y: st.y - 18, size: 8, grow: 320, life: 0.5, color: 'rgba(143,208,255,0.9)' });
-        if (st.id === myIdRef.current) { aimRef.current = t.aim; chargeRef.current.power = 0.5; sfx('turn'); }
+        if (st.id === myIdRef.current) { aimRef.current = t.aim; sfx('turn'); } // 💾 power survives respawn too
       }
     }
     // crates mirror — positions eased toward server targets in update()
@@ -414,7 +425,7 @@ export default function Game({ gs, myId, local = 0 }) {
     const tn = turnRef.current;
     const ts = tanksRef.current;
     if (!ts.length || tn.phase === 'over') return;
-    chargeRef.current = { power: 0.5 };
+    // 💾 power carries across turns — your last missile power is remembered
     selRef.current = 'normal'; // weapon pick doesn't carry across turns
     setSelUi('normal');
     if (checkGameOver()) return;
@@ -742,7 +753,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (typeof m.aim === 'number') t.netAim = m.aim;
       if (typeof m.s === 'number') t.netS = m.s;
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
-      if (typeof m.p === 'number') t.netPower = m.p;        // 👀 rival aim power is public
+      // 🕵️ no m.p handling — rival aim power is secret and never rides the stream
       if (typeof m.para === 'boolean') t.para = m.para;     // 🪂 touchdown signal from the owner
       if (typeof m.palette === 'number') t.palette = m.palette; // 🎨 live recolor
     };
@@ -936,7 +947,6 @@ export default function Game({ gs, myId, local = 0 }) {
                 aim: me.aim,
                 s: Math.round(me.s || 0),
                 fuel: Math.round(me.fuel ?? 100),
-                p: Math.round(chargeRef.current.power * 100) / 100,
                 para: true,
               });
             }
@@ -1107,7 +1117,7 @@ export default function Game({ gs, myId, local = 0 }) {
               aim: me === active ? aimRef.current : me.aim,
               s: Math.round(me.s || 0),
               fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
-              p: Math.round(chargeRef.current.power * 100) / 100,     // 👀 rivals see your aim
+              // 🕵️ no p — your missile power is YOUR secret (persisted locally only)
               para: me.para === true,                                 // 🪂 chute stowed = touchdown
             });
           }
@@ -1833,14 +1843,15 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.restore();
         }
 
-        // dotted aim guide — classic: the active tank gets the full power ring + %.
+        // dotted aim guide — classic: YOUR active tank gets the full power ring + %.
+        // 🕵️ rival power is never shown — no ring, no %; their dots are direction-only.
         // ⚡ chaos: NO pivot rings — power rides the crosshair, reload lives on the ground ring.
         const aiming = !t.dead && turn.phase !== 'over' && countdownRef.current <= 0
           && (chaosR || (isActive && turn.phase === 'open'));
         if (aiming) {
-          const p = mineT ? chargeRef.current.power : (t.netPower ?? 0.5);
+          const p = mineT ? chargeRef.current.power : 0.5; // 🕵️ rival power secret — hint dots fly a nominal arc
           const a = mineT ? aimRef.current : (t.aim ?? -0.6); // remote: streamed barrel angle
-          if (!chaosR) { // classic pivot ring + % readout (unchanged)
+          if (!chaosR && mineT) { // classic pivot ring + % readout — YOUR power only
             const pv = pivotOf(t);
             ctx.lineWidth = 5;
             ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -1863,6 +1874,7 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.globalAlpha = 1;
           }
           // short dotted arc hint — 4 dots (3 for rivals) tracing the parabola, fading downrange
+          // ✨ YOUR dots: bright white, bigger, high alpha — easy to read against any sky
           const tip = muzzleOf(t, a);
           const v = SPEED(Math.max(0.06, p));
           const vx = Math.cos(a) * v, vy0 = Math.sin(a) * v;
@@ -1871,9 +1883,9 @@ export default function Game({ gs, myId, local = 0 }) {
             const dt2 = i * 0.11;
             const dx2 = vx * dt2;
             const dy2 = vy0 * dt2 + 0.5 * GRAV * dt2 * dt2;
-            ctx.globalAlpha = (mineT ? 0.6 : 0.55) * (1 - i / (dots + 2));
-            ctx.fillStyle = mineT ? '#fff' : 'rgb(255,120,90)'; // enemy aim = red tint
-            ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, 1.7, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = (mineT ? 0.95 : 0.55) * (1 - i / (dots + 3)); // slower fade — stays visible downrange
+            ctx.fillStyle = mineT ? '#ffffff' : 'rgb(255,120,90)'; // enemy aim = red tint
+            ctx.beginPath(); ctx.arc(tip.x + dx2, tip.y + dy2, mineT ? 2.4 : 1.7, 0, Math.PI * 2); ctx.fill();
           }
           ctx.globalAlpha = 1;
         }
@@ -2306,6 +2318,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (onlineRef.current && me.id !== myIdRef.current) return;
       e.preventDefault();
       chargeRef.current.power = Math.max(0, Math.min(1, chargeRef.current.power - e.deltaY * POWER_SCROLL));
+      savePower(chargeRef.current.power); // 💾 persist every tweak — next turn/round/match starts here
       powerFlashRef.current = performance.now(); // ⚡ flash the turret charge arc
     };
     const onKey = (e, down) => {
@@ -2399,34 +2412,32 @@ export default function Game({ gs, myId, local = 0 }) {
       {/* top bar */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
-        alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
-        background: 'rgba(8,12,8,0.55)', // frosted glass strip
-        backdropFilter: 'blur(14px) saturate(1.25)',
-        WebkitBackdropFilter: 'blur(14px) saturate(1.25)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem',
+        // 🫥 no background strip — text floats over the battlefield, shadow keeps it readable
+        textShadow: '0 1px 3px rgba(0,0,0,0.85)',
         color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
       }}>
         <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
         {chaos && (
           <span style={{
-            background: 'rgba(255,180,94,0.16)', color: '#ffb45e', borderRadius: 6,
-            padding: '0.15rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
+            background: 'transparent', border: '1px solid rgba(255,180,94,0.5)', color: '#ffb45e', borderRadius: 6,
+            padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
           }} title="real-time free-for-all — infinite shells, 1s reload, 5s respawn, most damage wins at 0:00">⚡ CHAOS</span>
         )}
         {ready && (
           <span
             title={`wind ${windUi > 0 ? '→' : windUi < 0 ? '←' : 'calm'} (${Math.round(Math.abs(windUi) * 100)}%)`}
             style={{
-              background: 'rgba(143,208,255,0.12)', color: '#8fd0ff', borderRadius: 6,
-              padding: '0.15rem 0.5rem', fontSize: '0.8rem', fontWeight: 700,
+              background: 'transparent', border: '1px solid rgba(143,208,255,0.45)', color: '#8fd0ff', borderRadius: 6,
+              padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 700,
               letterSpacing: 1, minWidth: '4.6rem', textAlign: 'center',
             }}
           >🌬️ {windLabel}</span>
         )}
         {showMatch && (
           <span style={{
-            background: 'rgba(255,215,94,0.14)', color: '#ffd75e', borderRadius: 6,
-            padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
+            background: 'transparent', border: '1px solid rgba(255,215,94,0.45)', color: '#ffd75e', borderRadius: 6,
+            padding: '0.1rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
           }}>ROUND {match.round}/{match.roundsTotal}</span>
         )}
         <span style={{
@@ -2441,12 +2452,12 @@ export default function Game({ gs, myId, local = 0 }) {
           {chaos ? ctl(['⏳'], '1s reload') : ctl(['⏎'], 'pass')}
         </span>
         <span style={{ flex: 1 }} />
-        <button className="btn" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? '🔇' : '🔊'}</button>
-        <button className="btn" onClick={cycleColor}>🎨 {colorName}</button>
+        <button className="btn-hud" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? 'muted' : 'sound'}</button>
+        <button className="btn-hud" onClick={cycleColor}>{colorName}</button>
         {isHost && turnInfo.phase !== 'over' && (
           <>
-        <button className="btn" onClick={() => getSocket()?.emit('regen-terrain')}>🎲 New terrain</button>
-        <button className="btn" onClick={() => getSocket()?.emit('end-game')}>🏁 End game</button>
+        <button className="btn-hud" onClick={() => getSocket()?.emit('regen-terrain')}>New terrain</button>
+        <button className="btn-hud" onClick={() => getSocket()?.emit('end-game')}>End game</button>
           </>
         )}
       </div>
