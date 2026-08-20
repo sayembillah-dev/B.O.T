@@ -126,13 +126,28 @@ const rollWind = () => {
   return Math.sign(w) * Math.pow(Math.abs(w), 0.7);
 };
 
+/** 📏 measureText cache (5b.8): stable labels (names, ▼ YOU, steering hint) are
+ *  measured once per (font, text) instead of per tank per frame. */
+const measureCache = new Map();
+const measureCached = (ctx, text, font) => {
+  const key = `${font}|${text}`;
+  let w = measureCache.get(key);
+  if (w == null) {
+    ctx.font = font;
+    w = ctx.measureText(text).width;
+    if (measureCache.size > 400) measureCache.clear(); // bound it
+    measureCache.set(key, w);
+  }
+  return w;
+};
+
 /** Small name tag floating above a tank (world-space) - stroked for legibility over any terrain. */
 const drawNameTag = (ctx, x, y, t) => {
   const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
   if (!label) return;
   ctx.font = 'bold 13px system-ui';
   ctx.textAlign = 'center';
-  const w = ctx.measureText(label).width;
+  const w = measureCached(ctx, label, 'bold 13px system-ui');
   ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill behind the name
   ctx.beginPath(); ctx.roundRect(x - w / 2 - 8, y - 12.5, w + 16, 17.5, 8.5); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 0.8; ctx.stroke();
@@ -170,6 +185,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const shakeRef = useRef(0);
   const keysRef = useRef(new Set());
   const keyStampRef = useRef(new Map()); // 🐕 held key → last keydown stamp (auto-repeat) - the wedged-key watchdog
+  const feedRef = useRef([]);            // 💀 kill feed: last few { k, v, at } - top-centre, fades after ~5s
   const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' - mirrored from server online
   const gsRef = useRef(null);        // latest game-state prop (read inside effects)
   const onlineRef = useRef(false);   // online multiplayer mode flag
@@ -608,6 +624,11 @@ export default function Game({ gs, myId, local = 0 }) {
             by.kills = (by.kills | 0) + 1;
             fxRef.current.text(by.x, (by.y ?? srf(by.x)) - 66, 'KILL +1', '#ffd75e');
           }
+          { // 💀 kill feed (offline too)
+            const label = (tt) => `${tt?.emoji ?? ''} ${tt?.name ?? '?'}`.trim();
+            feedRef.current.push({ k: by ? label(by) : '💥', v: label(t), at: performance.now() });
+            if (feedRef.current.length > 6) feedRef.current.splice(0, feedRef.current.length - 6);
+          }
           fxRef.current.text(tx, ty - 40, 'ELIMINATED', '#ff5a4e');
         } else { // solo: wreck pop + instant respawn
           let rx = 60 + Math.round(Math.random() * (terrain.width - 180));
@@ -687,6 +708,13 @@ export default function Game({ gs, myId, local = 0 }) {
         if (m.src === myIdRef.current && d.id !== myIdRef.current) {
           const me2 = tanksRef.current.find((k) => k.id === myIdRef.current);
           if (me2) { fxRef.current.text(me2.x, (me2.y ?? groundY(me2.x)) - 66, 'KILL +1', '#ffd75e'); sfx('pickup'); }
+        }
+        // 💀 kill feed (everyone's screen, every kill)
+        {
+          const kn = tanksRef.current.find((k) => k.id === m.src);
+          const label = (tt) => `${tt?.emoji ?? ''} ${tt?.name ?? '?'}`.trim();
+          feedRef.current.push({ k: m.src && kn ? label(kn) : '💥', v: label(t), at: performance.now() });
+          if (feedRef.current.length > 6) feedRef.current.splice(0, feedRef.current.length - 6);
         }
       }
     }
@@ -1355,6 +1383,20 @@ export default function Game({ gs, myId, local = 0 }) {
               para: me.para === true,                                 // 🪂 chute stowed = touchdown
             });
           }
+        }
+      }
+
+      // 4c: eased HUD readouts (exact-exponential, frame-rate-proof) - hpShown
+      //    chases hp fast; hpGhost trails ~0.4s as the white damage-ghost bar
+      //    (heals snap up); fuelShown chases fuel
+      {
+        const easeFast = 1 - Math.exp(-14 * dt), easeGhost = 1 - Math.exp(-2.6 * dt);
+        for (const t of tanksRef.current) {
+          const hpT = t.hp ?? 100;
+          t.hpShown = t.hpShown == null ? hpT : t.hpShown + (hpT - t.hpShown) * easeFast;
+          if (t.hpGhost == null || t.hpGhost < t.hpShown) t.hpGhost = t.hpShown;
+          else t.hpGhost += (t.hpShown - t.hpGhost) * easeGhost;
+          t.fuelShown = t.fuelShown == null ? (t.fuel ?? 100) : t.fuelShown + ((t.fuel ?? 100) - t.fuelShown) * easeFast;
         }
       }
 
@@ -2071,7 +2113,7 @@ export default function Game({ gs, myId, local = 0 }) {
               { txt: 'D ▶', on: kR },
               { txt: kL || kR ? '  steering' : '  steer', on: kL || kR },
             ];
-            const wTot = parts.reduce((w, p) => w + ctx.measureText(p.txt).width, 0);
+            const wTot = parts.reduce((w, p) => w + measureCached(ctx, p.txt, '600 11.5px system-ui'), 0);
             const hx = Math.max(wTot / 2 + 8, Math.min(cw - wTot / 2 - 8, t.x + dx + swayX)); // never clip off-screen at the map edge
             const hy = gy + dy + 30;
             let px = hx - wTot / 2;
@@ -2079,7 +2121,7 @@ export default function Game({ gs, myId, local = 0 }) {
             for (const p of parts) {
               ctx.fillStyle = p.on ? '#86ffab' : '#d7ecff';
               ctx.fillText(p.txt, px, hy);
-              px += ctx.measureText(p.txt).width;
+              px += measureCached(ctx, p.txt, '600 11.5px system-ui');
             }
             ctx.textAlign = 'center';
             ctx.globalAlpha = 1;
@@ -2094,7 +2136,7 @@ export default function Game({ gs, myId, local = 0 }) {
           if (chaosR) { // ⚡ bright, readable, ZERO flicker - sits above the name tag
             ctx.font = 'bold 11px system-ui';
             const youLabel = '▼ YOU';
-            const yw = ctx.measureText(youLabel).width;
+            const yw = measureCached(ctx, youLabel, 'bold 11px system-ui');
             const yx = stackX - yw / 2 - 9, yy = stackY - 112, yh = 17;
             ctx.fillStyle = 'rgba(6,8,6,0.6)'; // dark offset backplate → crisp contrast edge
             ctx.beginPath(); ctx.roundRect(yx + 1.5, yy + 1.5, yw + 18, yh, 8.5); ctx.fill();
@@ -2202,14 +2244,21 @@ export default function Game({ gs, myId, local = 0 }) {
 
 
 
-        // HP bar with tick points + number
+        // HP bar with tick points + number (eased fill + white damage-ghost, 4c)
         const hp = t.hp ?? 100;
+        const hpS = t.hpShown ?? hp;
+        const hpG = Math.max(hpS, t.hpGhost ?? hpS);
         const bx = stackX - 23, by = stackY - 52; // aligned with the tank, sway included
         ctx.fillStyle = 'rgba(10,14,10,0.72)';
         ctx.beginPath(); ctx.roundRect(bx, by, 46, 7, 3); ctx.fill();
-        const hw = (hp / 100) * 44;
+        if (hpG > hpS + 0.5) { // 👻 the ghost: what that hit just cost you, draining away
+          const gw0 = (hpS / 100) * 44, gw1 = (hpG / 100) * 44;
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.beginPath(); ctx.roundRect(bx + 1 + gw0, by + 1, gw1 - gw0, 5, 2); ctx.fill();
+        }
+        const hw = (hpS / 100) * 44;
         if (hw > 0.5) {
-          ctx.fillStyle = `hsl(${hp * 1.2} 75% 48%)`;
+          ctx.fillStyle = `hsl(${hpS * 1.2} 75% 48%)`;
           ctx.beginPath(); ctx.roundRect(bx + 1, by + 1, hw, 5, 2); ctx.fill();
         }
         ctx.fillStyle = 'rgba(10,14,10,0.85)';
@@ -2217,10 +2266,10 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 8.5px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(`${hp}`, stackX, by - 2.5);
+        ctx.fillText(`${Math.round(hpS)}`, stackX, by - 2.5);
 
         // fuel bar (amber) - burns while driving, regens slowly; flashes red when low
-        const fuel = t.fuel ?? 100;
+        const fuel = t.fuelShown ?? (t.fuel ?? 100);
         const fy = by + 10;
         const lowFuel = fuel < 18;
         ctx.globalAlpha = lowFuel ? 0.55 + 0.45 * Math.abs(Math.sin(now * 0.012)) : 1;
@@ -2447,6 +2496,35 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffb45e';
         ctx.fillText(`🔌 ${goneNames.map((t) => `${t.emoji ?? ''} ${t.name ?? ''}`.trim()).join(', ')} reconnecting…`, cw / 2, 97);
+      }
+
+      // 💀 kill feed - last 4 kills, top-centre under the banner; entries slide
+      //    in fast and fade out after ~4.4s (4b)
+      {
+        const feed = feedRef.current;
+        const rows = [];
+        for (let i = feed.length - 1; i >= 0 && rows.length < 4; i--) {
+          const age = (now - feed[i].at) / 1000;
+          if (age > 5.6) break; // time-ordered - older entries are all past it
+          rows.push({ e: feed[i], age });
+        }
+        if (rows.length) {
+          ctx.font = '600 11.5px system-ui';
+          ctx.textAlign = 'center';
+          rows.reverse().forEach(({ e, age }, i) => {
+            const slide = Math.max(0, 1 - age / 0.18) * -7;
+            const fade = age < 4.4 ? 1 : Math.max(0, 1 - (age - 4.4) / 1.2);
+            const line = `${e.k} ☠ ${e.v}`;
+            const lw = ctx.measureText(line).width + 20;
+            const ly = 116 + i * 18 + slide;
+            ctx.globalAlpha = 0.92 * fade;
+            ctx.fillStyle = 'rgba(8,12,8,0.5)';
+            ctx.beginPath(); ctx.roundRect(cw / 2 - lw / 2, ly - 10, lw, 15, 7.5); ctx.fill();
+            ctx.fillStyle = '#e8ece4';
+            ctx.fillText(line, cw / 2, ly + 2);
+          });
+          ctx.globalAlpha = 1;
+        }
       }
 
       // 🏆 realtime leaderboard - top-right glass panel, redrawn live every frame.
@@ -3013,9 +3091,16 @@ export default function Game({ gs, myId, local = 0 }) {
               boxShadow: '0 12px 60px rgba(0,0,0,0.6)', minWidth: 300,
             }}>
               <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffd75e', marginBottom: '0.4rem' }}>{title}</div>
-              {showMatch && !match.over && (
-                <div style={{ color: '#9fb08f', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-                  round {match.round} of {match.roundsTotal}
+              {showMatch && ( // ▮▮▮▯▯ match progress as a segmented bar (4e)
+                <div title={`round ${match.round} of ${match.roundsTotal}`}
+                  style={{ display: 'flex', gap: 4, justifyContent: 'center', margin: '0.2rem 0 0.6rem' }}>
+                  {Array.from({ length: match.roundsTotal }, (_, i) => (
+                    <span key={i} style={{
+                      width: 22, height: 5, borderRadius: 3,
+                      background: i < match.round ? '#7fb069' : 'rgba(255,255,255,0.14)',
+                      boxShadow: i === match.round - 1 && !match.over ? '0 0 6px rgba(155,225,93,0.8)' : 'none',
+                    }} />
+                  ))}
                 </div>
               )}
               {board.length > 0 && (

@@ -51,13 +51,15 @@ const g0 = await startedP;
 if (!g0.tanks.every((t) => t.para)) fail('chaos tanks should spawn under canopy');
 ok('2-player chaos started - both tanks parachuting');
 
-// B hovers mid-air at (700, 300) and NEVER reports a stow - the hostile client
-b.emit('tank-move', { x: 700, y: 300 });
+// B hovers mid-air at (700, 60) and NEVER reports a stow - the hostile client.
+// y=60 is above every possible peak (surface tops out at height*0.14 = 151 for
+// 2 players), so the server's ground check can never mistake it for landed.
+b.emit('tank-move', { x: 700, y: 60 });
 await sleep(300);
 
 // ── 1) immunity: a blast dead-on B's position must report d:0 ──
 const rep1P = waitEvent(a, 'blast', (m) => m.dmg?.some((d) => d.id === bId), 'blast on para B');
-a.emit('blast', { x: 700, y: 300 - 18, r: 58, scale: 6, big: false }); // would be 300 direct dmg
+a.emit('blast', { x: 700, y: 60 - 18, r: 58, scale: 6, big: false }); // would be 300 direct dmg
 const rep1 = await rep1P;
 const e1 = rep1.dmg.find((d) => d.id === bId);
 if (e1.d !== 0 || e1.dead || e1.hp !== 100) fail(`parachuting tank must be blocked (d:0, hp:100, alive) - got ${JSON.stringify(e1)}`);
@@ -70,10 +72,10 @@ if ((aT1.dmg | 0) !== 0) fail(`blocked damage must not score - A's dmg is ${aT1.
 ok("shooter's damage total unmoved by the block (farming a chute scores nothing)");
 
 // ── 2) after the owner reports the stow, the same blast hurts ──
-b.emit('tank-move', { x: 700, y: 300, para: false });
+b.emit('tank-move', { x: 700, y: 60, para: false });
 await sleep(300);
 const rep2P = waitEvent(a, 'blast', (m) => m.dmg?.some((d) => d.id === bId), 'blast after stow');
-a.emit('blast', { x: 700, y: 300 - 18, r: 58, scale: 6, big: false });
+a.emit('blast', { x: 700, y: 60 - 18, r: 58, scale: 6, big: false });
 const rep2 = await rep2P;
 const e2 = rep2.dmg.find((d) => d.id === bId);
 if (!(e2.d > 0) || !e2.dead) fail(`a stowed tank must take the hit (300 direct) - got ${JSON.stringify(e2)}`);
@@ -97,7 +99,7 @@ ok(`ground-checked tank is mortal (${e3.d} dmg)`);
 
 // ── 4) exploit: hover mid-air FOREVER - the PARA_MAX_MS deadline stows ──
 await waitEvent(a, 'game-event', (e) => e.kind === 'respawn' && e.id === bId, 'B respawns again', 8000);
-b.emit('tank-move', { x: 700, y: 300 }); // mid-air hover, never lands, never stows
+b.emit('tank-move', { x: 700, y: 60 }); // mid-air hover, never lands, never stows
 const t0 = Date.now();
 const g5 = await waitEvent(a, 'game-state', (g) => {
   const t = g.tanks.find((tk) => tk.id === bId);
@@ -105,7 +107,7 @@ const g5 = await waitEvent(a, 'game-state', (g) => {
 }, 'deadline stow', 15000);
 ok(`🪂 PARA_MAX_MS deadline force-stowed the stalled chute (~${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 const rep4P = waitEvent(a, 'blast', (m) => m.dmg?.some((d) => d.id === bId), 'blast post-deadline');
-a.emit('blast', { x: 700, y: 300 - 18, r: 58, scale: 6, big: false });
+a.emit('blast', { x: 700, y: 60 - 18, r: 58, scale: 6, big: false });
 const e4 = (await rep4P).dmg.find((d) => d.id === bId);
 if (!(e4.d > 0)) fail(`deadline-stowed tank must take damage - got ${JSON.stringify(e4)}`);
 ok(`deadline-stowed tank is mortal (${e4.d} dmg) - a stalled/hostile client cannot hide in the sky`);
