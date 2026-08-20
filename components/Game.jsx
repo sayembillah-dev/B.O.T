@@ -8,6 +8,7 @@ import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
 import { FX } from '@/lib/fx.mjs';
 import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
 import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
+import { QualityGovernor, TIERS } from '@/lib/quality.mjs';
 
 /**
  * 🛡️ B.O.T - battle of tanks. Worms-style, side-view destructible terrain, zero sprites.
@@ -187,6 +188,12 @@ export default function Game({ gs, myId, local = 0 }) {
   const [selUi, setSelUi] = useState('normal'); // weapon slot mirror for the HUD
   const [, setInvUi] = useState(0);  // inventory/buff change → HUD rerender
   const invSigRef = useRef('');      // B9: last rendered HUD signature - gs packets only bump on real change
+  const qualityRef = useRef(null);   // 🎚️ QualityGovernor - auto/high/low render tiers (lazy, browser-only)
+  const [qualityUi, setQualityUi] = useState('auto'); // graphics chip mirror (mode)
+  const [lowUi, setLowUi] = useState(false);          // live tier mirror for DOM knobs (backdrop off in Low)
+  const lowUiRef = useRef(false);
+  const terrainViewRef = useRef(null); // 🖼️ pre-scaled terrain cache: downscale once per blast, not per frame (5b)
+  const ctx2dRef = useRef(null);       // cached 2D context (getContext every frame is needless)
   const [windUi, setWindUi] = useState(0); // 🌬️ wind chip mirror
   const [mutedUi, setMutedUi] = useState(false);
   const [fsUi, setFsUi] = useState(false); // ⛶ fullscreen chip mirror
@@ -268,6 +275,7 @@ export default function Game({ gs, myId, local = 0 }) {
           renderTerrainToCanvas(off, terrain); // one full repaint after replay
         }
         terrainCanvasRef.current = off;
+        if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ fresh terrain → re-scale the blit cache
         const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
         const srvTanks = local > 0 ? null : (gsRef.current?.tanks ?? null);
         const placed = []; // ⚖️ fairness: each new spawn keeps its distance from these
@@ -504,6 +512,7 @@ export default function Game({ gs, myId, local = 0 }) {
         const reg = renderTerrainRegion(terrain, rg.x, rg.y, rg.w, rg.h);
         c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
       }
+      if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ re-scale the blit cache
     } else {
       const bands = [];
       for (const rg of regions) {
@@ -1665,7 +1674,7 @@ export default function Game({ gs, myId, local = 0 }) {
       {
         const w = windRef.current, aw = Math.abs(w);
         const ss = streaksRef.current;
-        const target = Math.round(aw * 26);
+        const target = Math.round(aw * (qualityRef.current?.knobs ?? TIERS.high).windStreaks); // 🎚️ tier-scaled
         while (ss.length < target) ss.push({ x: Math.random() * terrain.width, y: 30, len: 20, sp: 0.6 + Math.random() * 0.9, ph: Math.random() * 6.28, amp: 4 + Math.random() * 9, fresh: true });
         if (ss.length > target) ss.length = target;
         const upwind = w > 0 ? -50 : terrain.width + 50;
@@ -1694,9 +1703,10 @@ export default function Game({ gs, myId, local = 0 }) {
           while (q.length && budget > 0) {
             const band = q.shift();
             const rg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h);
-            c2d.putImageData(new ImageData(rg.data, rg.w, rg.h), rg.x, rg.y);
+            c2d.putImageData(new ImageData(reg.data, reg.w, rg.h), rg.x, rg.y);
             budget -= rg.w * rg.h;
           }
+          if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ bands landed - re-scale the blit cache
         }
       }
 
@@ -1705,9 +1715,26 @@ export default function Game({ gs, myId, local = 0 }) {
       if (whiteRef.current > 0) whiteRef.current = Math.max(0, whiteRef.current - dt * 0.7); // ☢️ flash fades slowly
     };
 
+    let lastFrameAt = performance.now();
+    let lastRenderAt = 0;
     const frame = (now) => {
+      const rawMs = now - lastFrameAt; lastFrameAt = now; // real frame delta (pre-clamp) - the governor's sample
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
+      const gov = qualityRef.current;
+      if (gov) {
+        gov.sample(rawMs, now);
+        const k = gov.knobs;
+        fxRef.current.cap = k.particleCap;      // 🎚️ live particle budget
+        fxRef.current.emitScale = k.emitScale;  //     and emission throttle
+        if ((gov.tier === 'low') !== lowUiRef.current) { lowUiRef.current = gov.tier === 'low'; setLowUi(lowUiRef.current); }
+        if (k.frameCapMs && now - lastRenderAt < k.frameCapMs) { // Low tier: 60fps render ceiling on 120Hz+ panels
+          update(dt);
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+      }
+      lastRenderAt = now;
       update(dt);
       render(now, dt);
       raf = requestAnimationFrame(frame);
@@ -1718,14 +1745,17 @@ export default function Game({ gs, myId, local = 0 }) {
       const off = terrainCanvasRef.current;
       const terrain = terrainRef.current;
       if (!canvas || !off || !terrain) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const qk = qualityRef.current?.knobs ?? TIERS.high;
+      const dpr = Math.min(window.devicePixelRatio || 1, qk.dprCap); // 🎚️ Low tier renders at 1×
       const cw = canvas.clientWidth, chh = canvas.clientHeight;
       if (!cw || !chh) return;
       if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(chh * dpr)) {
         canvas.width = Math.round(cw * dpr);
         canvas.height = Math.round(chh * dpr);
+        if (terrainViewRef.current) terrainViewRef.current.dirty = true; // DPR/tier switch → re-scale
       }
-      const ctx = canvas.getContext('2d');
+      if (!ctx2dRef.current || ctx2dRef.current.canvas !== canvas) ctx2dRef.current = canvas.getContext('2d');
+      const ctx = ctx2dRef.current;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#0a0d09';
       ctx.fillRect(0, 0, cw, chh);
@@ -1735,9 +1765,26 @@ export default function Game({ gs, myId, local = 0 }) {
       const ox = cw / 2 - (off.width / 2) * scale;
       const oy = chh / 2 - (off.height / 2) * scale;
       viewRef.current = { scale, ox, oy };
+      // 🖼️ pre-scaled terrain cache (5b): the source bitmap is up to 3360×1260
+      //    and high-quality-downscaling it EVERY frame was the biggest single
+      //    render cost. Terrain changes only on a blast (dirty flag set by the
+      //    repaint sites) - so downscale ONCE into a device-pixel cache and
+      //    blit 1:1 per frame.
+      const dw = Math.max(2, Math.round(off.width * scale * dpr));
+      const dh = Math.max(2, Math.round(off.height * scale * dpr));
+      let tv = terrainViewRef.current;
+      if (!tv) { tv = terrainViewRef.current = { c: document.createElement('canvas'), w: 0, h: 0, dirty: true }; }
+      if (tv.w !== dw || tv.h !== dh) { tv.c.width = dw; tv.c.height = dh; tv.w = dw; tv.h = dh; tv.dirty = true; }
+      if (tv.dirty) {
+        const tc = tv.c.getContext('2d');
+        tc.imageSmoothingEnabled = true;
+        tc.imageSmoothingQuality = qk.smoothing;
+        tc.clearRect(0, 0, dw, dh);
+        tc.drawImage(off, 0, 0, dw, dh);
+        tv.dirty = false;
+      }
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(off, ox, oy, off.width * scale, off.height * scale);
+      ctx.drawImage(tv.c, 0, 0, dw, dh, ox, oy, off.width * scale, off.height * scale);
 
       ctx.save();
       ctx.translate(ox, oy);
@@ -1913,7 +1960,7 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.fillStyle = core;
             ctx.fillRect(stackX - 4, stackY - beamH, 8, beamH);
             // motes rising through the beam - alive, but cheap
-            for (let k = 0; k < 3; k++) {
+            for (let k = 0; k < qk.motes; k++) { // 🎚️ 0 in Low
               const rise = (now * 0.045 + k * 53) % beamH;
               ctx.globalAlpha = (1 - rise / beamH) * 0.45;
               ctx.fillStyle = `${hot} / 1)`;
@@ -1939,7 +1986,7 @@ export default function Game({ gs, myId, local = 0 }) {
             } else { // ready: bright breathing ring + two orbiting pips
               ctx.save();
               ctx.shadowColor = `${hot} / 0.9)`;
-              ctx.shadowBlur = 7;
+              ctx.shadowBlur = qk.shadowBlur ? 7 : 0; // 🎚️
               ctx.strokeStyle = `${hot} / ${0.7 + 0.3 * pulse})`;
               ctx.beginPath(); ctx.ellipse(stackX, ey, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
               ctx.restore();
@@ -2308,7 +2355,7 @@ export default function Game({ gs, myId, local = 0 }) {
         const tx = 16 + shakeX, ty = 62 + shakeY; // below the frosted header
         const tw = 98, th = 46;
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
         ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill
         ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.fill();
         ctx.restore();
@@ -2380,7 +2427,7 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.font = 'bold 13px system-ui';
       const bw = ctx.measureText(banner).width + 42;
       ctx.save(); // glass pill with a soft drop shadow
-      ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+      ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
       ctx.fillStyle = 'rgba(8,12,8,0.58)';
       ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 60, bw, 26, 13); ctx.fill();
       ctx.restore();
@@ -2419,7 +2466,7 @@ export default function Game({ gs, myId, local = 0 }) {
           const panelH = 24 + ranked.length * rowH + 6;
           const bx = cw - 16 - panelW, by = 76; // just under the frosted header, top-right
           ctx.save();
-          ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+          ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
           ctx.fillStyle = 'rgba(8,12,8,0.55)'; // same glass as the timer pill
           ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.fill();
           ctx.restore();
@@ -2686,6 +2733,19 @@ export default function Game({ gs, myId, local = 0 }) {
     if (!m) sfx('turn'); // little "sound is back" blip
   };
 
+  // 🎚️ graphics: auto (adapts to measured frame time) → high → low → auto
+  useEffect(() => {
+    if (!qualityRef.current) qualityRef.current = new QualityGovernor();
+    setQualityUi(qualityRef.current.mode);
+    setLowUi(lowUiRef.current = qualityRef.current.tier === 'low');
+  }, []);
+  const cycleQuality = () => {
+    if (!qualityRef.current) qualityRef.current = new QualityGovernor();
+    const mode = qualityRef.current.cycleMode();
+    setQualityUi(mode);
+    setLowUi(lowUiRef.current = qualityRef.current.tier === 'low');
+  };
+
   // ⛶ fullscreen toggle (Esc backs out - handled in onKey + natively by the browser)
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen?.();
@@ -2771,6 +2831,9 @@ export default function Game({ gs, myId, local = 0 }) {
         </span>
         <span style={{ flex: 1 }} />
         <button className="btn-hud" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? 'muted' : 'sound'}</button>
+        <button className="btn-hud" onClick={cycleQuality} title={`graphics: ${qualityUi}${qualityUi === 'auto' ? ' (follows measured frame rate)' : ''} - click to cycle auto → high → low`}>
+          ✨ {qualityUi}{qualityUi === 'auto' ? (lowUi ? '·low' : '·high') : ''}
+        </button>
         <button className="btn-hud" onClick={toggleFullscreen} title={fsUi ? 'leave fullscreen (Esc)' : 'play fullscreen (Esc to leave)'}>{fsUi ? '⛶ exit' : '⛶ fullscreen'}</button>
         <button className="btn-hud" onClick={cycleColor}>{colorName}</button>
         <button className="btn-hud" onClick={() => router.push('/')} title="back to the main menu">⌂ menu</button>
@@ -2829,7 +2892,7 @@ export default function Game({ gs, myId, local = 0 }) {
               color: '#e8ece4', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.8rem',
               opacity: dead ? (chaos ? 0.55 : 0.35) : 1, textDecoration: dead && !chaos ? 'line-through' : 'none', // ⚡ chaos: dead = 5s timeout, not elimination
               transition: 'all 0.25s',
-              backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', // frosted pill
+              ...(lowUi ? {} : { backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }), // 🎚️ frosted pill - off in Low
             }}>
               {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{t?.gone ? ' · 🔌 reconnecting…' : ''}{t ? ` · ☠${t.kills | 0}` : ''}{showMatch ? ` · R×${match.wins?.[p.id] | 0}` : ''}{p.id === myId ? ' (you)' : ''}
             </span>
@@ -2853,7 +2916,7 @@ export default function Game({ gs, myId, local = 0 }) {
             gap: '0.35rem', alignItems: 'center', fontFamily: 'system-ui, sans-serif',
             background: 'rgba(8,12,8,0.42)', border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 14, padding: '0.3rem 0.4rem',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', // frosted dock
+            ...(lowUi ? {} : { backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }), // 🎚️ frosted dock - off in Low
           }}>
             {teleUi && ( // 🌀 pending teleport - only on the owner's screen; click or press T to aim
               <span
@@ -2941,7 +3004,7 @@ export default function Game({ gs, myId, local = 0 }) {
         return (
           <div style={{
             position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-            background: 'rgba(4,7,4,0.55)', backdropFilter: 'blur(3px)',
+            background: 'rgba(4,7,4,0.55)', ...(lowUi ? {} : { backdropFilter: 'blur(3px)' }), // 🎚️ off in Low
             fontFamily: 'system-ui, sans-serif', zIndex: 10,
           }}>
             <div style={{
