@@ -2398,11 +2398,21 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.beginPath(); ctx.roundRect(bx + 1 + gw0, by + 1, gw1 - gw0, 5, 2); ctx.fill();
         }
         const hw = (hpS / 100) * 44;
-        if (hw > 0.5) {
-          ctx.fillStyle = `hsl(${hpS * 1.2} 75% 48%)`;
-          ctx.beginPath(); ctx.roundRect(bx + 1, by + 1, hw, 5, 2); ctx.fill();
+        if (hw > 0.5) { // lit-top → shaded-bottom gradient = inner-shadow read (4c)
+          const qh = Math.round(hpS * 1.2 / 4) * 4; // quantized hue → cached gradient (5b.3)
+          ctx.save();
+          ctx.translate(bx + 1, by + 1);
+          ctx.fillStyle = cachedGrad(ctx, `hp:${qh}`, (c) => {
+            const g = c.createLinearGradient(0, 0, 0, 5);
+            g.addColorStop(0, `hsl(${qh} 78% 58%)`);
+            g.addColorStop(0.55, `hsl(${qh} 75% 46%)`);
+            g.addColorStop(1, `hsl(${qh} 72% 36%)`);
+            return g;
+          });
+          ctx.beginPath(); ctx.roundRect(0, 0, hw, 5, 2); ctx.fill();
+          ctx.restore();
         }
-        ctx.fillStyle = 'rgba(10,14,10,0.85)';
+        ctx.fillStyle = 'rgba(10,14,10,0.45)'; // hairline ticks, lower contrast (4c)
         for (let k = 1; k < 10; k++) ctx.fillRect(bx + 1 + k * 4.4 - 0.5, by + 1, 1, 5);
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 8.5px system-ui';
@@ -2417,11 +2427,19 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillStyle = 'rgba(10,14,10,0.72)';
         ctx.beginPath(); ctx.roundRect(bx, fy, 46, 4.5, 2); ctx.fill();
         const fw = (fuel / 100) * 44;
-        if (fw > 0.5) {
-          ctx.fillStyle = lowFuel ? '#ff6b4e' : '#f5a623';
-          ctx.beginPath(); ctx.roundRect(bx + 1, fy + 1, fw, 2.5, 1); ctx.fill();
+        if (fw > 0.5) { // same gradient recipe as HP, amber (or red when low) (4c)
+          ctx.save();
+          ctx.translate(bx + 1, fy + 1);
+          ctx.fillStyle = cachedGrad(ctx, lowFuel ? 'fuelLow' : 'fuel', (c) => {
+            const g = c.createLinearGradient(0, 0, 0, 2.5);
+            if (lowFuel) { g.addColorStop(0, '#ff8a6e'); g.addColorStop(1, '#d64a2e'); }
+            else { g.addColorStop(0, '#ffcf6e'); g.addColorStop(1, '#c77f15'); }
+            return g;
+          });
+          ctx.beginPath(); ctx.roundRect(0, 0, fw, 2.5, 1); ctx.fill();
+          ctx.restore();
         }
-        ctx.fillStyle = 'rgba(10,14,10,0.85)';
+        ctx.fillStyle = 'rgba(10,14,10,0.45)'; // hairline ticks, lower contrast (4c)
         for (let k = 1; k < 5; k++) ctx.fillRect(bx + 1 + k * 8.8 - 0.5, fy + 1, 1, 2.5);
         ctx.globalAlpha = 1;
       }
