@@ -8,6 +8,10 @@
  *   5. B drops and rejoins → A stays host (members never steal the crown)
  *   6. a cid-less legacy client joins/leaves → crown untouched
  *   7. game flow still works, and a mid-game drop/rejoin returns the crown too
+ *   8. B1: the mid-game rejoin RE-BINDS the tank by cid (alive, not gone),
+ *      and tank-move from the new socket drives it again
+ *   9. grace lapse: a leaver who never rejoins has their tank die in place
+ *      (run the server with LEAVE_GRACE_MS=1500 so the lapse is quick)
  * Run the server first.  Usage: URL=http://localhost:3000 node scripts/host-reclaim-test.mjs
  */
 import { io } from 'socket.io-client';
@@ -109,12 +113,51 @@ a2.disconnect();
 const stMid = await b2SeesMid;
 if (stMid.hostId !== b2.id) fail('mid-game: B should caretake while A is gone');
 const a3 = await connect('A3');
+// join-room streams the full game-state right after the ack - capture it
+const a3StateP = new Promise((res, rej) => {
+  const t = setTimeout(() => rej(new Error('A3 game-state timeout')), 8000);
+  a3.once('game-state', (g) => { clearTimeout(t); res(g); });
+});
 const a3Join = await join(a3, 'Alice', 'cid-alice');
 if (!a3Join?.ok) fail('A mid-game rejoin failed: ' + a3Join?.error);
 if (a3Join.room.hostId !== a3.id) fail('mid-game rejoin: crown should return to creator A');
 console.log('✅ mid-game drop/rejoin: crown still returns to the creator');
 
+// 8) B1: the rejoin must also re-bind the TANK by cid (not just the crown) -
+//    before the fix, a reconnecting player silently became a spectator of
+//    their own corpse: every input died at once, permanently
+const a3State = await a3StateP;
+const reb = a3State?.tanks?.find((tk) => tk.id === a3.id);
+if (!reb) fail('B1: no tank carries A’s new socket id - A would be a spectator of their own corpse');
+if (reb.dead) fail('B1: A’s tank was killed by a transient drop - it must survive the grace window');
+if (reb.gone) fail('B1: the re-bound tank is still marked gone');
+console.log('✅ B1: tank re-bound to the new socket - alive, grace mark cleared');
+
+// …and movement authority is back: tank-move from the new socket relays to B
+//    (the server looks the tank up BY socket.id - no re-bind, no relay)
+const b2SeesMove = new Promise((res, rej) => {
+  const t = setTimeout(() => rej(new Error('tank-move relay timeout')), 8000);
+  const h = (m) => { if (m.id === a3.id && Math.abs(m.x - 424) < 1) { clearTimeout(t); b2.off('tank-move', h); res(m); } };
+  b2.on('tank-move', h);
+});
+a3.emit('tank-move', { x: 424, y: reb.y ?? 300, aim: -1, s: 0 });
+await b2SeesMove;
+console.log('✅ B1: tank-move from the rejoined socket drives the re-bound tank');
+
+// 9) grace lapse: B drops and never rejoins → the tank dies in place and the
+//    classic round ends (the old leave behaviour, deferred by LEAVE_GRACE_MS)
+const b2Id = b2.id; // ⚠️ capture NOW - socket.io-client clears socket.id on disconnect
+const a3SeesKill = new Promise((res, rej) => {
+  const t = setTimeout(() => rej(new Error('grace-lapse timeout')), 8000);
+  const h = (g) => { if (g?.tanks?.some((tk) => tk.id === b2Id && tk.dead)) { clearTimeout(t); a3.off('game-state', h); res(g); } };
+  a3.on('game-state', h);
+});
+b2.disconnect();
+const gEnd = await a3SeesKill;
+if (gEnd.turn?.phase !== 'over') fail('with B’s tank dead, the classic round should be over (A is last standing)');
+console.log('✅ B1: grace lapse kills the tank in place - round ends for the survivor');
+
 await sleep(200);
-[b2, a3].forEach((s) => s.disconnect());
+[a3].forEach((s) => s.disconnect());
 console.log('\n🎉 HOST CROWN STABLE - creator keeps the master role through drops, rejoins and matches');
 process.exit(0);

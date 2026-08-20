@@ -53,7 +53,8 @@ function pickEmoji(room) {
 // ─────────────────────────────────────────────────────────────────────
 const TURN_TIME_MS = 20000;   // per-turn timer, then auto-pass
 const SETTLE_MS = 1300;       // beat after a shot resolves before next turn
-const SHOT_TIMEOUT_MS = 20000;// safety: never get stuck in 'shot'
+const SHOT_TIMEOUT_MS = 6000; // safety: never get stuck in 'shot' (a backgrounded shooter's rAF stops, so shot-done never arrives - keep the freeze short)
+const LEAVE_GRACE_MS = Number(process.env.LEAVE_GRACE_MS || 10000); // 🔌 disconnect ≠ death: a dropped socket gets this long to rejoin and reclaim its tank before it dies in place
 const GRAV = 850;
 const BLAST_R = 58;
 const CRATE_TTL_MS = 60000;   // ⏳ landed supply crates disappear after 1 minute
@@ -68,6 +69,7 @@ const CHAOS_RESPAWN_MS = Number(process.env.CHAOS_RESPAWN_MS || 5000);     // de
 const CHAOS_WIND_MS = Number(process.env.CHAOS_WIND_MS || 18000);          // wind re-roll (no turns)
 const CHAOS_GHOST_MS = 12000; // a dead tank's in-flight shells may still land
 const CHAOS_GRACE_MS = 8000;  // terrain-gen + countdown runway before the clock truly bites
+const PARA_MAX_MS = Number(process.env.PARA_MAX_MS || 9000); // 🪂 hard deadline on a chute (full drop ≈ 5.7s) - catches a stalled/hostile client streaming para forever
 const CHAOS_FIRE_GRACE_MS = Number(process.env.CHAOS_FIRE_GRACE_MS || 3400); // 🎬 no fire during the client's "3,2,1" (3.6s from state receipt, 200ms slack) - crafted-client pre-fires get nacked
 // ⚖️ fair spawns - N players get N evenly-spaced slots, symmetric about the map
 // centre: nobody starts with more map (or fewer neighbours) than anyone else
@@ -132,14 +134,17 @@ async function createGame(room) {
     placed.push(x);
     return {
       id: p.id, name: p.name, emoji: p.emoji, ai: p.ai ?? null, // 🤖 CPU difficulty tag
+      cid: p.cid ?? null, // 🔌 stable per-tab identity - lets a reconnecting socket reclaim THIS tank
       x, y: mode === 'chaos' ? -60 : surfOf(T, x), // 🪂 chaos drops in by parachute
       para: mode === 'chaos',
       aim: x < T.width / 2 ? -0.6 : -2.54, palette: i % 6,
       hp: 100, fuel: 100, tele: false, inv: { cluster: 0, guided: 0, tomahawk: 0 }, buff: 0, dead: false,
       cdAt: 0,   // ⚡ chaos reload bookkeeping
-      dmg: 0,    // ⚡ chaos scoreboard - total damage dealt to OTHERS (the win metric)
+      dmg: 0,    // 💥 damage dealt to OTHERS (tie-breaker metric)
+      kills: 0, deaths: 0, // 💀 the headline stat - most kills wins
       deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
       shieldUntil: 0, // 🛡️ chaos shield pickup - invulnerable until this stamp
+      paraUntil: mode === 'chaos' ? Date.now() + PARA_MAX_MS : 0, // 🪂 server-owned chute deadline
     };
   });
   const now = Date.now();
@@ -181,7 +186,7 @@ function serializeGame(room, full = false) {
 // ── Match bookkeeping: best-of-N rounds, wins per player ─────────────
 /** Fresh match when a game starts from the lobby. */
 function startMatch(room) {
-  room.match = { round: 1, roundsTotal: room.roundsTotal, wins: {}, over: false, lastWinner: null };
+  room.match = { round: 1, roundsTotal: room.roundsTotal, wins: {}, kills: {}, deaths: {}, dmg: {}, over: false, lastWinner: null };
 }
 /** Record a round result exactly once (called from every game-over path). */
 function finishRound(room, winnerId) {
@@ -193,6 +198,13 @@ function finishRound(room, winnerId) {
   if (!m) return;
   m.lastWinner = g.winner;
   if (g.winner) m.wins[g.winner] = (m.wins[g.winner] | 0) + 1;
+  // 💀 fold the round's kills/deaths/damage into the match career board, so a
+  //    best-of-N shows career numbers (the tanks themselves reset next round)
+  for (const t of g.tanks) {
+    if (t.kills | 0) m.kills[t.id] = (m.kills[t.id] | 0) + (t.kills | 0);
+    if (t.deaths | 0) m.deaths[t.id] = (m.deaths[t.id] | 0) + (t.deaths | 0);
+    if (t.dmg | 0) m.dmg[t.id] = (m.dmg[t.id] | 0) + (t.dmg | 0);
+  }
   if (m.round >= m.roundsTotal) m.over = true; // played all rounds → most wins takes the match
 }
 function broadcastGame(roomId) {
@@ -200,21 +212,22 @@ function broadcastGame(roomId) {
   if (room) io.to(roomId).emit('game-state', serializeGame(room));
 }
 
-/** ⚡ chaos time-out: the match clock hit 0:00 - MOST DAMAGE DEALT wins
- *  (exact top-tie = draw). Even a tank that's mid-respawn can take it:
- *  damage is the score, survival just keeps you dealing it. */
+/** ⚡ chaos time-out: the match clock hit 0:00 - MOST KILLS wins; damage dealt
+ *  breaks a kill-tie (exact tie on both = draw). Even a tank that's mid-respawn
+ *  can take it: the scoreboard never sleeps, survival just keeps you scoring. */
 function endChaosByScore(room) {
   const g = room.game;
   if (!g || g.turn.phase === 'over') return;
   let top = null, tie = false;
   for (const t of g.tanks) {
-    if (!top || (t.dmg | 0) > (top.dmg | 0)) { top = t; tie = false; }
-    else if ((t.dmg | 0) === (top.dmg | 0)) tie = true;
+    const k = t.kills | 0, d = t.dmg | 0;
+    if (!top || k > (top.kills | 0) || (k === (top.kills | 0) && d > (top.dmg | 0))) { top = t; tie = false; }
+    else if (k === (top.kills | 0) && d === (top.dmg | 0)) tie = true; // dead level on BOTH - no unique winner
   }
-  const winnerId = top && !tie && (top.dmg | 0) > 0 ? top.id : null;
+  const winnerId = top && !tie && ((top.kills | 0) > 0 || (top.dmg | 0) > 0) ? top.id : null;
   finishRound(room, winnerId);
   broadcastGame(room.id);
-  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over - winner: ${winnerId ? `${top.name} (${top.dmg | 0} dmg)` : 'draw'}`);
+  console.log(`[room ${room.id}] ⏱ chaos time! round ${room.match?.round ?? 1} over - winner: ${winnerId ? `${top.name} (${top.kills | 0} kills, ${top.dmg | 0} dmg)` : 'draw'}`);
 }
 
 /** Rotate to the next living tank; ends the game when ≤1 remains. */
@@ -236,12 +249,18 @@ function advanceTurnServer(room) {
     io.to(room.id).emit('game-event', { kind: 'tele-fizzle', id: prev.id, x: prev.x, y: prev.y });
   }
   let i = g.turn.activeIdx;
-  for (let k = 0; k < ts.length; k++) { i = (i + 1) % ts.length; if (!ts[i].dead) break; }
+  // 🔌 skip the dead AND the disconnected-but-reclaimable - a classic match
+  //    is never held hostage by a tank whose owner dropped
+  for (let k = 0; k < ts.length; k++) { i = (i + 1) % ts.length; if (!ts[i].dead && !ts[i].gone) break; }
   g.turn.activeIdx = i;
   g.turn.num += 1;
   g.turn.phase = 'open';
   g.turn.endsAt = Date.now() + TURN_TIME_MS;
   g.turn.settleEnd = 0;
+  // ⛽ fresh turn, fresh tank of fuel (B4). Player tanks are refilled by their
+  //    own clients (fuel is owner-streamed); bots have no client, so the
+  //    server refills them here or they'd permanently starve (drive stops < 8)
+  for (const t of g.tanks) if (t.ai) t.fuel = 100;
   g.wind = rollWind(); // fresh wind every turn
   broadcastGame(room.id);
 }
@@ -279,6 +298,14 @@ function tickRoom(room) {
     if (g.windT <= 0) { g.windT = CHAOS_WIND_MS; g.wind = rollWind(); dirty = true; }
   }
 
+  // 🔌 disconnect grace: a gone tank whose owner never rejoined dies in place
+  if (tn.phase !== 'over') {
+    for (const t of g.tanks) {
+      if (!t.gone || t.dead || !t.goneAt) continue;
+      if (now - t.goneAt > LEAVE_GRACE_MS) { finalizeGone(room, t); return; } // finalizeGone broadcasts; start fresh next tick
+    }
+  }
+
   // ⚡ chaos respawns: a dead tank is back after CHAOS_RESPAWN_MS at a fresh
   // random spot with full HP + fuel - death is a timeout, not an elimination
   if (g.mode === 'chaos' && tn.phase !== 'over' && T) {
@@ -287,6 +314,7 @@ function tickRoom(room) {
       const placed = g.tanks.filter((o) => o !== t && !o.dead).map((o) => o.x);
       const x = findSpawn(T, 60 + Math.floor(Math.random() * (T.width - 120)), placed, T.width / 2);
       t.x = x; t.y = -60; t.para = true; // 🪂 ride the chute down to the fresh spot
+      t.paraUntil = now + PARA_MAX_MS;   // 🪂 server-owned deadline on the new chute
       t.aim = x < T.width / 2 ? -0.6 : -2.54;
       t.hp = 100; t.fuel = 100; t.dead = false; t.deadAt = 0; t.cdAt = 0;
       io.to(room.id).emit('game-event', { kind: 'respawn', id: t.id, x: t.x, y: t.y });
@@ -349,7 +377,7 @@ function tickRoom(room) {
       dirty = true;
       if (c.landed) {
         for (const t of g.tanks) {
-          if (t.dead) continue;
+          if (t.dead || t.para) continue; // 🪂 no crate vacuuming on the way down
           const ty = t.y - 16;
           if (Math.abs(t.x - c.x) > 30 || Math.abs(ty - (c.y - 14)) > 34) continue;
           c.taken = true;
@@ -378,6 +406,18 @@ function tickRoom(room) {
       if (!t.ai || t.dead || t.para) continue;
       const gy = surfOf(T, t.x);
       if (Math.abs(gy - t.y) > 1) { t.y = gy; dirty = true; }
+    }
+  }
+
+  // 🪂 server owns the chute: clear it on touchdown (ground check against the
+  //    authoritative bitmap) or when the hard deadline passes - a client that
+  //    never reports the stow cannot stay immortal
+  if (T && tn.phase !== 'over') {
+    for (const t of g.tanks) {
+      if (!t.para) continue;
+      if ((typeof t.y === 'number' && t.y >= surfOf(T, t.x) - 4) || (t.paraUntil && now > t.paraUntil)) {
+        t.para = false; t.paraUntil = 0; dirty = true;
+      }
     }
   }
 
@@ -519,21 +559,33 @@ function applyBlast(room, me, p) {
   const dmg = [];
   for (const t of g.tanks) {
     if (t.dead) continue;
+    const d = Math.hypot(t.x - x, (t.y - 18) - y);
+    if (d >= range) continue; // out of range - not even a block report (no BLOCKED spam)
+    // 🪂 a tank under canopy is untouchable - report a 0-damage block (the
+    //    client already renders d:0 as "🛡️ BLOCKED"). Above the shield check:
+    //    applies in classic too (harmless - para is chaos-only)
+    if (t.para) { dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false }); continue; }
     // 🛡️ shielded tanks take nothing - report a 0-damage block instead
     if (chaos && t.shieldUntil && Date.now() < t.shieldUntil) {
       dmg.push({ id: t.id, hp: t.hp, d: 0, direct: false, dead: false });
       continue;
     }
-    const d = Math.hypot(t.x - x, (t.y - 18) - y);
-    if (d >= range) continue;
     const direct = d < 30;
     const dd = direct ? Math.round(50 * scale) : Math.max(2, Math.round(46 * scale * (1 - d / range)));
     t.hp = Math.max(0, t.hp - dd);
-    if (t.hp <= 0) { t.dead = true; if (chaos) t.deadAt = Date.now(); } // ⚡ chaos: respawn timer starts
+    if (t.hp <= 0) {
+      t.dead = true;
+      if (chaos) t.deadAt = Date.now(); // ⚡ chaos: respawn timer starts
+      // 💀 kill attribution: the shooter scores (never for a self-kill - that
+      //    costs you a death and buys nobody a point), the victim logs a death
+      t.deaths = (t.deaths | 0) + 1;
+      if (me && t.id !== me.id) me.kills = (me.kills | 0) + 1;
+    }
     dmg.push({ id: t.id, hp: t.hp, d: dd, direct, dead: t.dead });
   }
-  // ⚡ chaos scoreboard: damage dealt to OTHERS is the win metric
-  if (chaos && me) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
+  // 💥 damage dealt to OTHERS - the tie-breaker metric (tracked in BOTH modes;
+  //    was chaos-gated, which left classic leaderboards falling back to HP - B10)
+  if (me) me.dmg = (me.dmg | 0) + dmg.reduce((s, d) => (d.id === me.id ? s : s + d.d), 0);
   const alive = g.tanks.filter((t) => !t.dead);
   // ⚡ chaos never ends on a wipeout - respawns keep the match rolling
   if (!chaos && g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
@@ -543,24 +595,37 @@ function applyBlast(room, me, p) {
   broadcastGame(room.id);
 }
 
-/** Leaving mid-game = your tank dies in place; the war goes on without you. */
+/** 🔌 A gone tank whose rejoin grace lapsed dies in place - the old
+ *  immediate-leave behaviour, deferred so a transient drop can reclaim it. */
+function finalizeGone(room, t) {
+  const g = room?.game;
+  if (!g || !t.gone || t.dead) return;
+  t.gone = false; t.goneAt = 0;
+  t.dead = true; t.hp = 0; // ⚡ chaos: no deadAt → leavers never respawn
+  if (g.mode === 'chaos') {
+    // ⚡ no eliminations in chaos - but if nobody's left to fight, score it now
+    if ((g.players?.length ?? 0) <= 1) endChaosByScore(room);
+  } else {
+    const alive = g.tanks.filter((tk) => !tk.dead);
+    if (g.tanks.length > 1 && alive.length <= 1) finishRound(room, alive[0]?.id ?? null);
+  }
+  broadcastGame(room.id);
+  console.log(`[room ${room.id}] 🔌 ${t.name} never came back - tank died in place`);
+}
+
+/** Leaving mid-game no longer kills outright: the tank is marked GONE for
+ *  LEAVE_GRACE_MS so a reconnect (new socket.id, same cid) can reclaim it via
+ *  join-room. Only when the grace lapses does finalizeGone() do what leaving
+ *  used to do - the war goes on without you. */
 function handleGameLeave(socket, room) {
   const g = room?.game;
   if (!g?.players) return;
   g.players = g.players.filter((p) => p.id !== socket.id);
   const t = g.tanks.find((tk) => tk.id === socket.id);
-  if (t && !t.dead) {
-    t.dead = true; t.hp = 0; // ⚡ chaos: no deadAt → leavers never respawn
-    if (g.mode === 'chaos') {
-      // ⚡ no eliminations in chaos - but if nobody's left to fight, score it now
-      if (g.players.length <= 1) endChaosByScore(room);
-    } else {
-      const alive = g.tanks.filter((tk) => !tk.dead);
-      if (g.tanks.length > 1 && alive.length <= 1) {
-        finishRound(room, alive[0]?.id ?? null);
-      } else if (g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
-        advanceTurnServer(room); // was their turn - move on
-      }
+  if (t && !t.dead && g.turn.phase !== 'over' && !t.ai) {
+    t.gone = true; t.goneAt = Date.now();
+    if (g.mode !== 'chaos' && g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
+      advanceTurnServer(room); // was their turn - move on, don't hold the match hostage
     }
   }
   if (g.players.length === 0) {
@@ -640,10 +705,26 @@ app.prepare().then(async () => {
           rooms.set(roomId, room);
           console.log(`[room ${roomId}] created`);
         }
+        const cid = String(payload?.cid || '').slice(0, 64) || null; // stable per-tab identity
+        // 🔁 same human, NEW socket (reload/reconnect before the old socket's
+        //    ping timeout): evict their stale entry first, or they can bounce
+        //    off a phantom of themselves on a full room. cid is per-tab
+        //    (sessionStorage), so a same-cid/different-socket entry is always stale.
+        let evicted = null;
+        if (cid) {
+          for (const [pid, pl] of room.players) {
+            if (pl.cid === cid && pid !== socket.id) {
+              evicted = pl;
+              room.players.delete(pid);
+              if (room.hostId === pid) room.hostId = socket.id; // crown follows the human, not the socket
+              console.log(`[room ${roomId}] 🔁 ${pl.name} reconnected on a new socket - stale entry evicted`);
+              break;
+            }
+          }
+        }
         if (room.players.size >= MAX_PLAYERS) return reply({ ok: false, error: `Room is full (${MAX_PLAYERS} players max).` });
 
-        const cid = String(payload?.cid || '').slice(0, 64) || null; // stable per-tab identity
-        const player = { id: socket.id, name, emoji: pickEmoji(room), joinedAt: Date.now(), cid };
+        const player = { id: socket.id, name, emoji: evicted?.emoji ?? pickEmoji(room), joinedAt: evicted?.joinedAt ?? Date.now(), cid }; // rejoiners keep their face + seniority
         room.players.set(socket.id, player);
         if (!room.hostId) room.hostId = socket.id; // first joiner is the room master 👑
         if (!room.hostCid && cid && room.hostId === socket.id) room.hostCid = cid; // remember the creator's identity - set once
@@ -653,6 +734,27 @@ app.prepare().then(async () => {
         }
         socket.data.roomId = roomId;
         socket.join(roomId);
+        // 🔌 mid-game rejoin: hand the player THEIR tank back. The tank survives
+        //    a disconnect for LEAVE_GRACE_MS (marked gone, not killed) - re-bind
+        //    it to the new socket.id by stable cid, exactly like the crown above.
+        //    Without this the reconnecting player silently became a spectator of
+        //    their own corpse: controlTank() found no tank with the new id.
+        if (room.game && cid) {
+          const g = room.game;
+          const t = g.tanks.find((tk) => tk.cid === cid);
+          if (t && t.id !== socket.id) {
+            console.log(`[room ${roomId}] 🔌 ${t.name} reclaimed their tank (${t.gone ? 'was gone' : 'stale socket'} - re-bound to new socket)`);
+            t.id = socket.id;
+            t.gone = false; t.goneAt = 0;
+            if (!g.players.some((p) => p.id === socket.id)) g.players.push({ id: socket.id, name: t.name, emoji: t.emoji });
+            // ⚡ chaos: the grace-kill already ran? a chaos tank is never eliminated -
+            //    route it through the normal respawn clock instead of a corpse-bind
+            if (t.dead && g.mode === 'chaos' && !t.deadAt && g.turn.phase !== 'over') t.deadAt = Date.now();
+            broadcastGame(roomId);
+          } else if (t) {
+            t.gone = false; t.goneAt = 0; // same-socket rejoin (idempotent path above missed it)
+          }
+        }
         console.log(`[room ${roomId}] ${name} joined (${room.players.size} players)`);
 
         reply({ ok: true, you: player, room: serializeRoom(room) });
@@ -713,7 +815,12 @@ app.prepare().then(async () => {
       if (typeof p?.aim === 'number' && isFinite(p.aim)) t.aim = p.aim;
       // 👀 shared intel: everyone sees everyone's fuel gauge - aim power stays the shooter's SECRET
       if (typeof p?.fuel === 'number' && isFinite(p.fuel)) t.fuel = Math.max(0, Math.min(100, p.fuel));
-      if (typeof p?.para === 'boolean') t.para = p.para; // 🪂 owner reports touchdown (chute stowed)
+      // 🪂 one-way stow: accept only the touchdown report (para: false). The
+      //    chute is server-owned now that it grants immunity - a crafted client
+      //    streaming para:true forever would be immortal; the server arms it at
+      //    spawn/respawn and clears it on this report, its own ground check,
+      //    or the PARA_MAX_MS deadline, whichever comes first
+      if (p?.para === false) { t.para = false; t.paraUntil = 0; }
       if (typeof p?.palette === 'number' && isFinite(p.palette)) t.palette = ((p.palette | 0) % 6 + 6) % 6; // 🎨 recolors are public
       if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {

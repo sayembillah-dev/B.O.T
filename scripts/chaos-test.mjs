@@ -127,6 +127,10 @@ let overFired = false;
 a.on('game-state', (g) => { if (g.turn.phase === 'over') overFired = true; });
 const killBlast = waitEvent(a, 'blast', (m) => m.dmg?.some((d) => d.id === bId && d.dead), 'lethal blast on B');
 const respawnEvt = waitEvent(a, 'game-event', (e) => e.kind === 'respawn' && e.id === bId, 'B respawn event', 12000);
+// attach BEFORE the blast: the kill broadcast itself is the post-kill state.
+// (attaching after used to race the 2.5s respawn window - only a crate in
+// flight would dirty-broadcast in time, making this flaky by drop timing)
+const postKill = waitEvent(a, 'game-state', (g) => g.tanks.some((t) => t.id === bId && t.dead), 'post-kill state');
 a.emit('blast', { x: 700, y: 300 - 14, r: 58, scale: 6, big: false }); // 300 direct dmg
 const mk = await killBlast;
 const bDmg = mk.dmg.find((d) => d.id === bId);
@@ -137,7 +141,7 @@ if (overFired) fail('round ended on a kill - chaos has no eliminations!');
 else ok('…but the match keeps rolling (no last-man-standing)');
 
 // damage tally: A dealt 300 to B; A's own splash (200px away) must not count
-const gAfter = await waitEvent(a, 'game-state', (g) => g.tanks.some((t) => t.id === bId && t.dead), 'post-kill state');
+const gAfter = await postKill;
 const aTank = gAfter.tanks.find((t) => t.id === aId);
 if ((aTank.dmg | 0) !== 300) fail(`A should have 300 damage dealt, got ${aTank.dmg}`);
 else ok('damage scoreboard ticks (A: 300 dealt, self-splash excluded)');

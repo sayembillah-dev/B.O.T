@@ -114,6 +114,10 @@ const findSpawn = (surf, terrain, ideal, placed, maxR) => {
   return Math.max(40, Math.min(terrain.width - 40, ideal));
 };
 const WEAPON_KEYS = { 1: 'normal', 2: 'cluster', 3: 'guided', 4: 'tomahawk' };
+// ⌨️ held keys are tracked by PHYSICAL code (e.code), never e.key - macOS
+//    rewrites e.key under ⌥/⇧ (physical D released with ⌥ down reports '∂'),
+//    which used to wedge 'd' in the held set forever (B2)
+const KEY_CODES = { KeyA: 'a', KeyD: 'd', KeyW: 'w', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', ArrowUp: 'arrowup', Space: ' ' };
 
 /** Worms wind ∈ [-1,1], biased toward useful strengths. */
 const rollWind = () => {
@@ -164,6 +168,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const fxRef = useRef(new FX());
   const shakeRef = useRef(0);
   const keysRef = useRef(new Set());
+  const keyStampRef = useRef(new Map()); // 🐕 held key → last keydown stamp (auto-repeat) - the wedged-key watchdog
   const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' - mirrored from server online
   const gsRef = useRef(null);        // latest game-state prop (read inside effects)
   const onlineRef = useRef(false);   // online multiplayer mode flag
@@ -171,6 +176,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const myIdRef = useRef(null);
   const netAccRef = useRef(0);       // own-tank stream accumulator
   const lastShotMineRef = useRef(false); // online: I fired the in-flight shot
+  const lastBlastRef = useRef(null);   // 🧪 latest server blast report (?test=1 hook)
   const shotSeqRef = useRef(0);        // 🏷️ per-shot id - lets a server nack find MY shell
   const lastFireRef = useRef(null);    // 🧾 { shot, kind, buff } - what the last optimistic fire consumed
   const numRef = useRef(1);          // last turn number seen (turn-change sfx)
@@ -180,6 +186,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const [turnInfo, setTurnInfo] = useState({ num: 1, idx: 0, phase: 'open' }); // DOM chips mirror
   const [selUi, setSelUi] = useState('normal'); // weapon slot mirror for the HUD
   const [, setInvUi] = useState(0);  // inventory/buff change → HUD rerender
+  const invSigRef = useRef('');      // B9: last rendered HUD signature - gs packets only bump on real change
   const [windUi, setWindUi] = useState(0); // 🌬️ wind chip mirror
   const [mutedUi, setMutedUi] = useState(false);
   const [fsUi, setFsUi] = useState(false); // ⛶ fullscreen chip mirror
@@ -340,6 +347,7 @@ export default function Game({ gs, myId, local = 0 }) {
       tn.num = gs.turn.num;
       tn.phase = gs.turn.phase;
       tn.activeIdx = gs.turn.activeIdx;
+      tn.fireAt = gs.turn.fireAt ?? 0; // 🚀 when the in-flight shot left (B5 stall detector)
       if (gs.turn.endsAt) tn.time = Math.max(0, (gs.turn.endsAt - Date.now()) / 1000);
       setTurnInfo({ num: tn.num, idx: tn.activeIdx, phase: tn.phase });
       if (gs.turn.num !== numRef.current) {
@@ -347,6 +355,9 @@ export default function Game({ gs, myId, local = 0 }) {
         sfx('turn');
         // 🔄 same rule as local advanceTurn: weapon back to normal (power persists - 💾 your last charge is remembered)
         selRef.current = 'normal'; setSelUi('normal');
+        // ⛽ fresh turn, fresh tank of fuel in classic (B4) - the owner streams
+        //    the refilled gauge to everyone on the next tank-move tick
+        if (!chaosRef.current) tanksRef.current.forEach((t) => { t.fuel = 100; t.fuelCut = false; });
         const nt = tanksRef.current[gs.turn.activeIdx];
         if (nt) setColorName(TANK_PALETTES[(nt.palette ?? 0) % TANK_PALETTES.length].name);
       }
@@ -362,9 +373,15 @@ export default function Game({ gs, myId, local = 0 }) {
       t.hp = st.hp;
       t.inv = { ...st.inv };
       t.buff = st.buff;
-      t.dmg = st.dmg | 0; // ⚡ chaos scoreboard - damage dealt
+      t.dmg = st.dmg | 0; // 💥 damage dealt (tie-breaker)
+      t.kills = st.kills | 0; t.deaths = st.deaths | 0; // 💀 the headline stat
+      t.gone = !!st.gone; // 🔌 owner dropped - reclaim grace window is running
       t.shieldUntil = st.shieldUntil ?? 0; // 🛡️ chaos shield bubble
-      if (st.para) t.para = true; // 🪂 one-way: touchdown clears it locally
+      // 🪂 one-way: touchdown clears it locally - and B6: only re-arm a chute
+      //    whose generation hasn't landed yet, or a stale game-state landing in
+      //    the ≤12Hz gap before the server learns of touchdown re-opens a stowed
+      //    chute (input hiccup + a flicker of immunity)
+      if (st.para && !t.paraDone) t.para = true;
       t.tele = !!st.tele; // 🌀 pending teleport is public knowledge
       if (typeof st.palette === 'number' && st.palette !== t.palette) { // 🎨 recolors are public
         t.palette = st.palette;
@@ -380,7 +397,7 @@ export default function Game({ gs, myId, local = 0 }) {
         t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
         t.netX = null; t.netY = null; t.netVx = 0; t.netVy = 0; t.netAt = 0; // 🪂 drop the DEATH-SPOT stream anchors - the fresh descent re-anchors from the owner's new stream (else we'd ease back toward the corpse!)
         t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100; t.aim = st.aim ?? t.aim;
-        t.para = !!st.para; // 🪂 ride the chute down again
+        t.para = !!st.para; t.paraDone = false; // 🪂 ride the chute down again - new generation, may be re-armed until it lands
         fxRef.current.text(st.x, st.y - 56, 'RESPAWN', '#8fd0ff');
         fxRef.current.add({ t: 'ring', x: st.x, y: st.y - 18, size: 8, grow: 320, life: 0.5, color: 'rgba(143,208,255,0.9)' });
         if (st.id === myIdRef.current) { aimRef.current = t.aim; sfx('turn'); } // 💾 power survives respawn too
@@ -393,7 +410,13 @@ export default function Game({ gs, myId, local = 0 }) {
       if (ex) { ex.tx = c.x; ex.ty = c.y; ex.tlanded = c.landed; ex.taken = c.taken; return ex; }
       return { ...c, tx: c.x, ty: c.y, tlanded: c.landed };
     });
-    setInvUi((n) => n + 1);
+    // B9: re-render the DOM HUD only when something it SHOWS actually changed -
+    //    a gs packet arrives ~10Hz whenever a crate is airborne; an unconditional
+    //    bump cost two full renders of the top bar, pills and dock per packet
+    const sig = tanksRef.current.map((t) =>
+      `${t.dead ? 1 : 0}${t.gone ? 1 : 0}:${t.kills | 0}:${t.deaths | 0}:${t.dmg | 0}:${t.inv?.cluster | 0},${t.inv?.guided | 0},${t.inv?.tomahawk | 0}:${t.buff | 0}:${t.tele ? 1 : 0}:${t.hp | 0}`
+    ).join('|');
+    if (sig !== invSigRef.current) { invSigRef.current = sig; setInvUi((n) => n + 1); }
   }, [gs, online]);
 
   const activeTank = () => tanksRef.current[turnRef.current.activeIdx] ?? null;
@@ -441,7 +464,9 @@ export default function Game({ gs, myId, local = 0 }) {
     }
     let i = tn.activeIdx;
     for (let k = 0; k < ts.length; k++) { i = (i + 1) % ts.length; if (!ts[i].dead) break; }
-    ts.forEach((t) => { t.driving = false; });
+    // ⛽ fresh turn, fresh tank of fuel (B4) - fuel is a per-turn movement
+    //    budget, never a match-long death spiral toward 0
+    ts.forEach((t) => { t.driving = false; t.fuel = 100; t.fuelCut = false; });
     tn.activeIdx = i;
     tn.num += 1;
     tn.phase = 'open';
@@ -538,6 +563,12 @@ export default function Game({ gs, myId, local = 0 }) {
     let died = false;
     for (const t of tanksRef.current) {
       if (t.dead) continue;
+      // 🪂/🛡️ offline mirrors the server: under canopy or shield = untouchable
+      if (t.para || (t.shieldUntil && Date.now() < t.shieldUntil)) {
+        const tx0 = t.x, ty0 = (t.y ?? srf(t.x)) - 18;
+        if (Math.hypot(tx0 - x, ty0 - y) < r + 34) fxRef.current.text(tx0, ty0 - 42, t.para ? '🪂 SAFE' : '🛡️ BLOCKED', '#8fd0ff');
+        continue;
+      }
       const tx = t.x, ty = (t.y ?? srf(t.x)) - 18;
       const d = Math.hypot(tx - x, ty - y);
       const range = r + 34;
@@ -561,6 +592,13 @@ export default function Game({ gs, myId, local = 0 }) {
         died = true;
         if (tanksRef.current.length > 1) {
           t.dead = true; t.hp = 0; t.driving = false; // eliminated - out of the rotation
+          t.deaths = (t.deaths | 0) + 1;
+          // 💀 offline/hot-seat attribution - the shell's owner scores (never a self-kill)
+          const by = opts.by;
+          if (by && by !== t) {
+            by.kills = (by.kills | 0) + 1;
+            fxRef.current.text(by.x, (by.y ?? srf(by.x)) - 66, 'KILL +1', '#ffd75e');
+          }
           fxRef.current.text(tx, ty - 40, 'ELIMINATED', '#ff5a4e');
         } else { // solo: wreck pop + instant respawn
           let rx = 60 + Math.round(Math.random() * (terrain.width - 180));
@@ -582,6 +620,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
   // ── 🌐 online: apply the server's authoritative blast report ──
   const applyServerBlast = useCallback((m) => {
+    lastBlastRef.current = { ...m, at: Date.now() }; // 🧪 test hook visibility
     // clear the visual shell(s) this boom belongs to - the server is the truth.
     // 🏷️ only the SHOOTER'S shells are candidates: a nearby shell of someone
     //    else's must survive this impact (was: nearest-remote-within-120px)
@@ -635,6 +674,11 @@ export default function Game({ gs, myId, local = 0 }) {
         fxRef.current.boom(t.x, ty);
         fxRef.current.text(t.x, ty - 40, 'ELIMINATED', '#ff5a4e');
         died = true;
+        // 💀 my kill - claim it on the spot (a self-kill earns nothing but the crater)
+        if (m.src === myIdRef.current && d.id !== myIdRef.current) {
+          const me2 = tanksRef.current.find((k) => k.id === myIdRef.current);
+          if (me2) { fxRef.current.text(me2.x, (me2.y ?? groundY(me2.x)) - 66, 'KILL +1', '#ffd75e'); sfx('pickup'); }
+        }
       }
     }
     if (died) sfx('boom');
@@ -772,7 +816,9 @@ export default function Game({ gs, myId, local = 0 }) {
       if (typeof m.s === 'number') t.netS = m.s;
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
       // 🕵️ no m.p handling - rival aim power is secret and never rides the stream
-      if (typeof m.para === 'boolean') t.para = m.para;     // 🪂 touchdown signal from the owner
+      // 🪂 touchdown signal from the owner - a stale in-flight para:true relay
+      //    must not re-open a chute this client already stowed (B6)
+      if (typeof m.para === 'boolean' && !(m.para && t.paraDone)) t.para = m.para;
       if (typeof m.palette === 'number') t.palette = m.palette; // 🎨 live recolor
     };
     const onFire = (m) => { // another player fired - spawn the same shell visually
@@ -846,6 +892,19 @@ export default function Game({ gs, myId, local = 0 }) {
       } else if (e.kind === 'drop') {
         fxRef.current.text(e.x, 26, '📦 supply drop inbound', '#cfd8c3');
         sfx('drop');
+      } else if (e.kind === 'respawn') { // ⚡ immediate, unambiguous revive (B11) -
+        // no waiting on the next game-state diff to race a stale para flag (B6)
+        const t = tanksRef.current.find((k) => k.id === e.id);
+        if (t && t.dead) {
+          t.dead = false; t.hp = 100; t.x = e.x; t.y = e.y;
+          t.netX = null; t.netY = null; t.netVx = 0; t.netVy = 0; t.netAt = 0; // drop the death-spot anchors
+          t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100;
+          t.aim = e.x < (terrainRef.current?.width ?? 1920) / 2 ? -0.6 : -2.54; // mirrors the server's respawn aim
+          t.para = true; t.paraDone = false; // 🪂 new chute generation
+          fxRef.current.text(e.x, e.y - 56, 'RESPAWN', '#8fd0ff');
+          fxRef.current.add({ t: 'ring', x: e.x, y: e.y - 18, size: 8, grow: 320, life: 0.5, color: 'rgba(143,208,255,0.9)' });
+          if (e.id === myIdRef.current) { aimRef.current = t.aim; sfx('turn'); } // 💾 power survives respawn
+        }
       }
     };
     // 🙅 the server refused our optimistic shot - roll it back: the in-flight
@@ -912,6 +971,7 @@ export default function Game({ gs, myId, local = 0 }) {
     if (!new URLSearchParams(window.location.search).has('test')) return;
     window.__bot = {
       PARA_FALL,
+      lastBlast: () => lastBlastRef.current, // 🧪 latest authoritative blast report (dmg array incl. d:0 blocks)
       tanks: () => tanksRef.current.map((t) => ({
         id: t.id, name: t.name, x: Math.round(t.x * 10) / 10, y: Math.round((t.y ?? -999) * 10) / 10,
         sway: +(t.renderSwayX || 0).toFixed(2), s: +(t.s || 0).toFixed(1),
@@ -982,7 +1042,10 @@ export default function Game({ gs, myId, local = 0 }) {
   // ── ⛶ fullscreen: keep the HUD chip in sync no matter how we got in/out
   //    (button, F11, or the browser's native Esc-from-fullscreen) ──
   useEffect(() => {
-    const onFs = () => setFsUi(!!document.fullscreenElement);
+    const onFs = () => {
+      setFsUi(!!document.fullscreenElement);
+      keysRef.current.clear(); keyStampRef.current.clear(); // 🧹 the fullscreen transition eats keyups (B2)
+    };
     document.addEventListener('fullscreenchange', onFs);
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, []);
@@ -1010,6 +1073,18 @@ export default function Game({ gs, myId, local = 0 }) {
       const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
       const slope = (x) => Math.atan2(surf(x + 8) - surf(x - 8), 16);
       const K = keysRef.current;
+
+      // 🐕 wedged-key watchdog: a physically held key auto-repeats keydown
+      //    (~every 30ms, always at least the last-pressed one), so if NOTHING
+      //    has repeated for >1.2s every key in the set is a phantom whose
+      //    keyup got eaten - flush them all (B2)
+      if (K.size) {
+        let newest = 0;
+        for (const stamp of keyStampRef.current.values()) newest = Math.max(newest, stamp);
+        if (!keyStampRef.current.size || performance.now() - newest > 1200) {
+          K.clear(); keyStampRef.current.clear();
+        }
+      }
 
       // ── ALL tanks simulate (gravity/footing/knockback); input drives only
       //    the active one - and online, only when it's YOUR tank ──
@@ -1060,9 +1135,20 @@ export default function Game({ gs, myId, local = 0 }) {
           if (me.y >= gyP) { // touchdown - stow the chute, kick up dust
             me.y = gyP; me.para = false; me.grounded = true;
             me.s = 0; me.netVx = 0; me.netVy = 0;
+            me.paraDone = true; // 🪂 this generation has landed - stale state can't re-arm it (B6)
             me.susVel += 10;
             fxRef.current.add({ t: 'dirt', x: me.x - 10, y: me.y - 2, vx: -40, vy: -30, size: 2.2, life: 0.5 });
             fxRef.current.add({ t: 'dirt', x: me.x + 10, y: me.y - 2, vx: 40, vy: -30, size: 2.2, life: 0.5 });
+            // 🌐 report the touchdown NOW, not on the next 12Hz slot - until the
+            //    server learns the chute is stowed it keeps broadcasting para:true
+            //    and every one of those states would re-arm it here (B6)
+            if (onlineNow && me.id === myIdRef.current) {
+              netAccRef.current = 0;
+              getSocket()?.emit('tank-move', {
+                x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10,
+                aim: me.aim, s: 0, fuel: Math.round(me.fuel ?? 100), para: false,
+              });
+            }
           }
           // 🌐 owner streams the glide so rivals see you steer down
           if (onlineNow && me.id === myIdRef.current) {
@@ -1143,7 +1229,9 @@ export default function Game({ gs, myId, local = 0 }) {
           } else {
           me.y = gyNow; // always rest ON the ground
           const th = slope(me.x);
-          me.driving = dir !== 0 && me.fuel > 0; // engine needs fuel
+          // 🔋 engine needs fuel - and after a dry cut it stays cut until 5+
+          //    is back (hysteresis kills the per-frame stall/creep cycle at 0, B4)
+          me.driving = dir !== 0 && me.fuel > 0 && !me.fuelCut;
           if (me.driving) {
             // driving: engine + gravity-downhill (+sinθ, y-down) − rolling friction
             me.s += (dir * 520 + GRAV * Math.sin(th) * 0.55 - me.s * 2.2) * dt;
@@ -1158,12 +1246,18 @@ export default function Game({ gs, myId, local = 0 }) {
             const ns = surf(nx);
             const nth = slope(nx);
             const uphill = me.s * Math.sin(nth) < 0;
-            // 🛡️ other tanks are SOLID - bumper-to-bumper, never through
+            // 🛡️ other tanks are SOLID - bumper-to-bumper, never through.
+            //    🧭 DIRECTIONAL (B3): block only when this step CLOSES the gap -
+            //    otherwise a tank you're overlapping handbrakes BOTH directions
+            //    (nx is ≤2.9px from me.x, so a non-directional test can't tell
+            //    "into" from "away" and you'd be wedged at ~2px/s forever)
             const tankBlock = tanksRef.current.some((o) =>
-              o !== me && !o.dead && Math.abs(nx - o.x) < 46 && Math.abs((o.y ?? me.y) - me.y) < 32);
-            const hardBlock = nx < 26 || nx > terrain.width - 26 || (ns > terrain.waterY - 4 && ns < me.y + 4) || tankBlock;
+              o !== me && !o.dead && Math.abs((o.y ?? me.y) - me.y) < 32
+              && Math.abs(nx - o.x) < 46 && Math.abs(nx - o.x) < Math.abs(me.x - o.x));
+            // (the old water term was dead code - waterY sits below the map - deleted, not "fixed")
+            const hardBlock = nx < 26 || nx > terrain.width - 26 || tankBlock;
             if (hardBlock) {
-              me.s *= 0.2; // blocked: world edge / water
+              me.s = 0; // blocked: world edge / solid tank - stop dead, don't grind (B3)
             } else {
               // very steep uphill → slow crawl, never a hard stop (no more stuck)
               if (Math.abs(nth) > 1.0 && uphill) me.s = Math.sign(me.s) * Math.min(Math.abs(me.s), 42);
@@ -1219,14 +1313,17 @@ export default function Game({ gs, myId, local = 0 }) {
 
         // fuel: burn while driving, regenerate otherwise (empty tank = engine dead)
         // ⚡ chaos: pit-stop refill - bone dry → full tank in 3 seconds
-        const wasFuel = me.fuel;
         if (me.driving) me.fuel = Math.max(0, me.fuel - FUEL_BURN(me.s) * dt);
         else me.fuel = Math.min(100, me.fuel + (chaosRef.current ? 100 / 3 : FUEL_REGEN) * dt);
+        if (me.fuel <= 0) me.fuelCut = true; else if (me.fuel >= 5) me.fuelCut = false; // 🔋 hysteresis (B4)
         me.noFuelT = Math.max(0, (me.noFuelT || 0) - dt);
         me.stopT = Math.max(0, (me.stopT || 0) - dt);
         me.cd = Math.max(0, (me.cd || 0) - dt);         // ⚡ chaos reload
         me.cdDenyT = Math.max(0, (me.cdDenyT || 0) - dt);
-        if ((chaosRef.current ? me.id === myIdRef.current : me === active) && me.driving && me.fuel <= 0 && wasFuel > 0 && me.noFuelT <= 0) {
+        // ⛽ warn whenever a direction is HELD at 0 fuel - the old condition
+        //    (me.driving && wasFuel > 0) was unreachable once pinned at 0,
+        //    so the player pressing A/D got zero feedback (B4)
+        if ((chaosRef.current ? me.id === myIdRef.current : me === active) && dir !== 0 && me.fuel <= 0 && me.noFuelT <= 0) {
           me.noFuelT = 3;
           fxRef.current.text(me.x, (me.y ?? surf(me.x)) - 62, 'OUT OF FUEL', '#ff9b5e');
           sfx('deny');
@@ -1263,7 +1360,9 @@ export default function Game({ gs, myId, local = 0 }) {
             if (A.dead || B.dead) continue;
             const dx = B.x - A.x, dy = (B.y ?? surf(B.x)) - (A.y ?? surf(A.x));
             if (Math.abs(dx) >= 46 || Math.abs(dy) >= 32) continue;
-            const push = (46 - Math.abs(dx)) * (Math.sign(dx) || (i % 2 ? 1 : -1));
+            // push to 50, not 46: land CLEAR of the blocking test with margin,
+            // so the pair doesn't re-wedge on the <46 knife edge every frame (B3)
+            const push = (50 - Math.abs(dx)) * (Math.sign(dx) || (i % 2 ? 1 : -1));
             const aMine = !onlineNow || A.id === myIdRef.current;
             const bMine = !onlineNow || B.id === myIdRef.current;
             if (aMine && bMine) { A.x -= push / 2; B.x += push / 2; A.s *= 0.3; B.s *= 0.3; }
@@ -1402,7 +1501,7 @@ export default function Game({ gs, myId, local = 0 }) {
           : p.kind === 'sub' ? { r: 40, scale: 0.75 * ds }
           : p.kind === 'guided' ? { r: BLAST_R, scale: 1.25 * ds }
           : { r: BLAST_R, scale: ds };
-        if (!onlineNow) { explode(p.x, p.y, spec.r, spec); return; }
+        if (!onlineNow) { explode(p.x, p.y, spec.r, { ...spec, by: p.src }); return; } // 💀 by = the shell's owner scores the kill
         if (p.mine) {
           // instant local terrain+FX; the server's 'blast' echo brings damage.
           // The echo is matched by shooter id - no coordinate-window guessing.
@@ -1441,7 +1540,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (p.kind === 'guided' && (p.armed || 0) < GUIDED_FUEL) {
           let best = null, bd = Infinity;
           for (const t of tanksRef.current) {
-            if (t.dead || t === p.src) continue;
+            if (t.dead || t === p.src || t.para) continue; // 🪂 never lock a chute - the missile can't hurt it
             const d = Math.hypot(t.x - p.x, (t.y - 14) - p.y);
             if (d < bd) { bd = d; best = t; }
           }
@@ -1507,6 +1606,7 @@ export default function Game({ gs, myId, local = 0 }) {
           let hitTank = null;
           for (const t of tanksRef.current) {
             if (t.dead) continue;
+            if (t.para) continue; // 🪂 shells pass THROUGH the canopy - it can't be hurt, so it can't be hit
             if (t === p.src && p.armed < 0.12) continue; // just left our own muzzle
             const cx = t.x, cy = (t.y ?? 0) - 19;
             const th = t.rot || 0, co = Math.cos(th), si = Math.sin(th);
@@ -1885,7 +1985,32 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.beginPath(); ctx.ellipse(9.5, -44, 4.5, 14, -0.12, Math.PI, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = 'rgba(10,14,10,0.35)';
           ctx.beginPath(); ctx.ellipse(0, -44, 22, 14, 0, Math.PI, Math.PI * 2); ctx.stroke();
+          // 🛡️ under canopy = untouchable: faint protective sheen (the shield
+          //    bubble recipe at low alpha) so the state is legible at a glance
+          {
+            const pg = ctx.createRadialGradient(0, -26, 20, 0, -26, 34);
+            pg.addColorStop(0, 'rgba(143,208,255,0)');
+            pg.addColorStop(0.85, 'rgba(143,208,255,0.08)');
+            pg.addColorStop(1, 'rgba(143,208,255,0.02)');
+            ctx.fillStyle = pg;
+            ctx.beginPath(); ctx.arc(0, -26, 34, 0, Math.PI * 2); ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.strokeStyle = 'rgba(143,208,255,0.4)';
+            ctx.beginPath(); ctx.arc(0, -26, 33, 0, Math.PI * 2); ctx.stroke();
+          }
           ctx.restore();
+          { // 🪂 SAFE chip above the canopy - everyone can read the immunity
+            const sx = t.x + dx + swayX, sy = gy + dy;
+            ctx.font = 'bold 10.5px system-ui';
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = 0.72 + 0.18 * Math.sin(now * 0.005);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(4,7,4,0.7)';
+            ctx.strokeText('🪂 SAFE', sx, sy - 64);
+            ctx.fillStyle = '#bfe6ff';
+            ctx.fillText('🪂 SAFE', sx, sy - 64);
+            ctx.globalAlpha = 1;
+          }
           if (t.id === myIdRef.current) { // 🪂 teach the steering on YOUR drop-in -
             // the held side lights up green LIVE: if pressing A/D doesn't light
             // it, the keypress never reached the game (window not focused?)
@@ -2221,7 +2346,9 @@ export default function Game({ gs, myId, local = 0 }) {
           ? tanksRef.current.find((tk) => tk.id === gsRef.current?.winner)
           : alive[0];
         banner = wt
-          ? '🏆 ' + (wt.emoji ?? '') + ' ' + (wt.name ?? '') + (chaosRef.current ? ` - ${wt.dmg | 0} 💥` : '') + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
+          ? '🏆 ' + (wt.emoji ?? '') + ' ' + (wt.name ?? '')
+            + (chaosRef.current ? ` - ${wt.kills | 0} ☠ · ${wt.dmg | 0} 💥` : ((wt.kills | 0) > 0 ? ` - ${wt.kills | 0} ☠` : ''))
+            + (inMatch ? (m.over ? ' WINS THE MATCH!' : ' wins round ' + m.round + '!') : ' WINS!')
           : (inMatch ? '🏳️ round ' + (m?.round ?? '') + ' - DRAW' : '🏳️ DRAW');
         bCol = '#ffd75e';
       } else if (turn.phase === 'open') {
@@ -2232,17 +2359,20 @@ export default function Game({ gs, myId, local = 0 }) {
             ? '🌀 TELEPORT - click where to land!  (T / Esc to cancel)'
             : '🌀 TELEPORT - click where to land!  (T / Esc to cancel · turn ends = wasted)';
           bCol = '#b48cff';
-        } else if (chaosRef.current) { // ⚡ chaos: respawns forever - most DAMAGE at 0:00
+        } else if (chaosRef.current) { // ⚡ chaos: respawns forever - most KILLS at 0:00
           const meT = tanksRef.current.find((tk) => tk.id === myIdRef.current);
-          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS - most DAMAGE wins at 0:00${meT ? ` · your 💥 ${meT.dmg | 0}` : ''}`;
+          banner = `${spec ? '👁 spectating · ' : ''}⚡ CHAOS - most KILLS wins at 0:00${meT ? ` · your ☠ ${meT.kills | 0} · 💥 ${meT.dmg | 0}` : ''}`;
           bCol = turn.time <= 30 ? '#ff6b4e' : '#ffb45e';
         } else {
           banner = `${spec ? '👁 spectating · ' : ''}${multi ? who + ' · ' : ''}TURN ${turn.num}`;
           bCol = turn.time <= 7 ? '#ff6b4e' : '#9be15d';
         }
       } else if (turn.phase === 'shot') {
-        banner = `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
-        bCol = '#8fd0ff';
+        // B5: a backgrounded shooter's rAF stops, so their shot-done never
+        //     arrives and everyone waits on the server timeout - explain it
+        const stalled = onlineRef.current && turn.fireAt && Date.now() - turn.fireAt > 2500;
+        banner = stalled ? `⏳ waiting for ${who || 'the shooter'}… (their tab may be asleep)` : `🚀 ${multi ? who + ' fired…' : 'shot away…'}`;
+        bCol = stalled ? '#ffb45e' : '#8fd0ff';
       } else {
         banner = '💥 settling…';
         bCol = '#8fd0ff';
@@ -2262,16 +2392,28 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.textAlign = 'center';
       ctx.fillText(banner, cw / 2 + 4, 77.5);
 
+      // 🔌 a dropped owner gets LEAVE_GRACE_MS to reconnect before their tank
+      //    dies in place - say so, so the freeze is never silent (B1)
+      const goneNames = onlineRef.current ? tanksRef.current.filter((t) => t.gone && !t.dead) : [];
+      if (goneNames.length) {
+        ctx.font = 'bold 11.5px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffb45e';
+        ctx.fillText(`🔌 ${goneNames.map((t) => `${t.emoji ?? ''} ${t.name ?? ''}`.trim()).join(', ')} reconnecting…`, cw / 2, 97);
+      }
+
       // 🏆 realtime leaderboard - top-right glass panel, redrawn live every frame.
-      // ⚡ chaos ranks by DAMAGE DEALT (self-splash excluded, dead tanks keep their
-      // score - they can still win at 0:00); classic ranks the living by HP.
+      // ⚡ chaos ranks by KILLS, damage as tie-breaker (self-splash excluded, dead
+      // tanks keep their score - they can still win at 0:00); classic ranks the
+      // living by HP. Same key as the server's endChaosByScore - live and final
+      // boards can never disagree.
       {
         const board = tanksRef.current;
         if (board.length > 1) {
           const chaosB = chaosRef.current;
           const mt = gsRef.current?.match;
           const ranked = [...board].sort((a, b) => chaosB
-            ? ((b.dmg | 0) - (a.dmg | 0)) || ((b.hp | 0) - (a.hp | 0))
+            ? ((b.kills | 0) - (a.kills | 0)) || ((b.dmg | 0) - (a.dmg | 0)) || ((b.hp | 0) - (a.hp | 0))
             : ((a.dead ? 1 : 0) - (b.dead ? 1 : 0)) || ((b.hp | 0) - (a.hp | 0)));
           const panelW = 150, rowH = 17;
           const panelH = 24 + ranked.length * rowH + 6;
@@ -2288,7 +2430,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.font = '600 9.5px system-ui';
           ctx.globalAlpha = 0.85;
           ctx.fillStyle = '#e8ece4';
-          ctx.fillText(chaosB ? '🏆 💥 DAMAGE' : '🏆 ❤ STANDINGS', bx + 10, by + 15);
+          ctx.fillText(chaosB ? '🏆 ☠ KILLS' : '🏆 ❤ STANDINGS', bx + 10, by + 15);
           if (mt && mt.roundsTotal > 1) {
             ctx.textAlign = 'right';
             ctx.fillText(`R${mt.round}/${mt.roundsTotal}`, bx + panelW - 10, by + 15);
@@ -2312,9 +2454,16 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.fillStyle = mineRow ? '#ffd75e' : '#e8ece4';
             ctx.fillText(`${tk.emoji ?? ''} ${nm}`.trim(), bx + 22, ry + 12);
             ctx.textAlign = 'right';
-            const leads = i === 0 && (chaosB ? (tk.dmg | 0) > 0 : !tk.dead);
+            const leads = i === 0 && (chaosB ? ((tk.kills | 0) > 0 || (tk.dmg | 0) > 0) : !tk.dead);
             ctx.fillStyle = leads ? '#ffd75e' : '#e8ece4';
-            ctx.fillText(chaosB ? `${tk.dmg | 0}💥` : tk.dead ? '💀' : `${tk.hp | 0}❤`, bx + panelW - 9, ry + 12);
+            if (chaosB) { // 💀 kills headline, damage dimmer + secondary
+              ctx.fillText(`${tk.kills | 0}☠`, bx + panelW - 9, ry + 12);
+              const kw = ctx.measureText(`${tk.kills | 0}☠`).width;
+              ctx.globalAlpha = 0.62;
+              ctx.fillText(`${tk.dmg | 0}💥 `, bx + panelW - 9 - kw, ry + 12);
+            } else {
+              ctx.fillText(tk.dead ? '💀' : `${tk.hp | 0}❤`, bx + panelW - 9, ry + 12);
+            }
             ctx.globalAlpha = 1;
           });
           ctx.textAlign = 'left';
@@ -2459,13 +2608,25 @@ export default function Game({ gs, myId, local = 0 }) {
       savePower(chargeRef.current.power); // 💾 persist every tweak - next turn/round/match starts here
       powerFlashRef.current = performance.now(); // ⚡ flash the turret charge arc
     };
+    // 🧹 any focus hiccup means keyups may have been eaten (Cmd-Tab, tab
+    //    switch, DevTools, fullscreen, OS overlays) - a latched key cancels
+    //    its opposite (dir = -1 + 1 = 0) and handbrakes the tank forever
+    const clearKeys = () => { keysRef.current.clear(); keyStampRef.current.clear(); };
     const onKey = (e, down) => {
-      const k = e.key.toLowerCase();
-      if (['a', 'd', 'arrowleft', 'arrowright', 'w', 'arrowup', ' '].includes(k)) {
+      const held = KEY_CODES[e.code]; // physical key → logical token (modifier-proof)
+      if (held) {
         e.preventDefault();
-        if (down) keysRef.current.add(k); else keysRef.current.delete(k);
+        if (down) {
+          // ⌘/⌃/⌥ held? the browser is about to eat the keyup (macOS suppresses
+          // keyup for other keys while ⌘ is down) - drop everything, register nothing
+          if (e.metaKey || e.ctrlKey || e.altKey) clearKeys();
+          else { keysRef.current.add(held); keyStampRef.current.set(held, performance.now()); }
+        } else { keysRef.current.delete(held); keyStampRef.current.delete(held); }
       }
+      // ⌘/⌃/⌥ itself going down: any keyup from now on may be eaten - flush the set
+      if (down && (e.key === 'Meta' || e.key === 'Control' || e.key === 'Alt')) clearKeys();
       if (!down) return;
+      const k = e.key.toLowerCase();
       if (k === 'escape' && document.fullscreenElement) document.exitFullscreen?.(); // ⛶ Esc leaves fullscreen (browsers do this natively too - belt and braces)
       if (countdownRef.current > 0) return; // no acting until "FIGHT!"
       if (k === 'enter' && turnRef.current.phase === 'open' && !chaosRef.current) { // ⚡ chaos: no turns to pass
@@ -2486,12 +2647,16 @@ export default function Game({ gs, myId, local = 0 }) {
     };
     const onKeyDown = (e) => onKey(e, true);
     const onKeyUp = (e) => onKey(e, false);
+    const onVis = () => { if (document.hidden) clearKeys(); };
     canvas.addEventListener('mousemove', onMove);
     canvas.addEventListener('mousedown', onDown);
     canvas.addEventListener('contextmenu', onCtx);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearKeys);   // 🧹 alt-tab / DevTools / click-out
+    window.addEventListener('focus', clearKeys);  //      belt and braces on return
+    document.addEventListener('visibilitychange', onVis);
     return () => {
       canvas.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mousedown', onDown);
@@ -2499,6 +2664,9 @@ export default function Game({ gs, myId, local = 0 }) {
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearKeys);
+      window.removeEventListener('focus', clearKeys);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, [ready, myId, fire, advanceTurn]);
 
@@ -2555,7 +2723,12 @@ export default function Game({ gs, myId, local = 0 }) {
       }} />
 
       {/* top bar */}
-      <div style={{
+      <div
+        // 🧹 a clicked HUD button must NOT keep DOM focus: Enter isn't
+        //    preventDefaulted (it passes the turn), so a focused button would
+        //    re-fire on every Enter - e.g. "End game" twice (B2)
+        onClick={(e) => e.target.closest?.('button')?.blur()}
+        style={{
         position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
         alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem',
         // 🫥 no background strip - text floats over the battlefield, shadow keeps it readable
@@ -2658,7 +2831,7 @@ export default function Game({ gs, myId, local = 0 }) {
               transition: 'all 0.25s',
               backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', // frosted pill
             }}>
-              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{chaos && t ? ` · 💥${t.dmg | 0}` : ''}{showMatch ? ` · ${match.wins?.[p.id] | 0}W` : ''}{p.id === myId ? ' (you)' : ''}
+              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{t?.gone ? ' · 🔌 reconnecting…' : ''}{t ? ` · ☠${t.kills | 0}` : ''}{showMatch ? ` · R×${match.wins?.[p.id] | 0}` : ''}{p.id === myId ? ' (you)' : ''}
             </span>
           );
         })}
@@ -2730,16 +2903,29 @@ export default function Game({ gs, myId, local = 0 }) {
         const roundWinner = online
           ? (gs?.winner ? roster.find((p) => p.id === gs.winner) ?? null : null)
           : (tanksRef.current.filter((t) => !t.dead)[0] ?? null);
-        const board = showMatch
-          ? roster.map((p) => ({ p, w: match.wins?.[p.id] | 0 })).sort((a, b) => b.w - a.w)
-          : [];
+        // 💀 scoreboard: kills headline, deaths + damage secondary. In a match,
+        // career numbers (folded in by the server at each round close); single
+        // rounds read the tanks directly. ALWAYS rendered (B8) - a 1-round game
+        // still deserves per-player numbers. Sorted like the server: kills → dmg → wins.
+        const statOf = (id) => {
+          const t = tanksRef.current.find((tk) => tk.id === id);
+          return showMatch
+            ? { kills: match.kills?.[id] | 0, deaths: match.deaths?.[id] | 0, dmg: match.dmg?.[id] | 0 }
+            : { kills: t?.kills | 0, deaths: t?.deaths | 0, dmg: t?.dmg | 0 };
+        };
+        const board = roster
+          .map((p) => ({ p, ...statOf(p.id), w: match?.wins?.[p.id] | 0 }))
+          .sort((a, b) => b.kills - a.kills || b.dmg - a.dmg || b.w - a.w);
         const champ = match?.over && board.length > 0 && board[0].w > 0 && (board.length === 1 || board[0].w > board[1].w)
           ? board[0].p : null;
+        const wT = roundWinner ? tanksRef.current.find((tk) => tk.id === roundWinner.id) : null;
+        const wKills = wT?.kills | 0;
+        const wTitle = roundWinner
+          ? `🏆 ${roundWinner.emoji ?? ''} ${roundWinner.name ?? ''} ${showMatch ? `wins round ${match.round}!` : 'WINS!'}${wKills > 0 ? ` — ${wKills} kill${wKills === 1 ? '' : 's'}` : ''}`
+          : '🏳️ DRAW';
         const title = match?.over && showMatch
-          ? (champ ? `🏆 ${champ.emoji} ${champ.name} WINS THE MATCH!` : '🏳️ MATCH DRAW')
-          : (roundWinner
-              ? `🏆 ${roundWinner.emoji ?? ''} ${roundWinner.name ?? ''} ${showMatch ? `wins round ${match.round}!` : 'WINS!'}`
-              : '🏳️ DRAW');
+          ? (champ ? `🏆 ${champ.emoji} ${champ.name} WINS THE MATCH! — ${statOf(champ.id).kills} ☠` : '🏳️ MATCH DRAW')
+          : wTitle;
         const btn = (label, event, primary) => (
           <button
             key={event}
@@ -2771,16 +2957,20 @@ export default function Game({ gs, myId, local = 0 }) {
               )}
               {board.length > 0 && (
                 <div style={{ margin: '0.9rem 0 0.4rem', display: 'grid', gap: '0.3rem' }}>
-                  {board.map(({ p, w }, i) => (
+                  {board.map(({ p, kills, deaths, dmg, w }, i) => (
                     <div key={p.id} style={{
-                      display: 'flex', justifyContent: 'space-between', gap: '2rem',
-                      padding: '0.3rem 0.8rem', borderRadius: 8,
-                      background: i === 0 && w > 0 ? 'rgba(255,215,94,0.16)' : 'rgba(255,255,255,0.05)',
-                      color: i === 0 && w > 0 ? '#ffd75e' : '#cfd8c3', fontSize: '0.9rem',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1.6rem',
+                      padding: '0.34rem 0.8rem', borderRadius: 8,
+                      background: i === 0 && (kills > 0 || dmg > 0 || w > 0) ? 'rgba(255,215,94,0.16)' : 'rgba(255,255,255,0.05)',
+                      color: i === 0 ? '#ffd75e' : '#cfd8c3', fontSize: '0.9rem',
                       fontWeight: i === 0 ? 700 : 500,
                     }}>
-                      <span>{i === 0 && w > 0 ? '👑 ' : ''}{p.emoji} {p.name}{p.id === myId ? ' (you)' : ''}</span>
-                      <span>{w}W</span>
+                      <span>{i === 0 ? '👑 ' : ''}{p.emoji} {p.name}{p.id === myId ? ' (you)' : ''}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>
+                        <strong style={{ fontSize: '1.02rem' }}>☠ {kills}</strong>
+                        <span style={{ opacity: 0.72, fontSize: '0.8rem' }}> · {deaths}💀 · {dmg}💥</span>
+                        {showMatch && <span style={{ opacity: 0.72, fontSize: '0.74rem' }}> · R×{w}</span>}
+                      </span>
                     </div>
                   ))}
                 </div>

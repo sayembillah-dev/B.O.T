@@ -1,15 +1,18 @@
 /**
- * 🪂⚡ Chaos parachute shootability test - two real headless-Chrome clients.
+ * 🪂⚡ Chaos parachute IMMUNITY test - two real headless-Chrome clients.
  *
  *   1. Alice (host) + Bob join a chaos room, both drop in by parachute, land.
  *   2. CONTROL: Alice shoots Bob ON THE GROUND until he dies → proves the
  *      normal kill path works end-to-end in real browsers.
- *   3. Bob respawns (parachute). MID-DESCENT we freeze Bob's JS (Debugger.pause
- *      ≈ his browser tab being in the background - the classic "dead for 5s,
- *      check your phone" case). His tank-move stream stops.
- *   4. Alice fires a SOLVED intercept at the Bob tank SHE sees. Assert:
- *      - Alice's view of Bob's y tracks the owner's stream (frozen), and
- *      - Bob TAKES DAMAGE mid-chute (server position ≈ visible position).
+ *   3. LIVE CHUTE PROBE: Alice fires SOLVED intercepts at Bob mid-descent.
+ *      Any blast report that catches him must show d:0 and unchanged HP -
+ *      a parachuting tank is UNTOUCHABLE.
+ *   4. FROZEN CHUTE (hard check): on a later respawn Bob's JS is frozen
+ *      mid-descent (Debugger.pause ≈ background tab). Alice's view of Bob
+ *      must hold at the last streamed y, and a shot dead-on at the frozen
+ *      chute must be BLOCKED (d:0, HP unchanged).
+ *   5. WINDOW CLOSES: after resume + touchdown, the very next shot must hurt -
+ *      immunity ends the frame the tracks touch dirt.
  *
  * Run the server first (LONG match clock - the test needs ~60s of match time):
  *   CHAOS_DURATION_MS=120000 CHAOS_RESPAWN_MS=2500 CHAOS_FIRE_GRACE_MS=1 PORT=3210 node server.js
@@ -129,24 +132,34 @@ try {
   if (!bDead) throw new Error('control kill failed - cannot even damage a LANDED tank');
   ok(`control: Bob died on the ground under fire (t=${tsec()}s)`);
 
-  // ═══ Bob respawns → shoot him mid-chute with everyone LIVE (normal case) ═══
+  // ═══ Bob respawns → LIVE mid-chute probe: every blast that catches him
+  //     must report d:0 - a tank under canopy is untouchable ═══
   await a.poll(`__bot.tanks().some((t) => t.id !== ${JSON.stringify(aMyId)} && !t.dead && t.para)`, 'Bob respawned (A view)', 15000);
   ok(`Bob respawned, parachuting (t=${tsec()}s)`);
   const fallRate0 = await a.evalJs(`__bot.PARA_FALL`);
-  let liveHit = null;
-  for (let shot = 0; shot < 4 && !liveHit; shot++) {
+  let liveBlock = null, liveHurt = null;
+  for (let shot = 0; shot < 5 && !liveBlock && !liveHurt; shot++) {
     const bt = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
-    if (!bt || bt.dead || !bt.para || (bt.y ?? 999) > 500) { await sleep(250); continue; } // wait for a healthy drop window
+    if (!bt || bt.dead || !bt.para) { await sleep(250); continue; }
+    if ((bt.y ?? 999) > 420) { await sleep(250); continue; } // too low - he could touch down mid-flight (inconclusive)
+    const prevAt = await a.evalJs(`__bot.lastBlast()?.at ?? 0`);
     const sol = await a.evalJs(`__bot.fireAt(${bt.x}, ${bt.y}, ${fallRate0})`); // lead the falling chute
     info(`live chute shot ${shot + 1}: ${JSON.stringify(sol)} at falling B (${Math.round(bt.x)},${Math.round(bt.y)})`);
-    for (let k = 0; k < 10 && !liveHit; k++) {
+    for (let k = 0; k < 12 && !liveBlock && !liveHurt; k++) {
       await sleep(300);
+      const rep = await a.evalJs(`__bot.lastBlast()`);
+      if (!rep || (rep.at ?? 0) <= prevAt) continue; // still waiting for this shot's report
+      const entry = (rep.dmg ?? []).find((d) => d.id === bt.id);
       const cur = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
-      if (cur && (cur.hp < bt.hp || cur.dead)) liveHit = { before: bt.hp, after: cur.hp, dead: cur.dead };
+      if (!entry) break; // missed him entirely - no verdict, fire again
+      if (entry.d === 0 && !entry.dead) liveBlock = { hp: entry.hp };
+      else if (cur?.para) liveHurt = { d: entry.d, hp: cur?.hp }; // damaged WHILE para - hard fail
+      else break; // he touched down before impact - inconclusive, fire again
     }
   }
-  if (liveHit) ok(`🪂💥 LIVE mid-chute hit landed too: ${liveHit.before} → ${liveHit.dead ? 'shot down!' : liveHit.after + ' hp'}`);
-  else fail('a live, streaming parachute tank took no damage (normal case broken)');
+  if (liveHurt) fail(`a live parachute tank TOOK ${liveHurt.d} damage mid-chute - immunity broken`);
+  else if (liveBlock) ok(`🪂🛡️ LIVE mid-chute shot BLOCKED: d=0, Bob still ${liveBlock.hp} hp`);
+  else info('live chute probe inconclusive (never caught him mid-chute) - the frozen case below is the hard check');
 
   // ═══ frozen case: kill Bob again if he survived + landed, then freeze his
   //     client mid-descent (backgrounded tab - the classic "dead 5s, check
@@ -169,13 +182,14 @@ try {
   }
   await a.poll(`__bot.tanks().some((t) => t.id !== ${JSON.stringify(aMyId)} && t.dead)`, 'Bob dead again', 20000);
   await a.poll(`__bot.tanks().some((t) => t.id !== ${JSON.stringify(aMyId)} && !t.dead && t.para)`, 'Bob parachuting again', 20000);
+  const respawnAt = Date.now(); // 🪂 PARA_MAX_MS (9s) force-stows a stalled chute - the frozen assertions must beat that deadline
   await a.poll(`(__bot.tanks().find((t) => t.id !== ${JSON.stringify(aMyId)})?.y ?? -999) > 100`, 'Bob mid-descent again', 15000);
   ok(`Bob respawned + dropping in for the frozen case (t=${tsec()}s)`);
   await b.send('Debugger.pause'); // 🧊 Bob's JS frozen - rAF stops, tank-move stream stalls
   await sleep(700);
   ok(`Bob's client frozen mid-chute (simulates his tab in the background)`);
 
-  // what does Alice see? (post-fix: Bob's y must FREEZE near the last stream)
+  // what does Alice see? (Bob's y must FREEZE near the last stream)
   const y1 = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId)?.y;
   await sleep(1200);
   const bt2 = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
@@ -184,36 +198,64 @@ try {
   if (!froze) fail(`Bob kept falling on Alice's screen after his stream stalled (y ${Math.round(y1)} → ${Math.round(bt2.y)}) - the ghost descends without its owner!`);
   else ok(`Bob's tank froze on Alice's screen where his stream stopped (y≈${Math.round(bt2.y)})`);
 
-  // ═══ THE TEST: Alice shoots the visible parachuting Bob ═══
-  const fallRate = await a.evalJs(`__bot.PARA_FALL`);
-  let damaged = null, lastY = bt2.y, sawFrozen = false; // aim where he IS once frozen
-  for (let shot = 0; shot < 6 && !damaged; shot++) {
+  // ═══ THE TEST: bombard the frozen, visibly-parachuting Bob. Shells pass
+  //     THROUGH the canopy by design, so most shots detonate on dirt far
+  //     beyond him - the hard invariants: his HP never moves, he never dies,
+  //     he is never knocked, and ANY blast report that does include him
+  //     (a blast within range) must report d:0. (The deterministic d:0
+  //     server-rule proof lives in chaos-para-immune-test.mjs at socket level)
+  const before = { hp: bt2.hp, x: bt2.x, y: bt2.y };
+  let sawBlock = null, sawHurt = null;
+  for (let shot = 0; shot < 3 && !sawHurt; shot++) {
+    if (Date.now() - respawnAt > 7500) { info('chute deadline (PARA_MAX_MS) nearing - stopping frozen probes'); break; }
     const bt = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
     if (!bt || bt.dead) break;
-    const falling = lastY == null ? bt.para : Math.abs(bt.y - lastY) > 3; // stationary = stalled stream → aim where he IS
-    if (!falling) sawFrozen = true;
-    lastY = bt.y;
-    const lead = falling ? fallRate : 0; // a real player aims AT the visible tank - lead only if it's actually dropping
-    const sol = await a.evalJs(`__bot.fireAt(${bt.x}, ${bt.y}, ${lead})`);
-    info(`chute shot ${shot + 1}: ${JSON.stringify(sol)} at visible B (${Math.round(bt.x)},${Math.round(bt.y)} para=${bt.para} lead=${lead})`);
-    for (let k = 0; k < 10 && !damaged; k++) { // ~3s for shell flight + blast echo
+    const prevAt = await a.evalJs(`__bot.lastBlast()?.at ?? 0`);
+    const sol = await a.evalJs(`__bot.fireAt(${bt.x}, ${bt.y}, 0)`); // frozen - aim where he IS, no lead
+    info(`frozen-chute shot ${shot + 1}: ${JSON.stringify(sol)} at frozen B (${Math.round(bt.x)},${Math.round(bt.y)} para=${bt.para})`);
+    for (let k = 0; k < 12; k++) { // ~3.5s for shell flight + blast echo
       await sleep(300);
-      const cur = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
-      if (cur && cur.hp < bt.hp) damaged = { before: bt.hp, after: cur.hp, dead: cur.dead };
+      const rep = await a.evalJs(`__bot.lastBlast()`);
+      if (!rep || (rep.at ?? 0) <= prevAt) continue;
+      const entry = (rep.dmg ?? []).find((d) => d.id === bt.id);
+      if (entry) { if (entry.d > 0 || entry.dead) sawHurt = entry; else sawBlock = entry; }
+      break; // report consumed - next shot
     }
   }
   await a.send('Page.captureScreenshot', { format: 'png' }).then((s) => writeFileSync('/tmp/para-A.png', Buffer.from(s.data, 'base64'))).catch(() => {});
-  if (damaged) ok(`🪂💥 parachuting Bob TOOK DAMAGE: ${damaged.before} → ${damaged.after} hp${damaged.dead ? ' (shot down!)' : ''}`);
-  else fail('parachuting Bob took NO damage - shots at the visible chute do not register');
+  const afterB = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
+  if (sawHurt) fail(`frozen parachute tank TOOK ${sawHurt.d} damage${sawHurt.dead ? ' and DIED' : ''} - chute immunity broken`);
+  else if (afterB && (afterB.hp < before.hp || afterB.dead)) fail(`frozen chute lost HP under fire (${before.hp} → ${afterB.hp})`);
+  else if (afterB && Math.hypot(afterB.x - before.x, afterB.y - before.y) > 6) fail('frozen chute was KNOCKED by a blast - blocked means no knockback either');
+  else ok(`🪂🛡️ frozen mid-chute bombardment blocked everything: hp ${before.hp}, never knocked${sawBlock ? ', blast report said d:0' : ' (shells passed through - no in-range blast)'}`);
 
+  // ═══ the window CLOSES on touchdown: resume Bob, let him land, and the
+  //     very next ground shot must hurt - immunity ends with the chute ═══
   await b.send('Debugger.resume').catch(() => {});
+  await a.poll(`__bot.tanks().some((t) => t.id !== ${JSON.stringify(aMyId)} && !t.dead && !t.para)`, 'Bob touched down after resume', 25000);
+  ok('Bob touched down after resume - chute stowed');
+  let landed = null;
+  for (let shot = 0; shot < 6 && !landed; shot++) {
+    const bt = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
+    if (!bt || bt.dead || bt.para) break;
+    const sol = await a.evalJs(`__bot.fireAt(${bt.x}, ${bt.y}, 0)`);
+    info(`post-touchdown shot ${shot + 1}: ${JSON.stringify(sol)} (B hp=${bt.hp})`);
+    for (let k = 0; k < 12 && !landed; k++) {
+      await sleep(300);
+      const cur = (await a.evalJs(`__bot.tanks()`)).find((t) => t.id !== aMyId);
+      if (cur && (cur.hp < bt.hp || cur.dead)) landed = { before: bt.hp, after: cur.hp, dead: cur.dead };
+    }
+  }
+  if (!landed) fail('Bob took NO damage after touchdown - the immunity window never closed');
+  else ok(`🪂→🎯 post-touchdown hit lands: ${landed.before} → ${landed.dead ? 'shot down!' : landed.after + ' hp'} - the window closed on landing`);
+
   await sleep(800);
   const bView2 = await b.evalJs(`__bot.tanks()`).catch(() => null);
   info(`B's own view after resume: ${JSON.stringify(bView2)}`);
-  if (damaged && bView2) {
+  if (bView2) {
     const bSelf = bView2.find((t) => t.id !== aMyId);
-    if (bSelf && bSelf.hp >= damaged.after) ok(`Bob's own client shows the damage too (hp=${bSelf.hp})`);
-    else fail(`Bob's own client did NOT reflect the damage (hp=${bSelf?.hp})`);
+    if (bSelf && (landed ? (bSelf.hp <= landed.after || bSelf.dead) : bSelf.hp === 100)) ok('Bob\'s own client agrees with Alice\'s');
+    else fail(`Bob's own client DIVERGED (hp=${bSelf?.hp})`);
   }
 } catch (e) {
   fail(e.message);
@@ -221,6 +263,6 @@ try {
   a.chrome.kill(); b.chrome.kill();
 }
 await sleep(200);
-if (failed) { console.error('\n💥 parachute test FAILED'); process.exit(1); }
-console.log('\n🎉 parachute shootability test passed');
+if (failed) { console.error('\n💥 parachute immunity test FAILED'); process.exit(1); }
+console.log('\n🎉 parachute immunity test passed - untouchable under canopy, mortal on touchdown');
 process.exit(0);
