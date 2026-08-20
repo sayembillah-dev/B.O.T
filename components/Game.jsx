@@ -141,6 +141,34 @@ const measureCached = (ctx, text, font) => {
   return w;
 };
 
+/** 🌈 gradient cache (5b.3): gradients are built in LOCAL space (the fill wrapped
+ *  in a translate) so a moving origin can't bust the cache; animated colours are
+ *  quantized into the key so breathing effects still hit. */
+const gradCache = new Map();
+const cachedGrad = (ctx, key, make) => {
+  let g = gradCache.get(key);
+  if (!g) {
+    g = make(ctx);
+    if (gradCache.size > 800) gradCache.clear(); // bound it
+    gradCache.set(key, g);
+  }
+  return g;
+};
+
+/** ☀️ sun-halo falloff baked once - per-frame cost is a single drawImage (5b.3). */
+let _sunHalo = null;
+const sunHaloSprite = () => {
+  if (_sunHalo) return _sunHalo;
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g2 = c.getContext('2d');
+  const grd = g2.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, 'rgba(255,244,200,0.17)');
+  grd.addColorStop(0.55, 'rgba(255,236,180,0.07)');
+  grd.addColorStop(1, 'rgba(255,236,180,0)');
+  g2.fillStyle = grd; g2.fillRect(0, 0, 256, 256);
+  return (_sunHalo = c);
+};
+
 /** Small name tag floating above a tank (world-space) - stroked for legibility over any terrain. */
 const drawNameTag = (ctx, x, y, t) => {
   const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
@@ -1836,12 +1864,7 @@ export default function Game({ gs, myId, local = 0 }) {
       {
         const sx = terrain.width * 0.78, sy = terrain.height * 0.15;
         const pr = terrain.height * 0.30 * (1 + Math.sin(now * 0.0006) * 0.045);
-        const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, pr);
-        grd.addColorStop(0, 'rgba(255,244,200,0.17)');
-        grd.addColorStop(0.55, 'rgba(255,236,180,0.07)');
-        grd.addColorStop(1, 'rgba(255,236,180,0)');
-        ctx.fillStyle = grd;
-        ctx.fillRect(sx - pr, sy - pr, pr * 2, pr * 2);
+        ctx.drawImage(sunHaloSprite(), sx - pr, sy - pr, pr * 2, pr * 2);
       }
 
       // 🌬️ wind streaks - faint speed-lines drifting across the sky; you read
@@ -1911,10 +1934,15 @@ export default function Game({ gs, myId, local = 0 }) {
         const cy = b.landed ? b.y - 14 : b.y;
         ctx.globalAlpha = blink;
         // wooden crate: warm planks, dark frame, diagonal strap, gold '?' badge
-        const wg = ctx.createLinearGradient(b.x, cy - 12, b.x, cy + 12);
-        wg.addColorStop(0, '#a9713a'); wg.addColorStop(0.5, '#8d5a2c'); wg.addColorStop(1, '#6f4520');
-        ctx.fillStyle = wg;
-        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.fill();
+        ctx.save(); // local space → the cached gradient is position-independent (5b.3)
+        ctx.translate(b.x, cy);
+        ctx.fillStyle = cachedGrad(ctx, 'crate', (c) => {
+          const g = c.createLinearGradient(0, -12, 0, 12);
+          g.addColorStop(0, '#a9713a'); g.addColorStop(0.5, '#8d5a2c'); g.addColorStop(1, '#6f4520');
+          return g;
+        });
+        ctx.beginPath(); ctx.roundRect(-12, -12, 24, 24, 4); ctx.fill();
+        ctx.restore();
         ctx.strokeStyle = 'rgba(46,28,12,0.9)'; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.stroke();
         ctx.strokeStyle = 'rgba(46,28,12,0.55)'; ctx.lineWidth = 1; // plank seams + strap
@@ -1983,24 +2011,33 @@ export default function Game({ gs, myId, local = 0 }) {
         t.renderSwayX = swayX; // 🧪 exposed via ?test=1 hook (visual-position jitter checks)
         const stackX = t.x + dx + swayX, stackY = gy + dy; // ONE centre line - every overlay hangs from it
         if (spot && !t.dead && turn.phase !== 'over') { // ⚡ chaos: the HERO MARKER - one aligned system for YOUR tank
-          const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
+          const palI = (t.palette ?? 0) % TANK_PALETTES.length;
+          const pal = TANK_PALETTES[palI];
           if (chaosR) {
             const hot = `hsla(${pal.h} ${Math.min(100, pal.s + 55)}% 68%`; // vivid team hue
             const pulse = 0.5 + 0.5 * Math.sin(now * 0.0045); // ONE shared breath - every layer in phase
+            const qp = Math.round(pulse * 24); // quantized breath → cache-friendly keys (5b.3)
             // sky beam - soft horizontal falloff, no hard rectangle edges
             const beamH = 150;
-            const bg = ctx.createLinearGradient(stackX - 15, 0, stackX + 15, 0);
-            bg.addColorStop(0, `${hot} / 0)`);
-            bg.addColorStop(0.5, `${hot} / ${0.12 + 0.07 * pulse})`);
-            bg.addColorStop(1, `${hot} / 0)`);
-            ctx.fillStyle = bg;
-            ctx.fillRect(stackX - 15, stackY - beamH, 30, beamH);
-            const core = ctx.createLinearGradient(stackX - 4, 0, stackX + 4, 0);
-            core.addColorStop(0, `${hot} / 0)`);
-            core.addColorStop(0.5, `${hot} / ${0.22 + 0.10 * pulse})`);
-            core.addColorStop(1, `${hot} / 0)`);
-            ctx.fillStyle = core;
-            ctx.fillRect(stackX - 4, stackY - beamH, 8, beamH);
+            ctx.save(); // local space → cached per (palette, breath step), position-independent
+            ctx.translate(stackX, 0);
+            ctx.fillStyle = cachedGrad(ctx, `beam:${palI}:${qp}`, (c) => {
+              const g = c.createLinearGradient(-15, 0, 15, 0);
+              g.addColorStop(0, `${hot} / 0)`);
+              g.addColorStop(0.5, `${hot} / ${0.12 + 0.07 * (qp / 24)})`);
+              g.addColorStop(1, `${hot} / 0)`);
+              return g;
+            });
+            ctx.fillRect(-15, stackY - beamH, 30, beamH);
+            ctx.fillStyle = cachedGrad(ctx, `beamCore:${palI}:${qp}`, (c) => {
+              const g = c.createLinearGradient(-4, 0, 4, 0);
+              g.addColorStop(0, `${hot} / 0)`);
+              g.addColorStop(0.5, `${hot} / ${0.22 + 0.10 * (qp / 24)})`);
+              g.addColorStop(1, `${hot} / 0)`);
+              return g;
+            });
+            ctx.fillRect(-4, stackY - beamH, 8, beamH);
+            ctx.restore();
             // motes rising through the beam - alive, but cheap
             for (let k = 0; k < qk.motes; k++) { // 🎚️ 0 in Low
               const rise = (now * 0.045 + k * 53) % beamH;
@@ -2010,12 +2047,17 @@ export default function Game({ gs, myId, local = 0 }) {
             }
             ctx.globalAlpha = 1;
             // glow pooling on the ground
-            const gg = ctx.createRadialGradient(stackX, stackY, 2, stackX, stackY, 44);
-            gg.addColorStop(0, `${hot} / ${0.30 + 0.10 * pulse})`);
-            gg.addColorStop(0.65, `${hot} / 0.12)`);
-            gg.addColorStop(1, `${hot} / 0)`);
-            ctx.fillStyle = gg;
-            ctx.beginPath(); ctx.arc(stackX, stackY, 44, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            ctx.translate(stackX, stackY);
+            ctx.fillStyle = cachedGrad(ctx, `pool:${palI}:${qp}`, (c) => {
+              const g = c.createRadialGradient(0, 0, 2, 0, 0, 44);
+              g.addColorStop(0, `${hot} / ${0.30 + 0.10 * (qp / 24)})`);
+              g.addColorStop(0.65, `${hot} / 0.12)`);
+              g.addColorStop(1, `${hot} / 0)`);
+              return g;
+            });
+            ctx.beginPath(); ctx.arc(0, 0, 44, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
             // THE ring - one ground ellipse = selection marker AND reload meter (no second ring anywhere)
             const rx = 37, ry = 9.5, ey = stackY - 1;
             const fr = Math.max(0, Math.min(1, (t.cd || 0) / CHAOS_COOLDOWN));
@@ -2040,11 +2082,16 @@ export default function Game({ gs, myId, local = 0 }) {
             }
           } else { // classic: plain whose-turn glow
             const hue = `hsla(${pal.h} ${Math.min(90, pal.s + 45)}% 60%`;
-            const gg = ctx.createRadialGradient(t.x, gy, 2, t.x, gy, 36);
-            gg.addColorStop(0, `${hue} / 0.30)`);
-            gg.addColorStop(1, `${hue} / 0)`);
-            ctx.fillStyle = gg;
-            ctx.beginPath(); ctx.arc(t.x, gy, 36, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            ctx.translate(t.x, gy);
+            ctx.fillStyle = cachedGrad(ctx, `turnGlow:${palI}`, (c) => {
+              const g = c.createRadialGradient(0, 0, 2, 0, 0, 36);
+              g.addColorStop(0, `${hue} / 0.30)`);
+              g.addColorStop(1, `${hue} / 0)`);
+              return g;
+            });
+            ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
           }
         }
         drawTank(ctx, t.x + dx + swayX, gy + dy, {
@@ -2077,11 +2124,13 @@ export default function Game({ gs, myId, local = 0 }) {
           // 🛡️ under canopy = untouchable: faint protective sheen (the shield
           //    bubble recipe at low alpha) so the state is legible at a glance
           {
-            const pg = ctx.createRadialGradient(0, -26, 20, 0, -26, 34);
-            pg.addColorStop(0, 'rgba(143,208,255,0)');
-            pg.addColorStop(0.85, 'rgba(143,208,255,0.08)');
-            pg.addColorStop(1, 'rgba(143,208,255,0.02)');
-            ctx.fillStyle = pg;
+            ctx.fillStyle = cachedGrad(ctx, 'paraSheen', (c) => { // already tank-local space (5b.3)
+              const g = c.createRadialGradient(0, -26, 20, 0, -26, 34);
+              g.addColorStop(0, 'rgba(143,208,255,0)');
+              g.addColorStop(0.85, 'rgba(143,208,255,0.08)');
+              g.addColorStop(1, 'rgba(143,208,255,0.02)');
+              return g;
+            });
             ctx.beginPath(); ctx.arc(0, -26, 34, 0, Math.PI * 2); ctx.fill();
             ctx.lineWidth = 1.6;
             ctx.strokeStyle = 'rgba(143,208,255,0.4)';
@@ -2177,12 +2226,17 @@ export default function Game({ gs, myId, local = 0 }) {
         if (shieldLeft > 0) { // 🛡️ energy shield - one clean bubble centred on the hull, not another ring
           const shY = stackY - 19;
           ctx.save();
-          const sg = ctx.createRadialGradient(stackX, shY, 26, stackX, shY, 37);
-          sg.addColorStop(0, 'rgba(143,208,255,0)');
-          sg.addColorStop(0.85, 'rgba(143,208,255,0.10)');
-          sg.addColorStop(1, 'rgba(143,208,255,0.02)');
-          ctx.fillStyle = sg;
-          ctx.beginPath(); ctx.arc(stackX, shY, 37, 0, Math.PI * 2); ctx.fill();
+          ctx.save();
+          ctx.translate(stackX, shY); // local space → cached bubble (5b.3)
+          ctx.fillStyle = cachedGrad(ctx, 'shield', (c) => {
+            const g = c.createRadialGradient(0, 0, 26, 0, 0, 37);
+            g.addColorStop(0, 'rgba(143,208,255,0)');
+            g.addColorStop(0.85, 'rgba(143,208,255,0.10)');
+            g.addColorStop(1, 'rgba(143,208,255,0.02)');
+            return g;
+          });
+          ctx.beginPath(); ctx.arc(0, 0, 37, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
           ctx.lineWidth = 2;
           ctx.strokeStyle = 'rgba(143,208,255,0.55)';
           ctx.beginPath(); ctx.arc(stackX, shY, 36, 0, Math.PI * 2); ctx.stroke();
@@ -2300,10 +2354,12 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.globalCompositeOperation = 'lighter';
         const glowR = proj.kind === 'tomahawk' ? 24 : 16;
         const gc = proj.kind === 'guided' ? '255,90,208' : '255,170,70';
-        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
-        grd.addColorStop(0, `rgba(${gc},0.5)`);
-        grd.addColorStop(1, `rgba(${gc},0)`);
-        ctx.fillStyle = grd;
+        ctx.fillStyle = cachedGrad(ctx, `shell:${glowR}:${gc}`, (c) => { // shell-local space (5b.3)
+          const g = c.createRadialGradient(0, 0, 0, 0, 0, glowR);
+          g.addColorStop(0, `rgba(${gc},0.5)`);
+          g.addColorStop(1, `rgba(${gc},0)`);
+          return g;
+        });
         ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI * 2); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 0.9;
