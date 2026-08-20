@@ -88,6 +88,9 @@ Friends on the same network can join via your LAN IP (`http://192.168.x.x:3000/r
 | `npm run test:ai` / `test:ai-game` | 🤖 bot accuracy + full bot-match tests |
 | `node scripts/mp-probe.mjs` | Full multiplayer protocol test: 2 headless clients play a turn, fire, take damage, rotate, rematch |
 | `node scripts/chaos-test.mjs` | ⚡ Chaos protocol test (start the dev server with `CHAOS_DURATION_MS=12000 CHAOS_COOLDOWN_MS=1500 CHAOS_WIND_MS=3000 CHAOS_RESPAWN_MS=2500` for speed) |
+| `node scripts/kills-test.mjs` | 💀 Kills scoring: attribution, self-kill rule, kills-first winner, damage tie-break, draw |
+| `node scripts/chaos-para-immune-test.mjs` | 🪂🛡️ Socket-level chute immunity: blast reports d:0, server-owned stow, both hover/land exploits closed (needs `PARA_MAX_MS=4000`) |
+| `node scripts/quality-test.mjs` | 🎚️ Quality-governor unit test: slow-window demotion, fast-window promotion, anti-flap cooldown, median-not-mean |
 | `node scripts/spawn-random-test.mjs` | 🎲 Verifies spawn assignment is shuffled every round, never join order |
 | `node scripts/<name>` | More focused probes live in `scripts/`: fairness, crates, teleports, host-reclaim, power-visibility… |
 
