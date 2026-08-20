@@ -23,7 +23,7 @@ Next.js + Socket.IO run in **one Node process**: the same server serves the page
 | Mode | How |
 | --- | --- |
 | **Online rooms - ⚔️ Classic** | Create a room, send the invite link, 2+ players, server-authoritative turn-based match |
-| **Online rooms - ⚡ Chaos** | Same room, host picks ⚡ in the lobby: real-time free-for-all - no turns, everyone moves at once, infinite shells behind a 1s reload, fuel refills in 3s, dead tanks respawn in 5s (parachuting back in - steerable with A/D, invulnerable under the canopy, mortal the frame it touches down), 3-minute match clock. Most damage dealt wins. Works with best-of-N rounds too |
+| **Online rooms - ⚡ Chaos** | Same room, host picks ⚡ in the lobby: real-time free-for-all - no turns, everyone moves at once, infinite shells behind a 1s reload, fuel refills in 3s, dead tanks respawn in 5s (parachuting back in - steerable with A/D, invulnerable under the canopy, mortal the frame it touches down), 3-minute match clock. **Most kills wins** - damage only breaks a tie (perfect tie on both = draw). Works with best-of-N rounds too |
 | **Solo practice** | One click from the home page (`?solo=1`) |
 | **🤖 vs AI** | Duel a server-driven CPU tank (`?solo=1&ai=easy\|medium\|hard`) - the bot searches real ballistic firing solutions against the authoritative terrain + wind, then applies a per-difficulty aim error: 😊 easy is partially accurate, 😐 medium accurate sometimes, 😈 hard accurate most of the time (plus smart target/weapon picks, repositioning, crate runs and teleports) |
 | **Hot-seat 2–4P** | One screen, shared keyboard/mouse (`?solo=1&local=N`) |
@@ -31,7 +31,9 @@ Next.js + Socket.IO run in **one Node process**: the same server serves the page
 
 ## Features
 
-- **Two rulesets** - Classic (turn-based, 20s turns) and ⚡ Chaos (real-time FFA, 1s reload, 5s respawns, 3:00 clock, most damage dealt wins)
+- **Two rulesets** - Classic (turn-based, 20s turns) and ⚡ Chaos (real-time FFA, 1s reload, 5s respawns, 3:00 clock, most kills wins)
+- **💀 Kills scoring** - every elimination credits the shooter (self-splash is a death, never a kill); ☠ kills headline the live standings, roster and results board, with deaths 💀 and damage 💥 secondary. Best-of-N folds each round into match-career totals
+- **🎚️ Quality tiers** - the `✨ auto·high·low` button: auto measures real frame times and steps the tier down/up itself (DPR cap, particle budget, shadows, backdrop blur, 60fps ceiling); a manual override persists across sessions
 - **Destructible seeded terrain** - per-pixel bitmap, caves, floating-island cleanup, deterministic from a seed
 - **Wind** - re-rolled every turn (on a timer in Chaos), pushes shells, drifting smoke shows it, guided missiles resist it
 - **Supply drops** - mystery crates parachute in (contents revealed only on pickup or expiry): ×2/×3 damage buffs, cluster shells, +10/+15 HP, rare guided missiles, tomahawks, teleports
@@ -57,6 +59,7 @@ Next.js + Socket.IO run in **one Node process**: the same server serves the page
 | `1` – `4` | Shell: normal / cluster / guided / tomahawk |
 | `Enter` | Pass turn |
 | `M` | Mute / unmute |
+| `✨` button | Graphics: cycle auto → high → low (auto follows measured frame rate) |
 | `⛶ fullscreen` button | Toggle fullscreen - `Esc` backs out |
 
 ## Quick start
@@ -96,7 +99,8 @@ Friends on the same network can join via your LAN IP (`http://192.168.x.x:3000/r
 | `components/Game.jsx` | The game: renderer, physics, input, effects, sound hooks. Mirrors server state online; runs everything locally in solo/hot-seat |
 | `lib/terrain.mjs` | Seeded terrain engine: generation, destruction, floating-island cleanup, sky reflow, painter |
 | `lib/tank.mjs` | Procedural tank drawing (palettes, barrel pivot, suspension, wheels) |
-| `lib/fx.mjs` | Particle engine (smoke drifts with wind) |
+| `lib/fx.mjs` | Particle engine (smoke drifts with wind), split back/front layers with batched blend modes |
+| `lib/quality.mjs` | Quality tiers: device heuristics + rolling median frame-time governor, persisted override |
 | `lib/bonus.mjs` | Supply-drop definitions + weighted loot table |
 | `lib/ai.mjs` | 🤖 CPU opponent: ballistic solver + per-difficulty aim error |
 | `lib/sfx.mjs` | Procedural WebAudio sound effects, zero assets |
@@ -148,8 +152,8 @@ Everything realtime rides one Socket.IO connection per tab - rooms, lobby, and t
 - **Acknowledgement callbacks** - `join-room` is request/response, so lobby errors ("Room is full", "Name is required") reach the UI
 - **Volatile emits** - the 12 Hz `tank-move` relay may drop packets under load; stale positions are worthless anyway
 - **Optimistic client + nacks** - shots/teleports happen instantly on your screen; a denial (`fire-denied`, `teleport-denied`) rolls them back
-- **Auto-reconnect + stable identity** - a per-tab `cid` in `sessionStorage` survives reloads/blips, so the creator's 👑 always returns to them
-- **Lifecycle hooks** - `disconnect` kills your tank in place mid-game (the war goes on); client `connect` re-joins the room
+- **Auto-reconnect + stable identity** - a per-tab `cid` in `sessionStorage` survives reloads/blips: the rejoining socket re-binds to its tank mid-game (and the creator's 👑 always returns to them)
+- **Lifecycle hooks** - `disconnect` starts a 10s reconnect grace (the tank waits, flagged 🔌); only when grace lapses does the tank die in place; client `connect` re-joins the room
 - **`socket.data`** - server-side per-connection state (which room this socket is in)
 - **One port, one process** - Socket.IO shares the Next.js HTTP server; `/_next/*` HMR upgrades are forwarded so dev hot-reload coexists (`destroyUpgrade: false`)
 - **WebSocket with fallback** - starts on HTTP long-polling, upgrades to WS; blocked-WS networks still work

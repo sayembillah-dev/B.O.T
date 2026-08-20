@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket, getClientId } from '@/lib/socket';
+import { loadQualityMode, guessTier } from '@/lib/quality.mjs';
 import Game from '@/components/Game';
 
 export default function Room({ roomId }) {
@@ -56,6 +57,13 @@ export default function Room({ roomId }) {
         setJoined(true);
       }
     }
+  }, []);
+
+  // 🎚️ Low quality tier flattens the lobby chrome too (no .card backdrop blur)
+  const [lowQ, setLowQ] = useState(false);
+  useEffect(() => {
+    const m = loadQualityMode();
+    setLowQ(m === 'low' || (m === 'auto' && guessTier() === 'low'));
   }, []);
 
   // 🧪 dev: ?mode=chaos - the host pre-picks the mode before anyone starts
@@ -173,7 +181,7 @@ export default function Room({ roomId }) {
   if (!joined) {
     return (
       <main className="container">
-        <div className="card">
+        <div className={`card${lowQ ? ' low-q' : ''}`}>
           <p className="eyebrow">you&apos;re joining room</p>
           <h1 className="room-code">{roomId}</h1>
           <form onSubmit={submitName} className="stack">
@@ -203,7 +211,7 @@ export default function Room({ roomId }) {
   // ---------- lobby ----------
   return (
     <main className="container">
-      <div className="card card-wide">
+      <div className={`card card-wide${lowQ ? ' low-q' : ''}`}>
         <div className="room-header">
           <div>
             <p className="eyebrow">room</p>

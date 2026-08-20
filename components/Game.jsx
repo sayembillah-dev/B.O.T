@@ -169,6 +169,95 @@ const sunHaloSprite = () => {
   return (_sunHalo = c);
 };
 
+// ── 🎨 HUD design tokens (4a) - ONE recipe for every panel: top strip, banner,
+//    kill feed, leaderboard, roster. `qk.shadowBlur` flattens them all in Low. ──
+const HUD = {
+  fill: 'rgba(8,12,8,0.55)',      // standard glass
+  fillSoft: 'rgba(8,12,8,0.35)',  // chips on the top strip
+  fillChip: 'rgba(8,12,8,0.50)',  // kill-feed chips
+  line: 'rgba(255,255,255,0.14)',
+  shadow: 'rgba(0,0,0,0.4)',
+  text: '#e8ece4',
+  ok: '#7fe066', warn: '#ffd75e', danger: '#ff4d4d', info: '#8fd0ff', gold: '#ffd75e', chaos: '#ffb45e', tele: '#b48cff',
+  r: 12, rChip: 7.5,
+  font: (w, s) => `${w} ${s}px system-ui`,
+};
+
+/** Rounded glass panel: shadowed fill + hairline stroke - the ONE recipe (4a). */
+const panel = (ctx, x, y, w, h, { r = HUD.r, fill = HUD.fill, line = HUD.line, lw = 1, shadow = true, qk = null } = {}) => {
+  ctx.save();
+  if (shadow && (!qk || qk.shadowBlur)) { ctx.shadowColor = HUD.shadow; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3; }
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+  ctx.restore();
+  if (line) {
+    ctx.strokeStyle = line; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.stroke();
+  }
+};
+
+// ── hoisted static styles (5b.7) - allocated once, not per render ──
+const ST_TOPBAR = {
+  position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
+  alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem',
+  // 🫥 no background strip - buttons float over the battlefield
+  textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+  color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
+  pointerEvents: 'none', // clicks fall through to the canvas; .btn-hud re-enables itself
+};
+const ST_SPACER = { flex: 1 };
+const ST_VIGNETTE = {
+  position: 'absolute', inset: 0, pointerEvents: 'none',
+  background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%)',
+};
+const ST_LOADING = {
+  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+  background: '#0a0d09', color: '#cfd8c3', fontFamily: 'system-ui, sans-serif',
+};
+const ST_LOADING_BOX = { width: 280, textAlign: 'center' };
+const ST_LOADING_ICON = { fontSize: '2rem', marginBottom: '0.5rem' };
+const ST_LOADING_LABEL = { marginBottom: '0.75rem' };
+const ST_LOADING_TRACK = { height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)' };
+const ST_ERROR = {
+  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+  color: '#ff9b9b', fontFamily: 'monospace',
+};
+const ST_DOCK = { // weapon dock - solid fill (4b), backdrop blur only on High
+  position: 'absolute', right: '1rem', bottom: '1rem', display: 'flex',
+  gap: '0.35rem', alignItems: 'center', fontFamily: 'system-ui, sans-serif',
+  background: 'rgba(8,12,8,0.42)', border: '1px solid rgba(255,255,255,0.09)',
+  borderRadius: 14, padding: '0.3rem 0.4rem',
+};
+const ST_KBD = {
+  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.25)',
+  borderBottomWidth: 2, borderRadius: 4, padding: '0 4px', marginRight: 2,
+  fontSize: '0.66rem', fontFamily: 'inherit', fontWeight: 700, lineHeight: 1.6,
+};
+const ST_CTL = { display: 'inline-flex', alignItems: 'center', gap: 3 };
+const ST_CTL_VERB = { marginLeft: 2 };
+const ST_RESULTS_OVERLAY = {
+  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+  background: 'rgba(4,7,4,0.55)',
+  fontFamily: 'system-ui, sans-serif', zIndex: 10,
+};
+const ST_RESULTS_CARD = {
+  background: 'rgba(10,14,9,0.92)', border: '1px solid rgba(255,215,94,0.35)',
+  borderRadius: 16, padding: '1.6rem 2.2rem', textAlign: 'center',
+  boxShadow: '0 12px 60px rgba(0,0,0,0.6)', minWidth: 300,
+};
+const ST_RESULTS_TITLE = { fontSize: '1.35rem', fontWeight: 800, color: '#ffd75e', marginBottom: '0.4rem' };
+const ST_SEG_WRAP = { display: 'flex', gap: 4, justifyContent: 'center', margin: '0.2rem 0 0.6rem' };
+const ST_BOARD = { margin: '0.9rem 0 0.4rem', display: 'grid', gap: '0.3rem' };
+const ST_RESULT_ROW = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1.6rem',
+  padding: '0.34rem 0.8rem', borderRadius: 8, fontSize: '0.9rem',
+};
+const ST_ROW_STATS = { whiteSpace: 'nowrap' };
+const ST_ROW_SUB = { opacity: 0.72, fontSize: '0.8rem' };
+const ST_ROW_WINS = { opacity: 0.72, fontSize: '0.74rem' };
+const ST_BTN_ROW = { display: 'flex', gap: '0.6rem', justifyContent: 'center', marginTop: '1.2rem', flexWrap: 'wrap' };
+const ST_WAITING = { color: '#9fb08f', fontSize: '0.9rem', padding: '0.5rem 0' };
+
 /** Small name tag floating above a tank (world-space) - stroked for legibility over any terrain. */
 const drawNameTag = (ctx, x, y, t) => {
   const label = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
@@ -230,6 +319,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const [colorName, setColorName] = useState(TANK_PALETTES[0].name);
   const [turnInfo, setTurnInfo] = useState({ num: 1, idx: 0, phase: 'open' }); // DOM chips mirror
   const [selUi, setSelUi] = useState('normal'); // weapon slot mirror for the HUD
+  const [hintsOpen, setHintsOpen] = useState(false); // ⌨️ <760px: key hints hide behind a ? chip (4d)
   const [, setInvUi] = useState(0);  // inventory/buff change → HUD rerender
   const invSigRef = useRef('');      // B9: last rendered HUD signature - gs packets only bump on real change
   const qualityRef = useRef(null);   // 🎚️ QualityGovernor - auto/high/low render tiers (lazy, browser-only)
@@ -238,7 +328,6 @@ export default function Game({ gs, myId, local = 0 }) {
   const lowUiRef = useRef(false);
   const terrainViewRef = useRef(null); // 🖼️ pre-scaled terrain cache: downscale once per blast, not per frame (5b)
   const ctx2dRef = useRef(null);       // cached 2D context (getContext every frame is needless)
-  const [windUi, setWindUi] = useState(0); // 🌬️ wind chip mirror
   const [mutedUi, setMutedUi] = useState(false);
   const [fsUi, setFsUi] = useState(false); // ⛶ fullscreen chip mirror
 
@@ -377,7 +466,6 @@ export default function Game({ gs, myId, local = 0 }) {
         } else {
           windRef.current = rollWind();
         }
-        setWindUi(windRef.current);
         setTurnInfo({ num: turnRef.current.num, idx: turnRef.current.activeIdx, phase: turnRef.current.phase });
         setSelUi('normal');
         setColorName(TANK_PALETTES[tanksRef.current[0]?.palette ?? 0].name);
@@ -417,7 +505,7 @@ export default function Game({ gs, myId, local = 0 }) {
       const at = tanksRef.current[tn.activeIdx];
       if (at && !chaosRef.current) aimRef.current = at.aim ?? aimRef.current; // ⚡ chaos: my aim is my own
     }
-    if (typeof gs.wind === 'number') { windRef.current = gs.wind; setWindUi(gs.wind); }
+    if (typeof gs.wind === 'number') windRef.current = gs.wind;
     // authoritative tank fields (positions are owner-streamed, not mirrored)
     for (const st of gs.tanks ?? []) {
       const t = tanksRef.current.find((k) => k.id === st.id);
@@ -526,7 +614,6 @@ export default function Game({ gs, myId, local = 0 }) {
     tn.time = TURN_TIME;
     aimRef.current = ts[i].aim ?? -0.6; // hand the barrel over as it was left
     windRef.current = rollWind(); // 🌬️ fresh wind every turn (local modes)
-    setWindUi(windRef.current);
     sfx('turn');
     setTurnInfo({ num: tn.num, idx: i, phase: 'open' });
     setColorName(TANK_PALETTES[ts[i].palette ?? 0].name);
@@ -2440,46 +2527,77 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.fillRect(0, 0, cw, chh);
       }
 
-      // ⏱ timer - classic: per-turn seconds; ⚡ chaos: the sudden-death match
-      //    clock (mm:ss). Glass pill with a draining track, green → amber → red.
-      if (turn.phase === 'open') {
-        const chaosR = chaosRef.current;
-        const total = chaosR ? ((gsRef.current?.dur ?? CHAOS_TIME * 1000) / 1000) : TURN_TIME;
-        // ⚡ the server's match clock includes the gen/countdown runway - pin the
-        //    pill at full while "3,2,1" plays instead of draining from 3:0X (#17)
-        const tSec = chaosR ? Math.min(total, Math.max(0, turn.time)) : Math.max(0, turn.time);
-        const cs = Math.ceil(tSec);
-        const tShow = chaosR ? `${Math.floor(cs / 60)}:${String(cs % 60).padStart(2, '0')}` : String(cs);
-        const frac = Math.max(0, Math.min(1, tSec / total));
-        const tCol = chaosR
-          ? (tSec > 60 ? '#7fe066' : tSec > 30 ? '#ffd75e' : '#ff4d4d')
-          : (tSec > 12 ? '#7fe066' : tSec > 7 ? '#ffd75e' : '#ff4d4d');
-        const inRed = chaosR ? tSec <= 30 : tSec <= 7;
-        const shakeX = inRed ? (Math.random() - 0.5) * 5 : 0;
-        const shakeY = inRed ? (Math.random() - 0.5) * 5 : 0;
-        const tx = 16 + shakeX, ty = 62 + shakeY; // below the frosted header
-        const tw = 98, th = 46;
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
-        ctx.fillStyle = 'rgba(8,12,8,0.55)'; // glass pill
-        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.fill();
-        ctx.restore();
-        ctx.strokeStyle = inRed ? tCol + 'aa' : 'rgba(255,255,255,0.14)';
-        ctx.lineWidth = inRed ? 1.8 : 1;
-        ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 12); ctx.stroke();
-        ctx.textAlign = 'left'; // seconds
-        ctx.font = `bold ${chaosR ? 21 : 23}px system-ui`;
-        ctx.fillStyle = tCol;
-        ctx.fillText(tShow, tx + 13, ty + 30);
-        ctx.font = '600 9.5px system-ui'; // label
-        ctx.globalAlpha = 0.72;
-        ctx.fillStyle = '#e8ece4';
-        ctx.fillText(chaosR ? '⚡ LEFT' : '⏱ SEC', tx + (chaosR ? 60 : 46), ty + 28);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = 'rgba(255,255,255,0.10)'; // time-track
-        ctx.beginPath(); ctx.roundRect(tx + 12, ty + th - 10, tw - 24, 4, 2); ctx.fill();
-        const pw = (tw - 24) * frac;
-        if (pw > 1) { ctx.fillStyle = tCol; ctx.beginPath(); ctx.roundRect(tx + 12, ty + th - 10, pw, 4, 2); ctx.fill(); }
+      // ── screen-space HUD (4d): hudScale shrinks every panel on small windows.
+      //    Everything below draws in VIRTUAL coords (vw × vh) under one scale. ──
+      const hudS = Math.max(0.75, Math.min(1.3, cw / 1280));
+      const vw = cw / hudS, vh = chh / hudS;
+      ctx.save();
+      ctx.scale(hudS, hudS);
+
+      // 🛡️ top strip (4b) - title · mode · wind · round · clock on ONE baseline.
+      //    The DOM bar carries only real controls (buttons) now; everything
+      //    informational renders here in the shared panel recipe.
+      {
+        const sy = 7;
+        let sx = 14;
+        ctx.textAlign = 'left';
+        ctx.font = HUD.font(800, 14.5);
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(4,7,4,0.75)';
+        ctx.strokeText('🛡️ B.O.T', sx, sy + 16);
+        ctx.fillStyle = HUD.text;
+        ctx.fillText('🛡️ B.O.T', sx, sy + 16);
+        sx += measureCached(ctx, '🛡️ B.O.T', HUD.font(800, 14.5)) + 10;
+        const chip = (label, col) => { // outlined chip on the same baseline
+          const f = HUD.font(700, 11);
+          ctx.font = f;
+          const wch = measureCached(ctx, label, f) + 13;
+          panel(ctx, sx, sy + 2, wch, 19, { r: HUD.rChip, fill: HUD.fillSoft, line: `${col}88`, shadow: false });
+          ctx.fillStyle = col;
+          ctx.fillText(label, sx + 6.5, sy + 15.5);
+          sx += wch + 7;
+        };
+        if (chaosRef.current) chip('⚡ CHAOS', HUD.chaos);
+        { // 🌬️ wind chip - chevrons ∝ strength, direction = push direction
+          const w0 = windRef.current, n = Math.round(Math.abs(w0) * 5);
+          chip(`🌬️ ${n === 0 ? '-' : (w0 > 0 ? '▶' : '◀').repeat(n)}`, HUD.info);
+        }
+        const mt0 = gsRef.current?.match;
+        if (onlineRef.current && mt0 && mt0.roundsTotal > 1) chip(`R${mt0.round}/${mt0.roundsTotal}`, HUD.gold);
+
+        // ⏱ clock on the same baseline - classic: per-turn seconds; ⚡ chaos: the
+        //    sudden-death match clock (mm:ss). Green → amber → red, shakes in red.
+        if (turn.phase === 'open') {
+          const chaosR = chaosRef.current;
+          const total = chaosR ? ((gsRef.current?.dur ?? CHAOS_TIME * 1000) / 1000) : TURN_TIME;
+          // ⚡ the server's match clock includes the gen/countdown runway - pin the
+          //    pill at full while "3,2,1" plays instead of draining from 3:0X (#17)
+          const tSec = chaosR ? Math.min(total, Math.max(0, turn.time)) : Math.max(0, turn.time);
+          const cs = Math.ceil(tSec);
+          const tShow = chaosR ? `${Math.floor(cs / 60)}:${String(cs % 60).padStart(2, '0')}` : String(cs);
+          const frac = Math.max(0, Math.min(1, tSec / total));
+          const tCol = chaosR
+            ? (tSec > 60 ? HUD.ok : tSec > 30 ? HUD.warn : HUD.danger)
+            : (tSec > 12 ? HUD.ok : tSec > 7 ? HUD.warn : HUD.danger);
+          const inRed = chaosR ? tSec <= 30 : tSec <= 7;
+          const shakeX = inRed ? (Math.random() - 0.5) * 4 : 0;
+          const shakeY = inRed ? (Math.random() - 0.5) * 4 : 0;
+          const tx = sx + shakeX, tyy = sy + shakeY;
+          const tw = 88, th = 26;
+          panel(ctx, tx, tyy, tw, th, { qk, line: inRed ? `${tCol}aa` : HUD.line, lw: inRed ? 1.8 : 1 });
+          ctx.textAlign = 'left';
+          ctx.font = HUD.font(700, chaosR ? 14.5 : 15.5);
+          ctx.fillStyle = tCol;
+          ctx.fillText(tShow, tx + 9, tyy + 17.5);
+          ctx.font = HUD.font(600, 8);
+          ctx.globalAlpha = 0.72;
+          ctx.fillStyle = HUD.text;
+          ctx.fillText(chaosR ? '⚡LEFT' : '⏱SEC', tx + (chaosR ? 54 : 42), tyy + 16.5);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = 'rgba(255,255,255,0.10)'; // time-track
+          ctx.beginPath(); ctx.roundRect(tx + 8, tyy + th - 5.5, tw - 16, 3, 1.5); ctx.fill();
+          const pw = (tw - 16) * frac;
+          if (pw > 1) { ctx.fillStyle = tCol; ctx.beginPath(); ctx.roundRect(tx + 8, tyy + th - 5.5, pw, 3, 1.5); ctx.fill(); }
+        }
       }
 
       // turn banner (screen space, just below the top bar)
@@ -2529,29 +2647,22 @@ export default function Game({ gs, myId, local = 0 }) {
         banner = '💥 settling…';
         bCol = '#8fd0ff';
       }
-      ctx.font = 'bold 13px system-ui';
-      const bw = ctx.measureText(banner).width + 42;
-      ctx.save(); // glass pill with a soft drop shadow
-      ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
-      ctx.fillStyle = 'rgba(8,12,8,0.58)';
-      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 60, bw, 26, 13); ctx.fill();
-      ctx.restore();
-      ctx.strokeStyle = 'rgba(255,255,255,0.13)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(cw / 2 - bw / 2, 60, bw, 26, 13); ctx.stroke();
+      ctx.font = HUD.font(700, 13);
+      const bw = measureCached(ctx, banner, HUD.font(700, 13)) + 42;
+      panel(ctx, vw / 2 - bw / 2, 44, bw, 26, { qk }); // one baseline under the strip
       ctx.fillStyle = bCol; // accent dot anchors the state color
-      ctx.beginPath(); ctx.arc(cw / 2 - bw / 2 + 16, 73, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(vw / 2 - bw / 2 + 16, 57, 3.4, 0, Math.PI * 2); ctx.fill();
       ctx.textAlign = 'center';
-      ctx.fillText(banner, cw / 2 + 4, 77.5);
+      ctx.fillText(banner, vw / 2 + 4, 61.5);
 
       // 🔌 a dropped owner gets LEAVE_GRACE_MS to reconnect before their tank
       //    dies in place - say so, so the freeze is never silent (B1)
       const goneNames = onlineRef.current ? tanksRef.current.filter((t) => t.gone && !t.dead) : [];
       if (goneNames.length) {
-        ctx.font = 'bold 11.5px system-ui';
+        ctx.font = HUD.font(700, 11.5);
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffb45e';
-        ctx.fillText(`🔌 ${goneNames.map((t) => `${t.emoji ?? ''} ${t.name ?? ''}`.trim()).join(', ')} reconnecting…`, cw / 2, 97);
+        ctx.fillStyle = HUD.chaos;
+        ctx.fillText(`🔌 ${goneNames.map((t) => `${t.emoji ?? ''} ${t.name ?? ''}`.trim()).join(', ')} reconnecting…`, vw / 2, 78);
       }
 
       // 💀 kill feed - last 4 kills, top-centre under the banner; entries slide
@@ -2565,19 +2676,18 @@ export default function Game({ gs, myId, local = 0 }) {
           rows.push({ e: feed[i], age });
         }
         if (rows.length) {
-          ctx.font = '600 11.5px system-ui';
+          ctx.font = HUD.font(600, 11.5);
           ctx.textAlign = 'center';
           rows.reverse().forEach(({ e, age }, i) => {
             const slide = Math.max(0, 1 - age / 0.18) * -7;
             const fade = age < 4.4 ? 1 : Math.max(0, 1 - (age - 4.4) / 1.2);
             const line = `${e.k} ☠ ${e.v}`;
-            const lw = ctx.measureText(line).width + 20;
-            const ly = 116 + i * 18 + slide;
+            const lw = measureCached(ctx, line, HUD.font(600, 11.5)) + 20;
+            const ly = 92 + i * 18 + slide;
             ctx.globalAlpha = 0.92 * fade;
-            ctx.fillStyle = 'rgba(8,12,8,0.5)';
-            ctx.beginPath(); ctx.roundRect(cw / 2 - lw / 2, ly - 10, lw, 15, 7.5); ctx.fill();
-            ctx.fillStyle = '#e8ece4';
-            ctx.fillText(line, cw / 2, ly + 2);
+            panel(ctx, vw / 2 - lw / 2, ly - 10, lw, 15, { r: HUD.rChip, fill: HUD.fillChip, line: null, shadow: false });
+            ctx.fillStyle = HUD.text;
+            ctx.fillText(line, vw / 2, ly + 2);
           });
           ctx.globalAlpha = 1;
         }
@@ -2598,29 +2708,24 @@ export default function Game({ gs, myId, local = 0 }) {
             : ((a.dead ? 1 : 0) - (b.dead ? 1 : 0)) || ((b.hp | 0) - (a.hp | 0)));
           const panelW = 150, rowH = 17;
           const panelH = 24 + ranked.length * rowH + 6;
-          const bx = cw - 16 - panelW, by = 76; // just under the frosted header, top-right
-          ctx.save();
-          ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = qk.shadowBlur ? 14 : 0; ctx.shadowOffsetY = qk.shadowBlur ? 3 : 0; // 🎚️
-          ctx.fillStyle = 'rgba(8,12,8,0.55)'; // same glass as the timer pill
-          ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.fill();
-          ctx.restore();
-          ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-          ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.roundRect(bx, by, panelW, panelH, 12); ctx.stroke();
+          const bx = vw - 16 - panelW, by = 76; // just under the top strip, top-right
+          panel(ctx, bx, by, panelW, panelH, { qk });
           ctx.textAlign = 'left'; // header - metric + round chip
-          ctx.font = '600 9.5px system-ui';
+          ctx.font = HUD.font(600, 9.5);
           ctx.globalAlpha = 0.85;
-          ctx.fillStyle = '#e8ece4';
+          ctx.fillStyle = HUD.text;
           ctx.fillText(chaosB ? '🏆 ☠ KILLS' : '🏆 ❤ STANDINGS', bx + 10, by + 15);
           if (mt && mt.roundsTotal > 1) {
             ctx.textAlign = 'right';
             ctx.fillText(`R${mt.round}/${mt.roundsTotal}`, bx + panelW - 10, by + 15);
           }
           ctx.globalAlpha = 1;
-          const medal = ['#ffd75e', '#cfd8dc', '#d8a05d']; // gold / silver / bronze ranks
-          ctx.font = '11px system-ui';
+          const medal = [HUD.gold, '#cfd8dc', '#d8a05d']; // gold / silver / bronze ranks
+          ctx.font = HUD.font(400, 11);
           ranked.forEach((tk, i) => {
-            const ry = by + 24 + i * rowH;
+            const targetY = by + 24 + i * rowH;
+            tk.lbY = tk.lbY == null ? targetY : tk.lbY + (targetY - tk.lbY) * (1 - Math.exp(-12 * dt)); // 4c: rows glide to their new rank
+            const ry = tk.lbY;
             const mineRow = tk.id === myIdRef.current;
             if (mineRow) { // YOU - gold wash + gold name
               ctx.fillStyle = 'rgba(255,215,94,0.16)';
@@ -2628,23 +2733,64 @@ export default function Game({ gs, myId, local = 0 }) {
             }
             ctx.globalAlpha = tk.dead ? (chaosB ? 0.62 : 0.45) : 1; // dead rows dim (still ranked in chaos)
             ctx.textAlign = 'left';
-            ctx.fillStyle = medal[i] ?? '#e8ece4';
+            ctx.fillStyle = medal[i] ?? HUD.text;
             ctx.fillText(`${i + 1}`, bx + 10, ry + 12);
             const rawNm = tk.name ?? '?';
             const nm = rawNm.length > 8 ? rawNm.slice(0, 7) + '…' : rawNm;
-            ctx.fillStyle = mineRow ? '#ffd75e' : '#e8ece4';
+            ctx.fillStyle = mineRow ? HUD.gold : HUD.text;
             ctx.fillText(`${tk.emoji ?? ''} ${nm}`.trim(), bx + 22, ry + 12);
             ctx.textAlign = 'right';
             const leads = i === 0 && (chaosB ? ((tk.kills | 0) > 0 || (tk.dmg | 0) > 0) : !tk.dead);
-            ctx.fillStyle = leads ? '#ffd75e' : '#e8ece4';
+            ctx.fillStyle = leads ? HUD.gold : HUD.text;
             if (chaosB) { // 💀 kills headline, damage dimmer + secondary
               ctx.fillText(`${tk.kills | 0}☠`, bx + panelW - 9, ry + 12);
-              const kw = ctx.measureText(`${tk.kills | 0}☠`).width;
+              const kw = measureCached(ctx, `${tk.kills | 0}☠`, HUD.font(400, 11));
               ctx.globalAlpha = 0.62;
               ctx.fillText(`${tk.dmg | 0}💥 `, bx + panelW - 9 - kw, ry + 12);
             } else {
               ctx.fillText(tk.dead ? '💀' : `${tk.hp | 0}❤`, bx + panelW - 9, ry + 12);
             }
+            ctx.globalAlpha = 1;
+          });
+          ctx.textAlign = 'left';
+        }
+      }
+
+      // 👥 roster (4b) - canvas rows in the same panel recipe, replacing the
+      //    stack of frosted DOM pills (eight backdrop-filter layers → zero).
+      {
+        const rs = tanksRef.current;
+        if (rs.length) {
+          const chaosR2 = chaosRef.current;
+          const mt = gsRef.current?.match;
+          const showM = onlineRef.current && mt && mt.roundsTotal > 1;
+          const over = turn.phase === 'over';
+          const rowH = 17, rw = 200;
+          const rh = 9 + rs.length * rowH;
+          const rx = 14, ry0 = vh - 14 - rh; // bottom-left
+          panel(ctx, rx, ry0, rw, rh, { qk });
+          ctx.font = HUD.font(600, 11.5);
+          rs.forEach((t, i) => {
+            const cy0 = ry0 + 4 + i * rowH;
+            const active = !chaosR2 && rs.length > 1 && turnRef.current.activeIdx === i && !over;
+            const winner = over && rs.length > 1 && (chaosR2 ? gsRef.current?.winner === t.id : !t.dead);
+            const mineRow = t.id === myIdRef.current;
+            if (winner || active || mineRow) {
+              ctx.fillStyle = winner ? 'rgba(255,215,94,0.20)' : active ? 'rgba(255,215,94,0.12)' : 'rgba(127,176,105,0.16)';
+              ctx.beginPath(); ctx.roundRect(rx + 3, cy0, rw - 6, rowH - 1, 6); ctx.fill();
+            }
+            ctx.globalAlpha = t.dead ? (chaosR2 ? 0.55 : 0.35) : 1; // ⚡ chaos: dead = respawning, not out
+            ctx.textAlign = 'left';
+            const rawNm = `${t.emoji ?? ''} ${t.name ?? ''}`.trim();
+            const nm = rawNm.length > 14 ? rawNm.slice(0, 13) + '…' : rawNm;
+            ctx.fillStyle = winner || mineRow ? HUD.gold : HUD.text;
+            ctx.fillText(`${winner ? '🏆 ' : active ? '▶ ' : ''}${nm}`, rx + 9, cy0 + 12.5);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = HUD.text;
+            let meta = `☠${t.kills | 0}`;
+            if (showM) meta += ` · R×${mt.wins?.[t.id] | 0}`;
+            if (t.gone && !t.dead) meta = `🔌 ${meta}`;
+            ctx.fillText(meta, rx + rw - 9, cy0 + 12.5);
             ctx.globalAlpha = 1;
           });
           ctx.textAlign = 'left';
@@ -2662,9 +2808,9 @@ export default function Game({ gs, myId, local = 0 }) {
         const pop = 1 + 0.55 * Math.max(0, 1 - justIn * 4.5); // quick punch-in, settles fast
         ctx.save();
         ctx.fillStyle = 'rgba(4,7,4,0.32)';
-        ctx.fillRect(0, 0, cw, chh);
+        ctx.fillRect(0, 0, vw, vh);
         ctx.globalAlpha = Math.min(1, justIn * 6); // quick fade-in per beat, no fade-out (hard swap reads snappier)
-        ctx.translate(cw / 2, chh / 2);
+        ctx.translate(vw / 2, vh / 2);
         ctx.scale(pop, pop);
         ctx.font = label === 'FIGHT!' ? 'bold 90px system-ui' : 'bold 140px system-ui';
         ctx.textAlign = 'center';
@@ -2688,19 +2834,21 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.font = 'bold 34px system-ui';
           ctx.lineWidth = 7;
           ctx.strokeStyle = 'rgba(4,7,4,0.85)';
-          ctx.strokeText('💀 DESTROYED', cw / 2, chh / 2 - 34);
+          ctx.strokeText('💀 DESTROYED', vw / 2, vh / 2 - 34);
           ctx.fillStyle = '#ff6b4e';
-          ctx.fillText('💀 DESTROYED', cw / 2, chh / 2 - 34);
+          ctx.fillText('💀 DESTROYED', vw / 2, vh / 2 - 34);
           ctx.font = 'bold 22px system-ui';
-          ctx.strokeText(`respawn in ${back.toFixed(1)}s`, cw / 2, chh / 2 + 6);
-          ctx.fillStyle = '#8fd0ff';
-          ctx.fillText(`respawn in ${back.toFixed(1)}s`, cw / 2, chh / 2 + 6);
+          ctx.strokeText(`respawn in ${back.toFixed(1)}s`, vw / 2, vh / 2 + 6);
+          ctx.fillStyle = HUD.info;
+          ctx.fillText(`respawn in ${back.toFixed(1)}s`, vw / 2, vh / 2 + 6);
           ctx.font = '600 13px system-ui';
           ctx.fillStyle = 'rgba(232,236,228,0.75)';
-          ctx.fillText('your damage total still counts - get back in there!', cw / 2, chh / 2 + 34);
+          ctx.fillText('your damage total still counts - get back in there!', vw / 2, vh / 2 + 34);
           ctx.restore();
         }
       }
+
+      ctx.restore(); // hudS - end of the screen-space HUD
     };
 
     raf = requestAnimationFrame(frame);
@@ -2886,24 +3034,13 @@ export default function Game({ gs, myId, local = 0 }) {
     else document.documentElement.requestFullscreen?.().catch(() => {}); // needs the click gesture - we have it
   };
 
-  // 🌬️ wind chip label: chevrons ∝ strength, direction = push direction
-  const windLabel = (() => {
-    const n = Math.round(Math.abs(windUi) * 5);
-    if (n === 0) return '-';
-    return (windUi > 0 ? '▶' : '◀').repeat(n);
-  })();
-
   // ⌨️ little keyboard-key cap for the controls hint
   const kbd = (label, key) => (
-    <kbd key={key ?? label} style={{
-      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.25)',
-      borderBottomWidth: 2, borderRadius: 4, padding: '0 4px', marginRight: 2,
-      fontSize: '0.66rem', fontFamily: 'inherit', fontWeight: 700, lineHeight: 1.6,
-    }}>{label}</kbd>
+    <kbd key={key ?? label} style={ST_KBD}>{label}</kbd>
   );
   const ctl = (keys, verb) => ( // key cap(s) + tiny verb, e.g. [A][D] drive
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-      {keys.map((k, i) => kbd(k, `${verb}-${i}`))}<span style={{ marginLeft: 2 }}>{verb}</span>
+    <span key={verb} style={ST_CTL}>
+      {keys.map((k, i) => kbd(k, `${verb}-${i}`))}<span style={ST_CTL_VERB}>{verb}</span>
     </span>
   );
 
@@ -2911,51 +3048,20 @@ export default function Game({ gs, myId, local = 0 }) {
     <div style={{ position: 'fixed', inset: 0, background: '#0a0d09', overflow: 'hidden' }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'none' }} />
 
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%)',
-      }} />
+      <div style={ST_VIGNETTE} />
 
-      {/* top bar */}
+      {/* top bar (4b) - REAL CONTROLS ONLY. Title/mode/wind/round/clock are
+          canvas-drawn on the top strip; this bar is just the btn-hud row. */}
       <div
         // 🧹 a clicked HUD button must NOT keep DOM focus: Enter isn't
         //    preventDefaulted (it passes the turn), so a focused button would
         //    re-fire on every Enter - e.g. "End game" twice (B2)
         onClick={(e) => e.target.closest?.('button')?.blur()}
-        style={{
-        position: 'absolute', top: 0, left: 0, right: 0, display: 'flex',
-        alignItems: 'center', gap: '0.75rem', padding: '0.6rem 1rem',
-        // 🫥 no background strip - text floats over the battlefield, shadow keeps it readable
-        textShadow: '0 1px 3px rgba(0,0,0,0.85)',
-        color: '#e8ece4', fontFamily: 'system-ui, sans-serif',
-      }}>
-        <strong style={{ fontSize: '1.05rem' }}>🛡️ B.O.T - battle of tanks</strong>
-        {chaos && (
-          <span style={{
-            background: 'transparent', border: '1px solid rgba(255,180,94,0.5)', color: '#ffb45e', borderRadius: 6,
-            padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 800, letterSpacing: 0.5,
-          }} title="real-time free-for-all - infinite shells, 1s reload, 5s respawn, most damage wins at 0:00">⚡ CHAOS</span>
-        )}
-        {ready && (
-          <span
-            title={`wind ${windUi > 0 ? '→' : windUi < 0 ? '←' : 'calm'} (${Math.round(Math.abs(windUi) * 100)}%)`}
-            style={{
-              background: 'transparent', border: '1px solid rgba(143,208,255,0.45)', color: '#8fd0ff', borderRadius: 6,
-              padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 700,
-              letterSpacing: 1, minWidth: '4.6rem', textAlign: 'center',
-            }}
-          >🌬️ {windLabel}</span>
-        )}
-        {showMatch && (
-          <span style={{
-            background: 'transparent', border: '1px solid rgba(255,215,94,0.45)', color: '#ffd75e', borderRadius: 6,
-            padding: '0.1rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
-          }}>ROUND {match.round}/{match.roundsTotal}</span>
-        )}
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
-          fontSize: '0.68rem', opacity: 0.85, whiteSpace: 'nowrap',
-        }}>
+        style={ST_TOPBAR}
+      >
+        <span style={ST_SPACER} />
+        <button className="btn-hud hud-hints-toggle" onClick={() => setHintsOpen((o) => !o)} title="controls">?</button>
+        <span className={`hud-hints${hintsOpen ? ' open' : ''}`}>
           {ctl(['A', 'D'], 'drive')}
           {ctl(['W'], 'jump')}
           {ctl(['⇅'], 'power')}
@@ -2963,7 +3069,6 @@ export default function Game({ gs, myId, local = 0 }) {
           {ctl(['1–4'], 'weapon')}
           {chaos ? ctl(['⏳'], '1s reload') : ctl(['⏎'], 'pass')}
         </span>
-        <span style={{ flex: 1 }} />
         <button className="btn-hud" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? 'muted' : 'sound'}</button>
         <button className="btn-hud" onClick={cycleQuality} title={`graphics: ${qualityUi}${qualityUi === 'auto' ? ' (follows measured frame rate)' : ''} - click to cycle auto → high → low`}>
           ✨ {qualityUi}{qualityUi === 'auto' ? (lowUi ? '·low' : '·high') : ''}
@@ -2981,14 +3086,11 @@ export default function Game({ gs, myId, local = 0 }) {
 
       {/* loading */}
       {!ready && !error && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-          background: '#0a0d09', color: '#cfd8c3', fontFamily: 'system-ui, sans-serif',
-        }}>
-          <div style={{ width: 280, textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⛰️</div>
-            <div style={{ marginBottom: '0.75rem' }}>forging terrain… {Math.round(progress * 100)}%</div>
-            <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)' }}>
+        <div style={ST_LOADING}>
+          <div style={ST_LOADING_BOX}>
+            <div style={ST_LOADING_ICON}>⛰️</div>
+            <div style={ST_LOADING_LABEL}>forging terrain… {Math.round(progress * 100)}%</div>
+            <div style={ST_LOADING_TRACK}>
               <div style={{
                 height: '100%', borderRadius: 3, background: '#7fb069',
                 width: `${progress * 100}%`, transition: 'width 0.15s',
@@ -2999,40 +3101,11 @@ export default function Game({ gs, myId, local = 0 }) {
       )}
 
       {error && (
-        <div style={{
-          position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-          color: '#ff9b9b', fontFamily: 'monospace',
-        }}>terrain error: {error}</div>
+        <div style={ST_ERROR}>terrain error: {error}</div>
       )}
 
-      {/* players - active turn highlighted, eliminated dimmed */}
-      <div style={{
-        position: 'absolute', left: '1rem', bottom: '1rem', display: 'flex',
-        gap: '0.4rem', flexWrap: 'wrap', fontFamily: 'system-ui, sans-serif',
-      }}>
-        {roster.map((p, i) => {
-          const t = tanksRef.current[i];
-          const isActive = !chaos && roster.length > 1 && turnInfo.idx === i && turnInfo.phase !== 'over'; // ⚡ chaos: nobody's turn
-          // ⚡ chaos: winner = most damage (server's call) - they might be mid-respawn
-          const winner = turnInfo.phase === 'over' && roster.length > 1 && (chaos ? gs?.winner === p.id : t && !t.dead);
-          const dead = !!t?.dead;
-          return (
-            <span key={p.id} style={{
-              background: winner ? 'rgba(255,215,94,0.28)'
-                : isActive ? 'rgba(255,215,94,0.18)'
-                : p.id === myId ? 'rgba(127,176,105,0.25)' : 'rgba(0,0,0,0.5)',
-              border: winner || isActive ? '1px solid rgba(255,215,94,0.75)'
-                : p.id === myId ? '1px solid rgba(127,176,105,0.6)' : '1px solid rgba(255,255,255,0.12)',
-              color: '#e8ece4', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.8rem',
-              opacity: dead ? (chaos ? 0.55 : 0.35) : 1, textDecoration: dead && !chaos ? 'line-through' : 'none', // ⚡ chaos: dead = 5s timeout, not elimination
-              transition: 'all 0.25s',
-              ...(lowUi ? {} : { backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }), // 🎚️ frosted pill - off in Low
-            }}>
-              {winner ? '🏆 ' : isActive ? '▶ ' : ''}{p.emoji} {p.name}{t?.gone ? ' · 🔌 reconnecting…' : ''}{t ? ` · ☠${t.kills | 0}` : ''}{showMatch ? ` · R×${match.wins?.[p.id] | 0}` : ''}{p.id === myId ? ' (you)' : ''}
-            </span>
-          );
-        })}
-      </div>
+      {/* 👥 roster is canvas-drawn bottom-left now (4b) - no DOM pills, no
+          stacked backdrop-filter layers */}
 
       {/* shell inventory - your tank's stock (⚡ chaos) / active tank's (classic), keys 1-4 to pick */}
       {ready && turnInfo.phase !== 'over' && (() => {
@@ -3046,10 +3119,7 @@ export default function Game({ gs, myId, local = 0 }) {
         ];
         return (
           <div style={{
-            position: 'absolute', right: '1rem', bottom: '1rem', display: 'flex',
-            gap: '0.35rem', alignItems: 'center', fontFamily: 'system-ui, sans-serif',
-            background: 'rgba(8,12,8,0.42)', border: '1px solid rgba(255,255,255,0.09)',
-            borderRadius: 14, padding: '0.3rem 0.4rem',
+            ...ST_DOCK,
             ...(lowUi ? {} : { backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }), // 🎚️ frosted dock - off in Low
           }}>
             {teleUi && ( // 🌀 pending teleport - only on the owner's screen; click or press T to aim
@@ -3137,19 +3207,13 @@ export default function Game({ gs, myId, local = 0 }) {
         );
         return (
           <div style={{
-            position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-            background: 'rgba(4,7,4,0.55)', ...(lowUi ? {} : { backdropFilter: 'blur(3px)' }), // 🎚️ off in Low
-            fontFamily: 'system-ui, sans-serif', zIndex: 10,
+            ...ST_RESULTS_OVERLAY,
+            ...(lowUi ? {} : { backdropFilter: 'blur(3px)' }), // 🎚️ off in Low
           }}>
-            <div style={{
-              background: 'rgba(10,14,9,0.92)', border: '1px solid rgba(255,215,94,0.35)',
-              borderRadius: 16, padding: '1.6rem 2.2rem', textAlign: 'center',
-              boxShadow: '0 12px 60px rgba(0,0,0,0.6)', minWidth: 300,
-            }}>
-              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffd75e', marginBottom: '0.4rem' }}>{title}</div>
+            <div style={ST_RESULTS_CARD}>
+              <div style={ST_RESULTS_TITLE}>{title}</div>
               {showMatch && ( // ▮▮▮▯▯ match progress as a segmented bar (4e)
-                <div title={`round ${match.round} of ${match.roundsTotal}`}
-                  style={{ display: 'flex', gap: 4, justifyContent: 'center', margin: '0.2rem 0 0.6rem' }}>
+                <div title={`round ${match.round} of ${match.roundsTotal}`} style={ST_SEG_WRAP}>
                   {Array.from({ length: match.roundsTotal }, (_, i) => (
                     <span key={i} style={{
                       width: 22, height: 5, borderRadius: 3,
@@ -3160,26 +3224,26 @@ export default function Game({ gs, myId, local = 0 }) {
                 </div>
               )}
               {board.length > 0 && (
-                <div style={{ margin: '0.9rem 0 0.4rem', display: 'grid', gap: '0.3rem' }}>
+                <div style={ST_BOARD}>
                   {board.map(({ p, kills, deaths, dmg, w }, i) => (
-                    <div key={p.id} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1.6rem',
-                      padding: '0.34rem 0.8rem', borderRadius: 8,
+                    <div key={p.id} className="result-row" style={{ // 4e: rows stagger in
+                      ...ST_RESULT_ROW,
+                      animationDelay: `${i * 70}ms`,
                       background: i === 0 && (kills > 0 || dmg > 0 || w > 0) ? 'rgba(255,215,94,0.16)' : 'rgba(255,255,255,0.05)',
-                      color: i === 0 ? '#ffd75e' : '#cfd8c3', fontSize: '0.9rem',
+                      color: i === 0 ? '#ffd75e' : '#cfd8c3',
                       fontWeight: i === 0 ? 700 : 500,
                     }}>
                       <span>{i === 0 ? '👑 ' : ''}{p.emoji} {p.name}{p.id === myId ? ' (you)' : ''}</span>
-                      <span style={{ whiteSpace: 'nowrap' }}>
+                      <span style={ST_ROW_STATS}>
                         <strong style={{ fontSize: '1.02rem' }}>☠ {kills}</strong>
-                        <span style={{ opacity: 0.72, fontSize: '0.8rem' }}> · {deaths}💀 · {dmg}💥</span>
-                        {showMatch && <span style={{ opacity: 0.72, fontSize: '0.74rem' }}> · R×{w}</span>}
+                        <span style={ST_ROW_SUB}> · {deaths}💀 · {dmg}💥</span>
+                        {showMatch && <span style={ST_ROW_WINS}> · R×{w}</span>}
                       </span>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+              <div style={ST_BTN_ROW}>
                 {isHost ? (
                   <>
                     {showMatch && !match.over && btn(`⚔️ Next round (${match.round + 1}/${match.roundsTotal})`, 'next-round', true)}
@@ -3189,7 +3253,7 @@ export default function Game({ gs, myId, local = 0 }) {
                     {btn(match?.over ? '🏁 Back to lobby' : '🏁 End game', 'end-game', false)}
                   </>
                 ) : (
-                  <div style={{ color: '#9fb08f', fontSize: '0.9rem', padding: '0.5rem 0' }}>
+                  <div style={ST_WAITING}>
                     waiting for the 👑 room master…
                   </div>
                 )}

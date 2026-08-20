@@ -115,6 +115,17 @@ body {
 .btn-lg { padding: 0.9rem 1.4rem; font-size: 1.05rem; width: 100%; }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--muted); width: 100%; margin-top: 1rem; }
 .btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+/* ── shared HUD tokens (mirror the canvas HUD recipe in Game.jsx, 4a) ── */
+:root {
+  --hud-fill: rgba(8, 12, 8, 0.55);
+  --hud-line: rgba(255, 255, 255, 0.14);
+  --hud-text: #e8ece4;
+  --hud-ok: #7fe066;
+  --hud-warn: #ffd75e;
+  --hud-danger: #ff4d4d;
+  --hud-info: #8fd0ff;
+}
+
 /* in-game HUD action buttons - small, borderless-bg, hairline outline, no emojis */
 .btn-hud {
   display: inline-flex;
@@ -124,13 +135,14 @@ body {
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.3px;
-  color: #e8ece4;
+  color: var(--hud-text);
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 0.4rem;
   cursor: pointer;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   transition: background 0.15s, border-color 0.15s;
+  pointer-events: auto; /* the top bar lets clicks fall through; buttons don't */
 }
 .btn-hud:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.65); }
 .btn-hud:active:not(:disabled) { transform: scale(0.97); }
@@ -363,3 +375,44 @@ code {
 .diff-medium:hover:not(:disabled) { background: rgba(245, 158, 11, 0.16); }
 .diff-hard { border-color: rgba(239, 68, 68, 0.55); color: #fca5a5; }
 .diff-hard:hover:not(:disabled) { background: rgba(239, 68, 68, 0.16); }
+
+/* ── ⌨️ HUD keyboard hints (4d): inline right of centre on wide windows,
+   behind a ? chip on narrow ones ── */
+.hud-hints {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.68rem;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+.hud-hints-toggle { display: none; }
+@media (max-width: 900px) {
+  .hud-hints { display: none; }
+  .hud-hints.open {
+    display: inline-flex;
+    position: absolute;
+    top: 2.4rem;
+    right: 0.6rem;
+    background: var(--hud-fill);
+    border: 1px solid var(--hud-line);
+    border-radius: 10px;
+    padding: 0.5rem 0.7rem;
+  }
+  .hud-hints-toggle { display: inline-flex; }
+}
+
+/* ── 🏆 results rows stagger in (4e) ── */
+.result-row { animation: rowIn 0.32s ease-out both; }
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* ── ♿ prefers-reduced-motion: no pop/drop/stagger animations ── */
+@media (prefers-reduced-motion: reduce) {
+  .player, .menu-panel, .result-row { animation: none !important; }
+  .btn, .btn-hud, .menu-btn, .round-chip { transition: none !important; }
+}
+
+/* ── 🎚️ Low quality tier: the lobby card loses its blur too ── */
+.low-q .card, .card.low-q { backdrop-filter: none; }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { newRoomId } from '@/lib/roomId';
+import { loadQualityMode, guessTier } from '@/lib/quality.mjs';
 
 // ── main-menu navigation: every mode is a direct button, no accordions ──────
 const DIFFS = [
@@ -17,6 +18,12 @@ const DIFFS = [
 export default function Home() {
   const router = useRouter();
   const [code, setCode] = useState('');
+  // 🎚️ Low quality tier flattens the menu chrome too (no .card backdrop blur)
+  const [lowQ, setLowQ] = useState(false);
+  useEffect(() => {
+    const m = loadQualityMode();
+    setLowQ(m === 'low' || (m === 'auto' && guessTier() === 'low'));
+  }, []);
 
   // 🌐 online rooms
   const createRoom = (mode) => () =>
@@ -53,7 +60,7 @@ export default function Home() {
 
   return (
     <main className="container">
-      <div className="card hero">
+      <div className={`card hero${lowQ ? ' low-q' : ''}`}>
         <h1 className="logo">🛡️ B.O.T - battle of tanks</h1>
         <p className="tagline">
           Worms-style artillery on destructible terrain - wind, supply drops, special shells.
