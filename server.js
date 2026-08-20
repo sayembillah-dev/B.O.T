@@ -617,14 +617,21 @@ function finalizeGone(room, t) {
  *  LEAVE_GRACE_MS so a reconnect (new socket.id, same cid) can reclaim it via
  *  join-room. Only when the grace lapses does finalizeGone() do what leaving
  *  used to do - the war goes on without you. */
-function handleGameLeave(socket, room) {
+function handleGameLeave(socket, room, { deliberate = false } = {}) {
   const g = room?.game;
   if (!g?.players) return;
   g.players = g.players.filter((p) => p.id !== socket.id);
   const t = g.tanks.find((tk) => tk.id === socket.id);
   if (t && !t.dead && g.turn.phase !== 'over' && !t.ai) {
     t.gone = true; t.goneAt = Date.now();
-    if (g.mode !== 'chaos' && g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
+    if (deliberate) { // 🚪 rage-quit = instant death - the reconnect grace is for DROPS, not exits
+      finalizeGone(room, t);
+      const gg = room.game; // finalizeGone may have ended the round already
+      if (gg && gg.mode !== 'chaos' && gg.turn.phase !== 'over' && gg.tanks[gg.turn.activeIdx]?.id === socket.id) {
+        advanceTurnServer(room); // was their turn - move on
+        broadcastGame(room.id);
+      }
+    } else if (g.mode !== 'chaos' && g.tanks[g.turn.activeIdx]?.id === socket.id && g.turn.phase !== 'over') {
       advanceTurnServer(room); // was their turn - move on, don't hold the match hostage
     }
   }
@@ -638,12 +645,12 @@ function handleGameLeave(socket, room) {
 }
 // ═══════════════════════ END GAME HOOK ═══════════════════════════════
 
-function leaveCurrentRoom(socket) {
+function leaveCurrentRoom(socket, deliberate = false) {
   const roomId = socket.data.roomId;
   if (!roomId) return;
   const room = rooms.get(roomId);
   if (!room) { socket.leave(roomId); socket.data.roomId = null; return; }
-  handleGameLeave(socket, room); // must run before socket.data.roomId is cleared
+  handleGameLeave(socket, room, { deliberate }); // must run before socket.data.roomId is cleared
   socket.leave(roomId);
   socket.data.roomId = null;
   room.players.delete(socket.id);
@@ -697,7 +704,7 @@ app.prepare().then(async () => {
           socket.emit('game-state', serializeGame(room, true));
           return;
         }
-        leaveCurrentRoom(socket);
+        leaveCurrentRoom(socket, true); // jumping rooms is a deliberate exit - no grace
 
         let room = rooms.get(roomId);
         if (!room) {
@@ -918,8 +925,8 @@ app.prepare().then(async () => {
       broadcastGame(room.id);
     });
 
-    socket.on('leave-room', () => leaveCurrentRoom(socket));
-    socket.on('disconnect', () => leaveCurrentRoom(socket));
+    socket.on('leave-room', () => leaveCurrentRoom(socket, true));   // 🚪 deliberate - instant death
+    socket.on('disconnect', () => leaveCurrentRoom(socket, false));  // 🔌 transport drop - reconnect grace
   });
 
   // authoritative tick: turn timers, supply drops, crate physics/collection

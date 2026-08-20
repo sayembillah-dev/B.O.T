@@ -143,6 +143,9 @@ const stats = (ds) => {
 };
 const f = (v, d = 2) => (+v).toFixed(d);
 
+// warm the dev-server route compile - a cold compile stalls first navigation
+await fetch(`${BASE}/room/warmup`).catch(() => { /* prod or already warm */ });
+
 const a = await launch(9351, 'A');
 const b = await launch(9352, 'B');
 try {

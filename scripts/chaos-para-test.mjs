@@ -85,6 +85,10 @@ async function launch(port, tag) {
 
 const t0 = Date.now();
 const tsec = () => ((Date.now() - t0) / 1000).toFixed(1);
+// warm the dev-server route compile - a cold compile can stall the first
+// navigation for seconds and blow the test's timing gates (dev-only flake)
+await fetch(`${BASE}/room/warmup`).catch(() => { /* prod or already warm */ });
+
 const a = await launch(9251, 'A');
 const b = await launch(9252, 'B');
 try {
