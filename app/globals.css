@@ -316,6 +316,20 @@ code {
 
 /* ── 🏠 main menu: Multiplayer / Hot Seat / vs AI accordion ── */
 .menu { display: grid; gap: 0.6rem; margin-top: 0.25rem; }
+/* flat navigation sections (no accordions - every mode is a direct button) */
+.menu-section {
+  display: grid; gap: 0.55rem;
+  padding: 0.8rem 0.95rem 0.9rem; border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid var(--border);
+}
+.menu-head { display: flex; align-items: center; gap: 0.9rem; text-align: left; }
+.menu-actions { display: flex; gap: 0.5rem; }
+.menu-actions > * { flex: 1; }
+.btn-chaos {
+  border-color: rgba(251, 146, 60, 0.55); color: #fdba74; font-weight: 800;
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.16), rgba(239, 68, 68, 0.14));
+}
+.btn-chaos:hover { background: linear-gradient(135deg, rgba(251, 146, 60, 0.28), rgba(239, 68, 68, 0.24)); }
 .menu-btn {
   display: flex; align-items: center; gap: 0.9rem; width: 100%;
   padding: 0.85rem 1.05rem; border-radius: 14px; text-align: left;

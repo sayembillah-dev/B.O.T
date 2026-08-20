@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims } from '@/lib/terrain.mjs';
 import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
@@ -80,8 +81,8 @@ const TOMAHAWK_SLOW = 0.55;// ☢️ heavy shell - flies far slower than a norma
 const CRATE_TTL = 60;      // s a landed supply crate stays before disappearing
 const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload - seconds between shots (server enforces too)
 const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn - seconds dead before you're back
-const PARA_FALL = 135;     // 🪂 parachute descent speed (px/s) - gentle drop-in
-const PARA_DRIFT = 95;     // 🪂 steering speed (px/s) - A/D glides you to a new landing spot
+const PARA_FALL = 230;     // 🪂 parachute descent speed (px/s) - brisk drop-in
+const PARA_DRIFT = 170;    // 🪂 steering speed (px/s) - A/D glides you to a new landing spot
 // ⚡ chaos crates are UNCOVERED - badge shows the contents, not a mystery '?'
 const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️' };
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
@@ -135,6 +136,7 @@ const drawNameTag = (ctx, x, y, t) => {
 };
 
 export default function Game({ gs, myId, local = 0 }) {
+  const router = useRouter();
   const canvasRef = useRef(null);
   const terrainCanvasRef = useRef(null);
   const terrainRef = useRef(null);
@@ -180,6 +182,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const [, setInvUi] = useState(0);  // inventory/buff change → HUD rerender
   const [windUi, setWindUi] = useState(0); // 🌬️ wind chip mirror
   const [mutedUi, setMutedUi] = useState(false);
+  const [fsUi, setFsUi] = useState(false); // ⛶ fullscreen chip mirror
 
   const seed = gs?.terrain?.seed;
   // ⚖️ terrain grows with player count; online the server's dims are law,
@@ -293,6 +296,7 @@ export default function Game({ gs, myId, local = 0 }) {
             palette: st?.palette ?? (i % TANK_PALETTES.length),
             aim: st?.aim ?? (x < terrain.width / 2 ? -0.6 : -2.54), // face the enemy side
             netX: null, netY: null, netAim: null, netS: 0, // online: streamed targets (🕵️ power is never shared)
+            netVx: 0, netVy: 0, netAt: 0,                  // 🛰️ stream velocity + last-packet time (para dead reckoning)
           };
         });
         // ⚡ chaos: start looking down MY barrel, not tank #0's
@@ -374,6 +378,7 @@ export default function Game({ gs, myId, local = 0 }) {
       if (st.dead && !t.dead) { t.dead = true; t.driving = false; t.deadAtMs = performance.now(); } // 💀 chaos: respawn countdown starts
       else if (!st.dead && t.dead) { // ⚡ chaos respawn - server revived this tank at a fresh spot
         t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
+        t.netX = null; t.netY = null; t.netVx = 0; t.netVy = 0; t.netAt = 0; // 🪂 drop the DEATH-SPOT stream anchors - the fresh descent re-anchors from the owner's new stream (else we'd ease back toward the corpse!)
         t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100; t.aim = st.aim ?? t.aim;
         t.para = !!st.para; // 🪂 ride the chute down again
         fxRef.current.text(st.x, st.y - 56, 'RESPAWN', '#8fd0ff');
@@ -748,8 +753,21 @@ export default function Game({ gs, myId, local = 0 }) {
     const onTankMove = (m) => {
       const t = tanksRef.current.find((k) => k.id === m?.id);
       if (!t) return;
-      if (typeof m.x === 'number') t.netX = m.x;
-      if (typeof m.y === 'number') t.netY = m.y;
+      // 🛰️ track stream velocity (smoothed) so remote chutes can dead-reckon
+      //    between the 12Hz snapshots instead of staircase-chasing them
+      const nowMs = performance.now();
+      const dtm = t.netAt ? (nowMs - t.netAt) / 1000 : 0;
+      const fresh = dtm > 0.02 && dtm < 0.4; // ignore bursts + long gaps (respawns)
+      if (typeof m.x === 'number') {
+        if (t.netX != null && fresh) t.netVx = (t.netVx || 0) * 0.5 + ((m.x - t.netX) / dtm) * 0.5;
+        t.netX = m.x;
+      }
+      if (typeof m.y === 'number') {
+        if (t.netY != null && fresh) t.netVy = (t.netVy || 0) * 0.5 + ((m.y - t.netY) / dtm) * 0.5;
+        else t.netVy = (m.para ?? t.para) ? PARA_FALL : 0; // 🛰️ no measurement yet (first packet after (re)spawn/stall): a chute falls at PARA_FALL - assume it until the stream proves otherwise
+        t.netY = m.y;
+      }
+      t.netAt = nowMs;
       if (typeof m.aim === 'number') t.netAim = m.aim;
       if (typeof m.s === 'number') t.netS = m.s;
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
@@ -885,6 +903,90 @@ export default function Game({ gs, myId, local = 0 }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, myId, applyServerBlast]);
 
+  // ── 🧪 dev test hook (?test=1) - exposes the live sim on window.__bot so
+  //    browser/CDP tests can read tank state and fire a SOLVED shot at a point
+  //    target (leading a parachuting target by its fall rate). Never active in
+  //    normal play. (refs only - safe with stale closures)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!new URLSearchParams(window.location.search).has('test')) return;
+    window.__bot = {
+      PARA_FALL,
+      tanks: () => tanksRef.current.map((t) => ({
+        id: t.id, name: t.name, x: Math.round(t.x * 10) / 10, y: Math.round((t.y ?? -999) * 10) / 10,
+        sway: +(t.renderSwayX || 0).toFixed(2), s: +(t.s || 0).toFixed(1),
+        hp: t.hp, dead: !!t.dead, para: !!t.para, dmg: t.dmg | 0, cd: +(t.cd || 0).toFixed(2),
+      })),
+      myId: () => myIdRef.current,
+      turn: () => ({ phase: turnRef.current.phase, countdown: countdownRef.current, wind: windRef.current }),
+      // 🎯 grid-search (angle × power) with the sim's exact ballistics (gravity,
+      // wind, 58×46 hitbox) so the shell INTERCEPTS (tx, ty) - ty may be a
+      // falling parachute target, so lead it by fall × flight-time. Then fires
+      // for real. Returns the solution or why it refused.
+      fireAt: (tx, ty, fall = 0, directOnly = false) => {
+        const me = controlTank();
+        const T = terrainRef.current;
+        if (!me || me.dead || !T) return { ok: false, why: 'no-tank' };
+        if (turnRef.current.phase === 'over' || countdownRef.current > 0) return { ok: false, why: 'not-live' };
+        if ((me.cd || 0) > 0) return { ok: false, why: 'reload' };
+        // one shell sim with the game's exact ballistics; reports a direct box
+        // hit, the dirt impact (splash candidate), and the closest approach
+        const sim = (a, p) => {
+          const tip = muzzleOf(me, a);
+          const v = SPEED(p);
+          let x = tip.x, y = tip.y, vx = Math.cos(a) * v, vy = Math.sin(a) * v, t = 0, dMin = Infinity, impact = null;
+          const dt = 1 / 120;
+          while ((t += dt) < 8) {
+            vy += GRAV * dt;
+            vx += windRef.current * WIND_MAX * dt;
+            x += vx * dt; y += vy * dt;
+            const tyi = ty + fall * t; // 🪂 lead a falling target
+            if (Math.abs(x - tx) <= 29 && Math.abs(y - tyi + 19) <= 23) return { a, p, t, direct: true };
+            if (x >= 0 && x < T.width && y >= 0 && isSolid(T, x, y)) { impact = Math.hypot(x - tx, y - tyi); break; } // ate dirt
+            if (x < -60 || x > T.width + 60 || y > T.height + 80) break;   // left the world
+            dMin = Math.min(dMin, Math.hypot(x - tx, y - tyi + 19));
+          }
+          return { a, p, t, dMin, impact };
+        };
+        let best = null, splash = null, seed = null; // seed = closest pass → refine around it
+        const coarseA = 0.025, coarseP = 0.04;
+        for (let p = 1; p >= 0.2 && !best; p -= coarseP) {
+          for (let a = -Math.PI + 0.04; a < -0.04 && !best; a += coarseA) {
+            const r = sim(a, p);
+            if (r.direct) { best = r; break; }
+            if (r.impact != null && r.impact <= BLAST_R + 30 && (!splash || r.impact < splash.d)) splash = { ...r, d: Math.round(r.impact) };
+            if (r.dMin != null && r.dMin < (seed?.dMin ?? Infinity)) seed = r;
+          }
+        }
+        // refine: coarse steps are ~35px wide at long range - thread the needle
+        if (!best && seed) {
+          for (let p = Math.min(1, seed.p + 0.06); p >= Math.max(0.06, seed.p - 0.06) && !best; p -= 0.008) {
+            for (let a = seed.a - 0.035; a <= seed.a + 0.035 && !best; a += 0.004) {
+              const r = sim(a, p);
+              if (r.direct) { best = r; break; }
+              if (r.impact != null && r.impact <= BLAST_R + 30 && (!splash || r.impact < splash.d)) splash = { ...r, d: Math.round(r.impact) };
+            }
+          }
+        }
+        const sol = best ?? (directOnly ? null : splash);
+        if (!sol) return { ok: false, why: 'no-solution', closest: seed?.dMin != null ? Math.round(seed.dMin) : null };
+        me.aim = sol.a; aimRef.current = sol.a;
+        chargeRef.current.power = sol.p;
+        fire();
+        return { ok: true, a: +sol.a.toFixed(3), p: +sol.p.toFixed(2), tof: +sol.t.toFixed(2), direct: !!sol.direct, splashD: sol.d };
+      },
+    };
+    return () => { delete window.__bot; };
+  }, [fire]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── ⛶ fullscreen: keep the HUD chip in sync no matter how we got in/out
+  //    (button, F11, or the browser's native Esc-from-fullscreen) ──
+  useEffect(() => {
+    const onFs = () => setFsUi(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
   // ── game loop ──
   useEffect(() => {
     if (!ready) return;
@@ -919,19 +1021,45 @@ export default function Game({ gs, myId, local = 0 }) {
         //    spot. You land, THEN you fight (brief spawn cover).
         if (me.para) {
           me.grounded = false; me.driving = false; me.airVy = 0;
+          const minePara = onlineNow ? me.id === myIdRef.current : true; // offline: every tank is locally simmed
+          // 🛰️ remote-chute dead reckoning: how stale is the owner's 12Hz stream?
+          //    Healthy → extrapolate the last packet by its velocity so the chute
+          //    GLIDES smoothly between snapshots (was: staircase chase = jitter).
+          //    Stalled (>0.15s: backgrounded tab…) → zero the velocity, so we ease
+          //    to the exact last server-known spot and HOLD (stays shootable).
+          const netAge = !minePara && me.netAt ? (performance.now() - me.netAt) / 1000 : 0;
+          if (!minePara && netAge > 0.15) { me.netVx = 0; me.netVy = 0; }
+          const netLead = Math.min(netAge, 0.15);
+          // exact exponential ease (1 - e^-k·dt) - NOT the Euler min(1,k·dt),
+          // which over-bites on long frames and wobbles under irregular rAF
+          const easeS = 1 - Math.exp(-9 * dt), easeNet = 1 - Math.exp(-14 * dt);
           if (me.id === myIdRef.current) { // steer your own drop-in (even mid-countdown)
             const pdir = (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0);
-            me.s = pdir * PARA_DRIFT;
-            if (pdir) me.x = Math.max(24, Math.min(terrain.width - 24, me.x + me.s * dt));
+            me.s += (pdir * PARA_DRIFT - me.s) * easeS; // 🪂 ease into the glide - no 0↔max snap (was a visible jerk)
+            me.x = Math.max(24, Math.min(terrain.width - 24, me.x + me.s * dt));
+            if (me.x <= 24 || me.x >= terrain.width - 24) me.s = 0; // wall - kill the glide, don't grind
           } else {
             me.s = 0;
-            if (onlineNow && me.netX != null) me.x += (me.netX - me.x) * Math.min(1, 10 * dt); // mirror the owner's glide
+            if (onlineNow && me.netX != null) me.x += ((me.netX + (me.netVx || 0) * netLead) - me.x) * easeNet; // mirror the owner's glide, dead-reckoned
           }
-          me.y = (me.y ?? -60) + PARA_FALL * dt;
+          if (minePara) {
+            me.y = (me.y ?? -60) + PARA_FALL * dt;
+          } else if (me.netY != null) {
+            // 🎯 shoot what you see: a rival's chute rides their STREAMED altitude
+            //    (12Hz), it never free-falls on our clock. If their client stalls
+            //    (backgrounded tab while dead/respawning - the classic), the tank
+            //    freezes where the SERVER last saw it too, so shots at the visible
+            //    chute always register (was: our ghost kept gliding + landing while
+            //    the server held it mid-sky - every "hit" did 0 damage).
+            me.y += ((me.netY + (me.netVy || 0) * netLead) - me.y) * easeNet;
+          }
+          // netY still null → their stream hasn't arrived since the (re)spawn:
+          // HOLD at the last server-known altitude - exactly where the server
+          // believes the tank is, so it hangs shootable instead of ghost-gliding
           const gyP = surf(me.x);
           if (me.y >= gyP) { // touchdown - stow the chute, kick up dust
             me.y = gyP; me.para = false; me.grounded = true;
-            me.s = 0;
+            me.s = 0; me.netVx = 0; me.netVy = 0;
             me.susVel += 10;
             fxRef.current.add({ t: 'dirt', x: me.x - 10, y: me.y - 2, vx: -40, vy: -30, size: 2.2, life: 0.5 });
             fxRef.current.add({ t: 'dirt', x: me.x + 10, y: me.y - 2, vx: 40, vy: -30, size: 2.2, life: 0.5 });
@@ -1653,7 +1781,17 @@ export default function Game({ gs, myId, local = 0 }) {
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
         const dy = (sh ? (Math.random() - 0.5) * 4 * sh : 0) + (Math.random() - 0.5) * 1.1 * rf;
         const mineT = !onlineRef.current || t.id === myIdRef.current; // my own tank (or all offline)
-        const swayX = t.para ? Math.sin(now * 0.003 + t.x) * 5 : 0; // 🪂 chute sway
+        // 🪂 chute sway: STABLE per-tank phase - never derived from t.x (steering
+        //    used to shift the sine phase at ±170 rad/s → violent jitter). Steering
+        //    still reads visually via a smoothed lean into the glide direction.
+        if (t.swayPh == null) t.swayPh = String(t.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0) * 0.73, 1.7) % (Math.PI * 2);
+        const rawVx = (t.x - (t.px ?? t.x)) / Math.max(dt, 1e-3); // actual glide speed this frame
+        t.svx = (t.svx || 0) + (Math.max(-260, Math.min(260, rawVx)) - (t.svx || 0)) * (1 - Math.exp(-7 * dt)); // exact exp ease - steady under irregular rAF
+        t.px = t.x;
+        const lean = t.para ? Math.max(-1, Math.min(1, (t.svx || 0) / PARA_DRIFT)) : 0;
+        const swayOsc = t.para ? Math.sin(now * 0.003 + t.swayPh) : 0;
+        const swayX = t.para ? swayOsc * 5 + lean * 4 : 0;
+        t.renderSwayX = swayX; // 🧪 exposed via ?test=1 hook (visual-position jitter checks)
         const stackX = t.x + dx + swayX, stackY = gy + dy; // ONE centre line - every overlay hangs from it
         if (spot && !t.dead && turn.phase !== 'over') { // ⚡ chaos: the HERO MARKER - one aligned system for YOUR tank
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
@@ -1732,7 +1870,7 @@ export default function Game({ gs, myId, local = 0 }) {
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
           ctx.save();
           ctx.translate(t.x + dx + swayX, gy + dy);
-          ctx.rotate(Math.sin(now * 0.003 + t.x) * 0.09); // pendulum swing
+          ctx.rotate(swayOsc * 0.08 + lean * 0.1); // pendulum swing + lean into the glide (stable phase - no jitter)
           ctx.strokeStyle = 'rgba(232,236,228,0.75)';
           ctx.lineWidth = 1.2;
           ctx.beginPath();
@@ -2328,6 +2466,7 @@ export default function Game({ gs, myId, local = 0 }) {
         if (down) keysRef.current.add(k); else keysRef.current.delete(k);
       }
       if (!down) return;
+      if (k === 'escape' && document.fullscreenElement) document.exitFullscreen?.(); // ⛶ Esc leaves fullscreen (browsers do this natively too - belt and braces)
       if (countdownRef.current > 0) return; // no acting until "FIGHT!"
       if (k === 'enter' && turnRef.current.phase === 'open' && !chaosRef.current) { // ⚡ chaos: no turns to pass
         e.preventDefault(); // pass the turn to the next player
@@ -2377,6 +2516,12 @@ export default function Game({ gs, myId, local = 0 }) {
     setMuted(m);
     setMutedUi(m);
     if (!m) sfx('turn'); // little "sound is back" blip
+  };
+
+  // ⛶ fullscreen toggle (Esc backs out - handled in onKey + natively by the browser)
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => {}); // needs the click gesture - we have it
   };
 
   // 🌬️ wind chip label: chevrons ∝ strength, direction = push direction
@@ -2453,7 +2598,9 @@ export default function Game({ gs, myId, local = 0 }) {
         </span>
         <span style={{ flex: 1 }} />
         <button className="btn-hud" onClick={toggleMute} title={mutedUi ? 'unmute' : 'mute'}>{mutedUi ? 'muted' : 'sound'}</button>
+        <button className="btn-hud" onClick={toggleFullscreen} title={fsUi ? 'leave fullscreen (Esc)' : 'play fullscreen (Esc to leave)'}>{fsUi ? '⛶ exit' : '⛶ fullscreen'}</button>
         <button className="btn-hud" onClick={cycleColor}>{colorName}</button>
+        <button className="btn-hud" onClick={() => router.push('/')} title="back to the main menu">⌂ menu</button>
         {isHost && turnInfo.phase !== 'over' && (
           <>
         <button className="btn-hud" onClick={() => getSocket()?.emit('regen-terrain')}>New terrain</button>
@@ -2652,6 +2799,7 @@ export default function Game({ gs, myId, local = 0 }) {
                     waiting for the 👑 room master…
                   </div>
                 )}
+                <button className="btn btn-ghost" onClick={() => router.push('/')}>⌂ menu</button>
               </div>
             </div>
           </div>
