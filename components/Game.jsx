@@ -1868,9 +1868,9 @@ export default function Game({ gs, myId, local = 0 }) {
           const c2d = offC.getContext('2d');
           while (q.length && budget > 0) {
             const band = q.shift();
-            const rg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h);
-            c2d.putImageData(new ImageData(reg.data, reg.w, rg.h), rg.x, rg.y);
-            budget -= rg.w * rg.h;
+            const reg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h);
+            c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
+            budget -= reg.w * reg.h;
           }
           if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ bands landed - re-scale the blit cache
         }
@@ -1883,27 +1883,39 @@ export default function Game({ gs, myId, local = 0 }) {
 
     let lastFrameAt = performance.now();
     let lastRenderAt = 0;
+    let frameErrs = 0; // 🧯 consecutive bad frames - logged, never fatal
     const frame = (now) => {
       const rawMs = now - lastFrameAt; lastFrameAt = now; // real frame delta (pre-clamp) - the governor's sample
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
       const gov = qualityRef.current;
-      if (gov) {
-        gov.sample(rawMs, now);
-        const k = gov.knobs;
-        fxRef.current.cap = k.particleCap;      // 🎚️ live particle budget
-        fxRef.current.emitScale = k.emitScale;  //     and emission throttle
-        if ((gov.tier === 'low') !== lowUiRef.current) { lowUiRef.current = gov.tier === 'low'; setLowUi(lowUiRef.current); }
-        if (k.frameCapMs && now - lastRenderAt < k.frameCapMs) { // Low tier: 60fps render ceiling on 120Hz+ panels
-          update(dt);
-          raf = requestAnimationFrame(frame);
-          return;
+      // 🧯 crash containment: a throw in update/render used to escape the rAF
+      //    callback BEFORE the next frame was scheduled - the loop simply died
+      //    and the canvas froze mid-match for the rest of the session (twice:
+      //    teleport surf(), banded-repaint reg). A bad frame is now skipped and
+      //    the loop ALWAYS reschedules - a hiccup beats a frozen screen.
+      try {
+        if (gov) {
+          gov.sample(rawMs, now);
+          const k = gov.knobs;
+          fxRef.current.cap = k.particleCap;      // 🎚️ live particle budget
+          fxRef.current.emitScale = k.emitScale;  //     and emission throttle
+          if ((gov.tier === 'low') !== lowUiRef.current) { lowUiRef.current = gov.tier === 'low'; setLowUi(lowUiRef.current); }
+          if (k.frameCapMs && now - lastRenderAt < k.frameCapMs) { // Low tier: 60fps render ceiling on 120Hz+ panels
+            update(dt);
+            return; // the finally below still reschedules
+          }
         }
+        lastRenderAt = now;
+        update(dt);
+        render(now, dt);
+        frameErrs = 0;
+      } catch (err) {
+        frameErrs++;
+        if (frameErrs <= 3 || frameErrs % 120 === 0) console.error(`🧯 bad frame skipped (game kept alive, #${frameErrs}):`, err);
+      } finally {
+        raf = requestAnimationFrame(frame);
       }
-      lastRenderAt = now;
-      update(dt);
-      render(now, dt);
-      raf = requestAnimationFrame(frame);
     };
 
     const render = (now, dt) => {
