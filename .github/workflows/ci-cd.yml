@@ -1,0 +1,110 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Deploys mutate one server; never run two at once. Do not cancel in progress -
+# a half-finished deploy is worse than a queued one.
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  ARTIFACT: bot-game-${{ github.sha }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Tar before uploading: upload-artifact over a loose node_modules tree is
+      # pathologically slow. Written to /tmp so tar never reads its own output.
+      - name: Package artifact
+        run: |
+          tar czf "/tmp/${ARTIFACT}.tar.gz" \
+            --exclude=./.git \
+            --exclude=./.github \
+            --exclude=./docs \
+            -C . .
+          ls -lh "/tmp/${ARTIFACT}.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: /tmp/${{ env.ARTIFACT }}.tar.gz
+          retention-days: 14
+
+  verify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: /tmp/artifact
+
+      # Exercise the exact bytes that will be deployed - not the source tree.
+      - name: Unpack artifact
+        run: |
+          mkdir -p /tmp/app
+          tar xzf "/tmp/artifact/${ARTIFACT}.tar.gz" -C /tmp/app
+
+      - name: Boot and smoke-test the artifact
+        working-directory: /tmp/app
+        run: |
+          NODE_ENV=production HOST=127.0.0.1 PORT=3000 node start.mjs > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          for i in $(seq 1 30); do
+            body="$(curl -fsS --max-time 3 'http://127.0.0.1:3000/socket.io/?EIO=4&transport=polling' || true)"
+            case "$body" in 0\{\"sid\"*) echo "handshake OK"; break ;; esac
+            sleep 1
+          done
+          URL=http://127.0.0.1:3000 npm run smoke
+
+      - name: Server log
+        if: always()
+        run: |
+          kill "$(cat /tmp/server.pid)" 2>/dev/null || true
+          tail -50 /tmp/server.log || true
+
+  deploy:
+    needs: [build, verify]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, bot-game]
+    environment: production
+    steps:
+      # The deploy script must exist before anything is untarred, so the job
+      # checks out the repo for the script and takes app bytes only from the artifact.
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: /tmp/artifact
+
+      - name: Activate release
+        run: bash deploy/deploy.sh "/tmp/artifact/${ARTIFACT}.tar.gz" "${GITHUB_SHA}"
+
+      - name: Service status
+        if: always()
+        run: sudo /usr/bin/systemctl is-active bot-game || true
