@@ -1,0 +1,24 @@
+[Unit]
+Description=B.O.T - battle of tanks (Next.js + Socket.IO)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botgame
+Group=botgame
+WorkingDirectory=/srv/bot-game/current
+EnvironmentFile=/etc/bot-game/env
+ExecStart=/usr/bin/node start.mjs
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bot-game
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
