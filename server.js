@@ -40,6 +40,18 @@ const ROOM_ID_RE = /^[a-z0-9]{4,24}$/;
 /** rooms: Map<roomId, { id, createdAt, players: Map<socketId, player>, game: object|null, sim: object|null, hostId: string|null, roundsTotal: number, match: object|null, mode: 'classic'|'chaos' }> */
 const rooms = new Map();
 
+// 📈 ops telemetry (opt-in): MEMLOG_MS=5000 logs heap/rss every 5s. Cheap leak
+//    hunting on hosts that OOM silently - heapUsed climbing without ever
+//    falling back means something is retaining, and the phase it climbs in
+//    (lobby / playing / post-game idle) narrows the suspect list.
+if (process.env.MEMLOG_MS) {
+  const mb = (n) => Math.round(n / 1048576);
+  setInterval(() => {
+    const m = process.memoryUsage();
+    console.log(`📈 mem heap=${mb(m.heapUsed)}/${mb(m.heapTotal)}MB rss=${mb(m.rss)}MB ext=${mb(m.external)}MB rooms=${rooms.size}`);
+  }, Math.max(1000, Number(process.env.MEMLOG_MS) || 5000)).unref();
+}
+
 function serializeRoom(room) {
   return {
     id: room.id, createdAt: room.createdAt, maxPlayers: MAX_PLAYERS,
