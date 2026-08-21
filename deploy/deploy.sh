@@ -29,9 +29,9 @@ health() {
 }
 
 activate() {
-    ln -sfn "$1" "$APP_ROOT/current.tmp"
-    mv -Tf "$APP_ROOT/current.tmp" "$CURRENT"
-    sudo /usr/bin/systemctl restart bot-game
+    ln -sfn "$1" "$APP_ROOT/current.tmp" \
+        && mv -Tf "$APP_ROOT/current.tmp" "$CURRENT" \
+        && sudo /usr/bin/systemctl restart bot-game
 }
 
 # Roll back to the previous release. Never re-entrant: a failure during
@@ -69,9 +69,9 @@ tar xzf "$TARBALL" -C "$NEW"
 # group `botgame` on the host. This is fatal and runs before activation, so
 # nothing is live yet if it fails.
 log "Preparing release permissions for the botgame service user"
-chgrp -R botgame "$NEW" \
+mkdir -p "$NEW/.next/cache" \
+    && chgrp -R botgame "$NEW" \
     && chmod -R g+rX "$NEW" \
-    && mkdir -p "$NEW/.next/cache" \
     && chmod -R g+w "$NEW/.next/cache" \
     || { echo "failed to prepare release permissions for botgame (is deploy in group botgame?)"; exit 1; }
 
