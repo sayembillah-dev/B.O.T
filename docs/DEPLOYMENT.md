@@ -1,9 +1,11 @@
 # Deployment runbook
 
 This documents what was actually done to stand up `sayembillah-dev/B.O.T` on
-its target server, not an idealised version. Where a step hasn't happened yet
-(runner registration) or was deliberately deferred (SSH hardening), that's
-called out explicitly rather than written as if it were done.
+its target server, not an idealised version. The self-hosted runner is now
+registered and running (§2 Step 8), and the automated pipeline has deployed
+end-to-end on it (§3). Where a step was deliberately deferred (SSH
+hardening), that's called out explicitly rather than written as if it were
+done.
 
 ## 1. What this deploys
 
@@ -176,38 +178,49 @@ sudo -u deploy sudo -n /usr/bin/systemctl is-active bot-game   # succeeds, rc=3 
 sudo -u deploy sudo -n /usr/bin/systemctl restart nginx        # "a password is required"
 ```
 
-### Step 8 — the Actions runner (NOT YET DONE)
+### Step 8 — the Actions runner (DONE)
 
-**Status: not done.** Repo admin on `sayembillah-dev/B.O.T` was never
-granted, so this step has not run. Until it does, the `deploy` job in
-`.github/workflows/ci-cd.yml` (`runs-on: [self-hosted, bot-game]`) has no
-runner to pick it up and **queues forever** on every push to `main`. Deploys
-must be done by hand — see §4 below — until this is complete.
+**Status: done.** A self-hosted runner named `play` is registered on
+`sayembillah-dev/B.O.T`, installed from `/home/deploy/actions-runner`
+(actions-runner v2.336.0 linux-x64), and running as the systemd service
+`actions.runner.sayembillah-dev-B.O.T.play.service` under the unprivileged
+`deploy` user (not root, per the security model in §8). Labels:
+`self-hosted, Linux, X64, bot-game`. Confirm it's up:
 
-**Do not register the runner until the two prerequisites below are done.**
-Registering it first — before the fork-approval setting is applied — leaves
-a window where a fork PR can define its own job targeting
-`runs-on: [self-hosted, bot-game]` and have it execute automatically on this
-LAN box. See §8 for why the `deploy` job's own `if:` guard does not close
-that window.
+```bash
+sudo systemctl status actions.runner.sayembillah-dev-B.O.T.play.service
+gh api repos/sayembillah-dev/B.O.T/actions/runners
+```
 
-**Prerequisite (a) — set the fork-approval setting, first, before anything
-else in this step:**
+Both prerequisites below were satisfied first, in that order, before the
+runner was registered. Registering it first — before the fork-approval
+setting was applied — would have left a window where a fork PR could define
+its own job targeting `runs-on: [self-hosted, bot-game]` and have it execute
+automatically on this LAN box. See §8 for why the `deploy` job's own `if:`
+guard does not close that window. If this box is ever rebuilt, do the two
+prerequisites first, in this order, before registering a new runner.
+
+**Prerequisite (a) — fork-approval setting — applied:**
 
 In **Settings → Actions → General → Fork pull request workflows from
-outside collaborators**, set **"Require approval for all outside
+outside collaborators**, set to **"Require approval for all outside
 collaborators"** (GitHub's current label for what the spec calls "Require
-approval for all external contributors"). Requires repo admin.
+approval for all external contributors"). Confirmed applied — see §8 for the
+verification command and why this is the primary control against a
+self-hosted runner on a public repo.
 
-**Prerequisite (b) — create the `production` GitHub Environment**, which §3
-and §8 already assume exists (it's what the `deploy` job in
-`ci-cd.yml` binds to):
+**Prerequisite (b) — the `production` GitHub Environment — created:**
 
 ```bash
 gh api -X PUT repos/sayembillah-dev/B.O.T/environments/production
 ```
 
-Only once both of those are done, proceed with the runner itself:
+Exists now; §3 and §8 already assume it does (it's what the `deploy` job in
+`ci-cd.yml` binds to). It currently has no required reviewers configured —
+adding one is an optional extra gate, see §8.
+
+The runner itself was installed like this — kept here as the reference for
+rebuilding the box, not as a pending step:
 
 ```bash
 # on the server, as deploy
@@ -225,8 +238,11 @@ gh api -X POST repos/sayembillah-dev/B.O.T/actions/runners/registration-token -q
 ```
 
 (or copy one from the GitHub UI: **Settings → Actions → Runners → New
-self-hosted runner**, which shows the same token for a limited time). Then,
-still as `deploy`:
+self-hosted runner**, which shows the same token for a limited time). In
+practice this token was minted using the repo owner's PAT, written to the
+server, consumed once by `config.sh`, and deleted — see §8 for that PAT's
+own disposition (it needs to be revoked and rotated). Then, still as
+`deploy`:
 
 ```bash
 ./config.sh --url https://github.com/sayembillah-dev/B.O.T \
@@ -237,8 +253,10 @@ sudo ./svc.sh start
 
 `--name play` matches the host's hostname, per plan. The label `bot-game` is
 what `runs-on: [self-hosted, bot-game]` in the workflow targets — it must be
-exactly this string. Installing the service as `deploy` (not root) matches
-the security model in §8.
+exactly this string; GitHub appends its own default labels
+(`self-hosted, Linux, X64`) automatically, which is why the runner's full
+label set ends up as `self-hosted, Linux, X64, bot-game`. Installing the
+service as `deploy` (not root) matches the security model in §8.
 
 ### Step 9 — firewall
 
@@ -264,17 +282,23 @@ external traffic to it anyway.
 
 ### Step 10 — SSH hardening (PENDING — do not run yet)
 
-**Deliberately not done.** See §8 for why, and the exact commands to run once
-the runner (§2 Step 8) is registered and the `deploy` account setup is
-otherwise finished. Locking down SSH now, before those are confirmed
-working, risks losing terminal access to the container with no other path
-in.
+**Deliberately not done.** The runner (§2 Step 8) is registered and the
+`deploy` account setup is otherwise finished, but SSH hardening itself still
+requires the two-terminal confirmation described in §8 before it runs —
+locking down SSH before key-only login is reconfirmed from a second terminal
+risks losing terminal access to the container with no other path in. See §8
+for the exact commands and that safety procedure.
 
 ## 3. How a deploy works
 
-This describes the pipeline's *designed* behavior. As of this writing the
-`deploy` job below has no runner to run on (§2 Step 8) — every push to `main`
-queues it forever, and the actual deploy is done by hand per §4.
+This is the automated path, and it is proven end-to-end on the self-hosted
+runner: two full runs have gone build → verify → deploy all green with no
+human touching the server — run `32484940339` (deployed `e6e35c4`) and run
+`32488039952` (a manual `workflow_dispatch`, deployed `d78679b`). Every push
+to `main` since has gone through this same automated path; `readlink -f
+/srv/bot-game/current` (§6) is the authority on what's actually live at any
+given moment, not this doc. §4's manual procedure is now break-glass only,
+for when the runner is down.
 
 Trigger: a `push` to `main`, or a manual `workflow_dispatch` run. (A
 `pull_request` event runs `build` and `verify` only — the `deploy` job's
@@ -328,10 +352,13 @@ Because there's exactly one Node process (§1), the `systemctl restart` step
 in the middle of this ends every in-flight game — that's expected on every
 successful deploy, not just failed ones.
 
-## 4. Manual deploy (the actual operative path right now)
+## 4. Manual deploy (break-glass — use when the runner is down)
 
-Since the runner isn't registered (§2 Step 8), this is what has been used in
-practice to deploy, and remains the correct procedure until that changes.
+The automated path (§3) is what actually deploys now. This procedure is kept
+as the recovery path for when the self-hosted runner is offline (see §6's
+"Waiting for a runner to pick up this job" entry) — it's exactly what
+`deploy/deploy.sh` inside the workflow's `deploy` job would run, just
+triggered by hand instead of by the runner.
 
 ```bash
 # 1. find the run and download its artifact
@@ -363,17 +390,13 @@ The `<sha>` argument must be the commit SHA the artifact was built from
 (`github.sha` in the run, i.e. the real commit on `main` for a `push`-triggered
 run — not the ephemeral merge ref a `pull_request`-triggered run would have
 used). This is exactly what `deploy/deploy.sh` inside the workflow's `deploy`
-job would run — same script, same artifact bytes, run by hand because no
-runner exists to run it automatically.
+job would run — same script, same artifact bytes, run by hand instead of by
+the runner because it isn't available right now.
 
-Whenever a run's `deploy` job is left `queued` because of this (every push to
-`main` currently does this), cancel it once the manual deploy is done so it
-doesn't hold the `cicd-refs/heads/main` concurrency group open for the next
-run:
-
-```bash
-gh run cancel <run-id> --repo sayembillah-dev/B.O.T
-```
+If this procedure is being run because the runner is down, see §6 for how to
+confirm that and bring it back. Once it's back online, any run still sitting
+`queued` behind it picks the job up and runs on its own — no manual cancel
+needed for the routine case.
 
 ## 5. Manual rollback
 
@@ -446,32 +469,35 @@ sudo cat /etc/sudoers.d/bot-game-deploy
 sudo -u deploy sudo -n -l /usr/bin/systemctl restart bot-game   # should print the command, rc=0
 ```
 
-**The `deploy` job is stuck `queued` in Actions, and it's blocking the next
-push to `main`.** No self-hosted runner labelled `bot-game` is registered —
-see §2 Step 8. This isn't just a stalled job: the workflow's
-`concurrency: cicd-${{ github.ref }}` group with `cancel-in-progress: false`
-means a queued `deploy` holds that group open, so the *next* push's run
-can't even start (it sits `pending`) until this one resolves. Left alone,
-GitHub's own queue limit is the only thing that eventually clears it — on
-the order of a day, not minutes. The job's `timeout-minutes: 10` does
-**not** help here: that clock only starts once a runner picks the job up,
-and with none registered it never does. Until the runner exists (§2 Step
-8), every push leaves its `deploy` job queued this way and it must be
-cancelled by hand:
+**A `deploy` job is stuck on "Waiting for a runner to pick up this job."**
+The self-hosted runner service is down. Confirm on the server (as `nifty`,
+same as every other SSH example here — `deploy`'s sudoers grant only covers
+the four `systemctl bot-game` subcommands in §2 Step 7, not this):
 
 ```bash
-gh run cancel <run-id> --repo sayembillah-dev/B.O.T
+ssh -i <key> nifty@192.168.1.219 "sudo systemctl status 'actions.runner.*'"
 ```
 
-Check for a runner process on the server first, to confirm this is really
-the "no runner" case and not something else:
+and confirm from the GitHub side that it doesn't show as online:
 
 ```bash
-ssh -i <key> nifty@192.168.1.219 'systemctl status "actions.runner.*" 2>&1 || echo "no runner service installed"'
+gh api repos/sayembillah-dev/B.O.T/actions/runners
 ```
 
-If nothing is installed, the runner has never been registered; deploy by
-hand per §4, then cancel the queued run as above.
+If `actions.runner.sayembillah-dev-B.O.T.play.service` isn't `active`,
+restart it:
+
+```bash
+ssh -i <key> nifty@192.168.1.219 \
+  'sudo systemctl restart actions.runner.sayembillah-dev-B.O.T.play.service'
+```
+
+and the queued job picks up on its own — no need to cancel and re-run. If it
+won't come back, deploy by hand per §4 while it's investigated. Note the
+workflow's `concurrency: cicd-${{ github.ref }}` group
+(`cancel-in-progress: false`) means a run stuck this way still holds that
+group open, so the *next* push's run can't start until this one resolves —
+don't leave a downed runner unattended for long.
 
 **Service won't start / crashes on boot.** Check `EnvironmentFile` is
 readable by `botgame` and `ExecStart`'s target exists:
@@ -511,12 +537,19 @@ automatically on this LAN box.
 **Primary control:** the repo setting **"Require approval for all outside
 collaborators"** (Settings → Actions → General → Fork pull request
 workflows from outside collaborators — this is what the spec calls "Require
-approval for all external contributors"). This is what actually stops a
-fork-authored job from running on the self-hosted runner at all — it gates
-*any* workflow run originating from a fork PR before it starts, regardless
-of what job the fork wrote. **Not yet confirmed set** — repo admin access
-has not been granted (see §2 Step 8). **Do not register the runner (§2 Step
-8) until this is confirmed set** — see the warning at the top of that step.
+approval for all external contributors"; the underlying API setting is
+`actions/permissions/fork-pr-contributor-approval`). This is what actually
+stops a fork-authored job from running on the self-hosted runner at all — it
+gates *any* workflow run originating from a fork PR before it starts,
+regardless of what job the fork wrote. **Applied** — the setting is
+`all_external_contributors`, not the risky default
+(`first_time_contributors`, which only requires approval the *first* time a
+given outside contributor opens a PR). It was set before the runner (§2 Step
+8) was registered, for exactly this reason. Verify:
+
+```bash
+gh api repos/sayembillah-dev/B.O.T/actions/permissions/fork-pr-contributor-approval
+```
 
 The following mitigations are real, but they protect the *existing*
 `deploy` job's path specifically, not the runner in general — they do not
@@ -528,8 +561,10 @@ substitute for the fork-approval setting above:
    run showed `deploy` as `skipped`. This guard only constrains *this job as
    it exists on `main`*; it cannot constrain a different job a fork PR
    defines in its own workflow file.
-2. `deploy` is bound to the `production` GitHub Environment, which can
-   require a reviewer and can be restricted to `main`.
+2. `deploy` is bound to the `production` GitHub Environment (created via the
+   API — §2 Step 8b). It currently has **no required reviewers** configured;
+   adding one would be an optional extra gate on top of the fork-approval
+   control above, not a substitute for it.
 3. The runner runs as unprivileged `deploy`, never root, with a sudoers grant
    narrowed to four specific `systemctl` subcommands on one unit (§2 Step 7).
 4. Sudoers uses the literal `/usr/bin/systemctl` path, matched against the
@@ -543,6 +578,17 @@ used from this machine, by hand, for provisioning and manual deploys.
 **Outstanding credential hygiene issues (unresolved, tracked here rather than
 silently fixed):**
 
+- A GitHub Personal Access Token belonging to the repo owner
+  (`sayembillah-dev`) was pasted into a chat transcript during setup. It
+  carried near-total scopes (`repo`, `workflow`, `admin:org`,
+  `admin:enterprise`, `delete_repo`, `admin:public_key`, and more) — full
+  account control, not a scoped deploy credential. **It must be revoked and
+  regenerated.** It was used only to apply the fork-approval setting above,
+  create the `production` environment (§2 Step 8b), and mint the runner's
+  short-lived registration token (§2 Step 8); the registration token itself
+  was written to the server, used once by `config.sh`, and deleted. The PAT
+  was never written to the server or committed to the repo — but a value
+  pasted into chat still has to be treated as disclosed.
 - The ed25519 key used to reach this server was pasted into a chat transcript
   during provisioning and must be treated as disclosed. It should be
   rotated — generate a new key, install it, confirm it works from a *second*
