@@ -25,6 +25,12 @@ const port = Number(process.env.PORT || 3000);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+// 🧯 last-resort containment: every room and every player rides this ONE event
+//    loop, so no uncaught throw (a malformed socket message, a bug in a game
+//    handler) may ever be allowed to kill the process. Log loudly, keep serving.
+process.on('uncaughtException', (err) => console.error('🧯 uncaughtException (server kept alive):', err));
+process.on('unhandledRejection', (err) => console.error('🧯 unhandledRejection (server kept alive):', err));
+
 // ── Room config ───────────────────────────────────────────────────────
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2; // online games need 2+ - solo/hot-seat bypass with {dev:true}
@@ -529,15 +535,22 @@ async function regenTerrain(socket) {
  *  Shared by the human 'blast' socket handler AND the 🤖 bot engine. */
 function applyBlast(room, me, p) {
   const g = room.game;
-  if (!g || !room.sim?.T) return;
+  const T = room.sim?.T;
+  if (!g || !T) return;
   const tn = g.turn;
   const chaos = g.mode === 'chaos';
   const x = Number(p?.x), y = Number(p?.y);
   if (!isFinite(x) || !isFinite(y)) return;
+  // 📏 sanity band: honest blasts always land within a blast-radius of the map
+  //    (world-wall hits, mid-air para splash at y ≥ -60). A crafted/corrupt
+  //    client sending e.g. x=1e15 passed the isFinite guard, then
+  //    removeFloaters ran new Uint8Array(negative-length) → RangeError thrown
+  //    mid-surgery: the bitmap was left half-carved (server/client desync) and
+  //    the throw escaped the socket handler uncaught. Drop those blasts whole.
+  if (x < -256 || x > T.width + 256 || y < -256 || y > T.height + 256) return;
   const r = Math.min(200, Math.max(8, Number(p?.r) || BLAST_R));
   const scale = Math.min(6, Math.max(0.1, Number(p?.scale) || 1));
   const big = !!p?.big;
-  const T = room.sim.T;
   const cut = []; // 🌱 cleared cells → rim seeds for the floater scan
   TERR.destroyCircle(T, x, y, r, cut);
   TERR.cleanDebris(T, x, y, r + 16, cut);

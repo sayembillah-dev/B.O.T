@@ -398,12 +398,21 @@ export default function Game({ gs, myId, local = 0 }) {
         // late-join / spectator: replay the server's blast log so craters match
         const blasts = local > 0 ? [] : (gsRef.current?.blasts ?? []);
         if (blasts.length) {
+          let bi = 0;
           for (const b of blasts) {
             const cut = []; // 🌱 rim seeds for the floater scan (#14)
             destroyCircle(terrain, b.x, b.y, b.r, cut);
             cleanDebris(terrain, b.x, b.y, b.r + 16, cut);
             removeFloaters(terrain, b.x, b.y, b.r + 190, cut);
             reflowSky(terrain, b.x, b.y, b.r + 16);
+            // 🫁 a long match replays up to 400 blasts of terrain surgery in one
+            //    loop - without a breath the tab freezes for seconds on join /
+            //    reload (worst on low-end machines) and Chrome offers to kill
+            //    the "unresponsive" page. Yield every 8 blasts.
+            if ((++bi & 7) === 0) {
+              await new Promise((res) => setTimeout(res, 0));
+              if (cancelled) return;
+            }
           }
           renderTerrainToCanvas(off, terrain); // one full repaint after replay
         }

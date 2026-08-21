@@ -170,6 +170,13 @@ npm run build
 npm start
 ```
 
+> **🚨 Host real sessions in production mode, not `npm run dev`.** Dev mode
+> compiles routes on demand *in the same process* - a new joiner or a refresh
+> can stall the one shared event loop for seconds (every game in every room
+> freezes), and dev memory grows over long sessions. `npm start` serves the
+> pre-built bundle and never compiles mid-game. On a Mac host, keep it awake
+> during matches: `caffeinate -s npm start`.
+
 ## License
 
 MIT.
