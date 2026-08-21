@@ -381,7 +381,17 @@ export default function Game({ gs, myId, local = 0 }) {
     repaintQRef.current = [];        // 🧱 no stale bands onto fresh terrain
     lastShotMineRef.current = false;
     lastFireRef.current = null;
-    countdownRef.current = COUNTDOWN_TOTAL;
+    // ⏳ countdown only for a genuinely FRESH round. A mid-game refresh/rejoin
+    //    REMOUNTS this component - replaying "3,2,1" would freeze input for 3.6s
+    //    while the SERVER clock keeps running (START_GRACE covers the real turn 1
+    //    only), so reclaimers and late-join spectators drop straight into the fight.
+    const st0 = gsRef.current;
+    const freshRound = !st0 || (
+      (st0.turn?.num ?? 1) <= 1 &&
+      !(st0.blasts?.length) &&
+      !(st0.startedAt && Date.now() - st0.startedAt > 5000)
+    );
+    countdownRef.current = freshRound ? COUNTDOWN_TOTAL : 0;
     cdLabelRef.current = null;
     turnRef.current = { num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME };
     numRef.current = 1;

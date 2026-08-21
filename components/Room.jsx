@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSocket, getClientId } from '@/lib/socket';
+import { getSocket, getClientId, getPlayerName, savePlayerName } from '@/lib/socket';
 import Game from '@/components/Game';
 import {
   LuLogIn, LuCopy, LuCheck, LuCrown, LuCrosshair, LuZap, LuTarget,
@@ -56,9 +56,9 @@ export default function Room({ roomId }) {
     if (['easy', 'medium', 'hard'].includes(ai)) { aiRef.current = ai; setAiDiff(ai); } // 🤖 vs CPU
     if (q.get('solo') === '1') {
       soloRef.current = true;
-      const name = sessionStorage.getItem('player-name') || (aiRef.current ? 'You' : 'dev');
+      const name = getPlayerName() || (aiRef.current ? 'You' : 'dev');
       nameRef.current = name;
-      sessionStorage.setItem('player-name', name);
+      savePlayerName(name);
       const n = parseInt(q.get('local') || '0', 10);
       setLocalCount(Number.isFinite(n) ? Math.min(4, Math.max(0, n)) : 0);
       setJoined(true);
@@ -66,7 +66,17 @@ export default function Room({ roomId }) {
       const name = q.get('name').trim().slice(0, 20);
       if (name) {
         nameRef.current = name;
-        sessionStorage.setItem('player-name', name);
+        savePlayerName(name);
+        setJoined(true);
+      }
+    } else {
+      // 🔌 AUTO-REJOIN: this browser was in THIS room before (refresh / accidental
+      //    tab close). Skip the name prompt - auto-join with the saved name +
+      //    stable cid, so a mid-game drop reclaims its tank inside the server's
+      //    LEAVE_GRACE_MS window instead of dying while the user re-types.
+      const saved = getPlayerName();
+      if (saved && localStorage.getItem(`rejoin:${roomId}`) === '1') {
+        nameRef.current = saved;
         setJoined(true);
       }
     }
@@ -90,7 +100,7 @@ export default function Room({ roomId }) {
   // ── END SOLO DEV BYPASS ──
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('player-name');
+    const saved = getPlayerName();
     if (saved && inputRef.current) inputRef.current.value = saved;
   }, []);
 
@@ -102,11 +112,15 @@ export default function Room({ roomId }) {
     const join = () => {
       socket.emit('join-room', { roomId, name: nameRef.current, cid: getClientId() }, (res) => {
         if (!res?.ok) {
+          try { localStorage.removeItem(`rejoin:${roomId}`); } catch { /* storage blocked */ }
           setError(res?.error || 'Could not join the room.');
           setJoined(false);
           return;
         }
         setError('');
+        // 🔌 remember "this browser is in this room" so a refresh / accidental
+        //    tab close auto-rejoins straight back into the match (see mount effect)
+        try { localStorage.setItem(`rejoin:${roomId}`, '1'); } catch { /* storage blocked */ }
         setMyId(res.you.id);
         setPlayers(res.room.players);
         setMaxPlayers(res.room.maxPlayers);
@@ -170,7 +184,7 @@ export default function Room({ roomId }) {
     const trimmed = (inputRef.current?.value || '').trim().slice(0, 20);
     if (!trimmed) return;
     nameRef.current = trimmed;
-    sessionStorage.setItem('player-name', trimmed);
+    savePlayerName(trimmed);
     setError('');
     setJoined(true);
   };
@@ -344,7 +358,10 @@ export default function Room({ roomId }) {
 
         {error && <p className="error">{error}</p>}
 
-        <button className="btn btn-ghost" onClick={() => router.push('/')}>
+        <button
+          className="btn btn-ghost"
+          onClick={() => { try { localStorage.removeItem(`rejoin:${roomId}`); } catch { /* storage blocked */ } router.push('/'); }}
+        >
           <LuLogOut /> Leave room
         </button>
       </div>

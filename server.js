@@ -296,6 +296,20 @@ function tickRoom(room) {
   const dt = Math.min(0.5, Math.max(0.02, (now - (room.tickAt ?? now - 100)) / 1000));
   room.tickAt = now;
   const tn = g.turn;
+
+  // 🔌 empty-game limbo: every player dropped at once (mid-game refresh of the
+  //    last player / all tabs cut). Freeze the match - turn timers, chaos clock,
+  //    crates, AI - for LEAVE_GRACE_MS so rejoiners reclaim right where it was;
+  //    tear it down only if nobody comes back.
+  if (g.players.length === 0) {
+    if (!g.emptyAt) { g.emptyAt = now; return; }
+    if (now - g.emptyAt > LEAVE_GRACE_MS) {
+      console.log(`[room ${room.id}] 💥 empty-game grace lapsed - match torn down`);
+      room.game = null; room.sim = null; room.match = null; room.aiRt = null;
+      broadcastGame(room.id);
+    }
+    return;
+  }
   if (tn.phase !== 'over') {
     if (g.mode === 'chaos') {
       if (now > g.endsAt) return endChaosByScore(room); // ⏳ 0:00 - most HP wins
@@ -661,7 +675,15 @@ function handleGameLeave(socket, room, { deliberate = false } = {}) {
     }
   }
   if (g.players.length === 0) {
-    // nobody left to play - tear it ALL down and tell the room: spectators
+    if (!deliberate) {
+      // 🔌 everyone in the game DROPPED at once (all tabs cut / last player
+      //    refreshed): hold the match in limbo for LEAVE_GRACE_MS so rejoiners
+      //    can reclaim their tanks - the tick tears it down only if nobody returns.
+      g.emptyAt = Date.now();
+      broadcastGame(room.id);
+      return;
+    }
+    // deliberate exit of the last player - tear it ALL down NOW and tell the room:
     // (sockets in the room but not in g.players) get null → back to the lobby
     room.game = null; room.sim = null;
     room.match = null; room.aiRt = null; // 🤖 scoreboard + bot runtime die with the game
@@ -680,8 +702,11 @@ function leaveCurrentRoom(socket, deliberate = false) {
   socket.data.roomId = null;
   room.players.delete(socket.id);
   if (room.players.size === 0) {
-    rooms.delete(roomId);
-    console.log(`[room ${roomId}] empty - deleted`);
+    // 🔌 room went empty (last tab cut / everyone refreshed at once): keep it in
+    //    limbo for LEAVE_GRACE_MS so a rejoin finds the match intact - the tick
+    //    loop sweeps it only if nobody comes back.
+    room.emptyAt = Date.now();
+    console.log(`[room ${roomId}] empty - rejoin grace open (${LEAVE_GRACE_MS}ms)`);
   } else {
     // host left → crown the longest-standing survivor (Map keeps join order) as
     // CARETAKER - the crown returns to the creator (hostCid) when they rejoin
@@ -775,6 +800,8 @@ app.prepare().then(async () => {
 
         const player = { id: socket.id, name, emoji: evicted?.emoji ?? pickEmoji(room), joinedAt: evicted?.joinedAt ?? Date.now(), cid }; // rejoiners keep their face + seniority
         room.players.set(socket.id, player);
+        room.emptyAt = 0; // someone is home - cancel the empty-room sweep
+        if (room.hostId && !room.players.has(room.hostId)) room.hostId = socket.id; // room went empty mid-game: first one back holds the crown (the creator reclaims it via hostCid below)
         if (!room.hostId) room.hostId = socket.id; // first joiner is the room master 👑
         if (!room.hostCid && cid && room.hostId === socket.id) room.hostCid = cid; // remember the creator's identity - set once
         if (cid && room.hostCid === cid && room.hostId !== socket.id) { // 👑 the crown ALWAYS returns to the creator
@@ -804,6 +831,7 @@ app.prepare().then(async () => {
             t.gone = false; t.goneAt = 0; // same-socket rejoin (idempotent path above missed it)
           }
         }
+        if (room.game?.players?.length) room.game.emptyAt = 0; // a player (re)bound - cancel the empty-game teardown
         console.log(`[room ${roomId}] ${name} joined (${room.players.size} players)`);
 
         reply({ ok: true, you: player, room: serializeRoom(room) });
@@ -973,7 +1001,15 @@ app.prepare().then(async () => {
 
   // authoritative tick: turn timers, supply drops, crate physics/collection
   setInterval(() => {
+    const now = Date.now();
     for (const room of rooms.values()) {
+      // 🔌 empty-room limbo sweep: everyone dropped at once - the room (and its
+      //    frozen match) survives LEAVE_GRACE_MS for rejoiners, then it's gone
+      if (room.players.size === 0 && room.emptyAt && now - room.emptyAt > LEAVE_GRACE_MS) {
+        rooms.delete(room.id);
+        console.log(`[room ${room.id}] empty grace lapsed - deleted`);
+        continue;
+      }
       try { tickRoom(room); } catch (err) { console.error(`[room ${room.id}] tick error:`, err); }
     }
   }, 100);
