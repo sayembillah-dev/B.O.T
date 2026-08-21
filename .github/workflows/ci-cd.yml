@@ -92,6 +92,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: [self-hosted, bot-game]
     environment: production
+    # A real deploy (download artifact + run deploy.sh) takes well under 5
+    # minutes; the artifact download is the slow part. Cap it so a run with
+    # no self-hosted runner registered fails fast instead of squatting on
+    # the `cicd-${{ github.ref }}` concurrency group (cancel-in-progress is
+    # deliberately false) and blocking every subsequent push to main.
+    timeout-minutes: 10
     steps:
       # The deploy script must exist before anything is untarred, so the job
       # checks out the repo for the script and takes app bytes only from the artifact.
