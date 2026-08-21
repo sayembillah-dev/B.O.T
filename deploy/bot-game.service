@@ -2,6 +2,13 @@
 Description=B.O.T - battle of tanks (Next.js + Socket.IO)
 After=network-online.target
 Wants=network-online.target
+# Disable systemd's start-rate limiting (default: 5 starts / 10s -> unit
+# enters start-limit-failed and `systemctl restart` starts refusing). A
+# crash-looping release can hit that in seconds, and `reset-failed` is
+# deliberately not in the deploy user's sudoers allowlist - so a limited
+# unit can strand deploy.sh's rollback path with no way to recover. Must
+# live in [Unit] (not [Service]) on current systemd.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
