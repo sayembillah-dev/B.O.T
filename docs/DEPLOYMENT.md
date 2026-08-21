@@ -446,16 +446,32 @@ sudo cat /etc/sudoers.d/bot-game-deploy
 sudo -u deploy sudo -n -l /usr/bin/systemctl restart bot-game   # should print the command, rc=0
 ```
 
-**The `deploy` job is stuck `queued` in Actions.** No self-hosted runner
-labelled `bot-game` is registered — see §2 Step 8. Check for a runner
-process on the server:
+**The `deploy` job is stuck `queued` in Actions, and it's blocking the next
+push to `main`.** No self-hosted runner labelled `bot-game` is registered —
+see §2 Step 8. This isn't just a stalled job: the workflow's
+`concurrency: cicd-${{ github.ref }}` group with `cancel-in-progress: false`
+means a queued `deploy` holds that group open, so the *next* push's run
+can't even start (it sits `pending`) until this one resolves. Left alone,
+GitHub's own queue limit is the only thing that eventually clears it — on
+the order of a day, not minutes. The job's `timeout-minutes: 10` does
+**not** help here: that clock only starts once a runner picks the job up,
+and with none registered it never does. Until the runner exists (§2 Step
+8), every push leaves its `deploy` job queued this way and it must be
+cancelled by hand:
+
+```bash
+gh run cancel <run-id> --repo sayembillah-dev/B.O.T
+```
+
+Check for a runner process on the server first, to confirm this is really
+the "no runner" case and not something else:
 
 ```bash
 ssh -i <key> nifty@192.168.1.219 'systemctl status "actions.runner.*" 2>&1 || echo "no runner service installed"'
 ```
 
 If nothing is installed, the runner has never been registered; deploy by
-hand per §4 and cancel the queued run per §4's last step.
+hand per §4, then cancel the queued run as above.
 
 **Service won't start / crashes on boot.** Check `EnvironmentFile` is
 readable by `botgame` and `ExecStart`'s target exists:

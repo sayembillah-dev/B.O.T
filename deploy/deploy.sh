@@ -28,9 +28,15 @@ health() {
     return 1
 }
 
+# ACTIVATED is set the moment the symlink swap lands (current now points at
+# $1), independent of whether the trailing systemctl restart succeeds - a
+# restart failure still leaves current pointed at the new release, which is
+# exactly the state rollback() needs to know about (see below).
+ACTIVATED=0
 activate() {
     ln -sfn "$1" "$APP_ROOT/current.tmp" \
         && mv -Tf "$APP_ROOT/current.tmp" "$CURRENT" \
+        && ACTIVATED=1 \
         && sudo /usr/bin/systemctl restart bot-game
 }
 
@@ -39,16 +45,25 @@ activate() {
 # again.
 rollback() {
     log "FAILED: $1"
-    if [ "$SAME_SHA" -eq 1 ]; then
-        # PREVIOUS is $SHA itself (same-SHA redeploy, see below) - reactivating
-        # it would just replay the identical bits that already failed, not a
-        # real recovery. Fail loudly instead of pretending a no-op is a
-        # rollback. The original live directory was never touched by this
-        # run, so it is still on disk under $PREVIOUS if manual intervention
-        # needs it.
-        log "This was a same-SHA redeploy of $SHA - refusing to \"roll back\" to the identical SHA. The previous live release at $(basename "$PREVIOUS") was never modified; investigate manually."
+    if [ "$SAME_SHA" -eq 1 ] && [ "$ACTIVATED" -eq 0 ]; then
+        # Same-SHA redeploy AND current was never repointed away from
+        # $PREVIOUS (failure happened during unpack/permission-prep, or
+        # activate()'s own symlink swap never landed). $PREVIOUS is $SHA
+        # itself here - reactivating it would just replay the identical
+        # bits that already failed, not a real recovery, and current is
+        # already correct (still on $PREVIOUS). Fail loudly instead of
+        # pretending a no-op is a rollback. The original live directory was
+        # never touched by this run, so it is still on disk under
+        # $PREVIOUS if manual intervention needs it.
+        log "This was a same-SHA redeploy of $SHA that failed before activation - nothing to roll back (current was never moved off $(basename "$PREVIOUS")). Investigate manually; the live release was never modified."
         exit 1
     fi
+    # Either a normal (different-SHA) deploy, or a same-SHA redeploy whose
+    # activate() already swapped current onto the new .redeploy-* directory
+    # before failing (restart, health, or smoke-test failure). In the latter
+    # case $PREVIOUS is still the untouched, previously-healthy original
+    # release directory - reactivating it is a genuine rollback, not a
+    # no-op, exactly like the normal case.
     if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ]; then
         log "Rolling back to $(basename "$PREVIOUS")"
         if activate "$PREVIOUS" && health; then
