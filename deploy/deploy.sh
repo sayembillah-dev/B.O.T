@@ -39,6 +39,16 @@ activate() {
 # again.
 rollback() {
     log "FAILED: $1"
+    if [ "$SAME_SHA" -eq 1 ]; then
+        # PREVIOUS is $SHA itself (same-SHA redeploy, see below) - reactivating
+        # it would just replay the identical bits that already failed, not a
+        # real recovery. Fail loudly instead of pretending a no-op is a
+        # rollback. The original live directory was never touched by this
+        # run, so it is still on disk under $PREVIOUS if manual intervention
+        # needs it.
+        log "This was a same-SHA redeploy of $SHA - refusing to \"roll back\" to the identical SHA. The previous live release at $(basename "$PREVIOUS") was never modified; investigate manually."
+        exit 1
+    fi
     if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ]; then
         log "Rolling back to $(basename "$PREVIOUS")"
         if activate "$PREVIOUS" && health; then
@@ -56,6 +66,32 @@ PREVIOUS=""
 [ -L "$CURRENT" ] && PREVIOUS="$(readlink -f "$CURRENT")"
 
 NEW="$RELEASES/$SHA"
+
+# Detect a same-SHA redeploy (workflow re-run, workflow_dispatch on unchanged
+# main, or a retry): $NEW would resolve to the exact directory that is
+# currently live ($PREVIOUS). Match by basename, not just direct path
+# equality, so this still fires correctly on a *second* consecutive
+# same-SHA redeploy, where $PREVIOUS is itself a ".redeploy-*" directory
+# from the first one.
+SAME_SHA=0
+if [ -n "$PREVIOUS" ]; then
+    case "$(basename "$PREVIOUS")" in
+        "$SHA" | "$SHA".*) SAME_SHA=1 ;;
+    esac
+fi
+
+if [ "$SAME_SHA" -eq 1 ]; then
+    # NEVER rm -rf the directory a same-SHA redeploy would otherwise target -
+    # that directory IS the live release. Unpack into a distinct sibling
+    # directory instead, so the live release is never absent or partial:
+    # the old directory is left completely untouched until the new one has
+    # been fully unpacked, permission-prepped, and activated via the normal
+    # atomic symlink swap in activate(). PREVIOUS still points at the
+    # original, intact directory throughout.
+    NEW="$RELEASES/${SHA}.redeploy-$(date +%s)-$$"
+    log "SHA $SHA is already live (at $(basename "$PREVIOUS")) - this is a same-SHA redeploy. Unpacking to a fresh directory ($(basename "$NEW")) instead of touching the live one."
+fi
+
 log "Unpacking $(basename "$TARBALL") -> $NEW"
 rm -rf "$NEW"
 mkdir -p "$NEW"
