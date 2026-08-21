@@ -296,7 +296,14 @@ Three jobs, in order:
    bound to the `production` GitHub Environment) — checks out the repo (for
    `deploy/deploy.sh` only), downloads the artifact, then runs
    `deploy/deploy.sh <tarball> <sha>` on the server:
-   - untars into `/srv/bot-game/releases/<sha>/`
+   - untars into `/srv/bot-game/releases/<sha>/` — **except** when `<sha>` is
+     already the live release (a re-run, or a retry after a failed deploy of
+     the same commit): then it untars into
+     `/srv/bot-game/releases/<sha>.redeploy-<timestamp>-<pid>/` instead, so
+     the running release is never `rm -rf`'d out from under itself. `current`
+     may therefore point at a `.redeploy-*` directory rather than a bare
+     `<sha>` one; `ls -1 /srv/bot-game/releases` (§5) always shows the real
+     name to use.
    - records the current `current` symlink target as the rollback point
    - fixes group ownership so `botgame` (the service user) can read/execute
      the release and write `.next/cache`, since the release was unpacked as

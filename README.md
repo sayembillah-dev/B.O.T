@@ -163,6 +163,12 @@ Everything realtime rides one Socket.IO connection per tab - rooms, lobby, and t
 
 ## Deployment
 
+> **This section is the public-internet story** (Railway/Render/Fly/a bare
+> VPS, fronted by Caddy for TLS). For the actual 192.168.1.219 deployment -
+> nginx + systemd + the artifact CI/CD pipeline, no public DNS, no TLS - the
+> runbook at [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) is authoritative;
+> follow that instead of this section for that box.
+
 The custom server needs a persistent Node process (websockets + in-memory rooms) - no serverless. Railway, Render, Fly.io, a VPS, or a container all work:
 
 ```bash
