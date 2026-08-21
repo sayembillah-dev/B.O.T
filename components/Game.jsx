@@ -541,7 +541,11 @@ export default function Game({ gs, myId, local = 0 }) {
       if (st.id === myIdRef.current && !st.tele && teleRef.current) { // server ate it (fizzle/used)
         teleRef.current = null; setTeleUi(null);
       }
-      if (st.dead && !t.dead) { t.dead = true; t.driving = false; t.deadAtMs = performance.now(); } // 💀 chaos: respawn countdown starts
+      if (st.dead && !t.dead) {
+        t.dead = true; t.driving = false; t.deadAtMs = performance.now(); // chaos: respawn countdown starts
+        fxRef.current.tankBoom(t.x, t.y ?? groundY(t.x), t.palette); // 💥 fireball + the tank blown apart
+        sfx('bigboom');
+      } // 💀 chaos: respawn countdown starts
       else if (!st.dead && t.dead) { // ⚡ chaos respawn - server revived this tank at a fresh spot
         t.dead = false; t.hp = st.hp; t.x = st.x; t.y = st.y; // snap to the server-picked spot
         t.netX = null; t.netY = null; t.netVx = 0; t.netVy = 0; t.netAt = 0; // 🪂 drop the DEATH-SPOT stream anchors - the fresh descent re-anchors from the owner's new stream (else we'd ease back toward the corpse!)
@@ -737,10 +741,10 @@ export default function Game({ gs, myId, local = 0 }) {
         t.susVel += 3; // suspension flinch
       }
       if (t.hp <= 0) {
-        fxRef.current.boom(tx, ty);
+        fxRef.current.tankBoom(t.x, t.y ?? srf(t.x), t.palette); // 💥 tank destroyed - parts fly, not just a shell pop
         died = true;
         if (tanksRef.current.length > 1) {
-          t.dead = true; t.hp = 0; t.driving = false; // eliminated - out of the rotation
+          t.dead = true; t.hp = 0; t.driving = false; t.deadAtMs = performance.now(); // eliminated - out of the rotation
           t.deaths = (t.deaths | 0) + 1;
           // 💀 offline/hot-seat attribution - the shell's owner scores (never a self-kill)
           const by = opts.by;
@@ -824,8 +828,8 @@ export default function Game({ gs, myId, local = 0 }) {
       }
       t.hp = d.hp;
       if (d.dead && !t.dead) {
-        t.dead = true; t.driving = false;
-        fxRef.current.boom(t.x, ty);
+        t.dead = true; t.driving = false; t.deadAtMs = performance.now();
+        fxRef.current.tankBoom(t.x, t.y ?? groundY(t.x), t.palette);
         fxRef.current.text(t.x, ty - 40, 'ELIMINATED', '#ff5a4e');
         died = true;
         // 💀 my kill - claim it on the spot (a self-kill earns nothing but the crater)
@@ -842,7 +846,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
     }
-    if (died) sfx('boom');
+    if (died) sfx('bigboom');
     setInvUi((n) => n + 1);
     const tn = turnRef.current;
     setTurnInfo({ num: tn.num, idx: tn.activeIdx, phase: tn.phase });
@@ -1876,7 +1880,7 @@ export default function Game({ gs, myId, local = 0 }) {
         }
       }
 
-      fxRef.current.update(dt);
+      fxRef.current.update(dt, terrainRef.current ? (x, y) => isSolid(terrainRef.current, x, y) : null); // wreck parts bounce off terrain
       if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - dt * 1.6);
       if (whiteRef.current > 0) whiteRef.current = Math.max(0, whiteRef.current - dt * 0.7); // ☢️ flash fades slowly
     };
@@ -2072,7 +2076,7 @@ export default function Game({ gs, myId, local = 0 }) {
       // tanks (active one shakes while firing/explosions)
       for (let i = 0; i < tanksRef.current.length; i++) {
         const t = tanksRef.current[i];
-        if (t.dead) { // eliminated → ghosted skull where the tank fell (gentle bob + fade)
+        if (t.dead && now - (t.deadAtMs || 0) >= 2800) { // wreck parts hold full opacity 2s + fade 0.8s first, then: eliminated → ghosted skull where the tank fell (gentle bob + fade)
           const gyD = t.y ?? groundY(t.x);
           const bob = Math.sin(now * 0.002 + i * 1.7) * 3;
           ctx.globalAlpha = 0.4 + 0.12 * Math.sin(now * 0.003 + i);
