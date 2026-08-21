@@ -1,29 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { newRoomId } from '@/lib/roomId';
-import { loadQualityMode, guessTier } from '@/lib/quality.mjs';
+import { GiBattleTank } from 'react-icons/gi';
+import {
+  LuGlobe, LuCrosshair, LuZap, LuArmchair, LuUsers,
+  LuBot, LuSmile, LuMeh, LuSkull, LuLogIn, LuWrench,
+} from 'react-icons/lu';
 
 // ── main-menu navigation: every mode is a direct button, no accordions ──────
 const DIFFS = [
-  { id: 'easy',   emoji: '😊', label: 'Easy',   cls: 'diff-easy',
+  { id: 'easy',   Icon: LuSmile, label: 'Easy',   cls: 'diff-easy',
     hint: 'partially accurate - learns to aim, often misses' },
-  { id: 'medium', emoji: '😐', label: 'Medium', cls: 'diff-medium',
+  { id: 'medium', Icon: LuMeh,   label: 'Medium', cls: 'diff-medium',
     hint: 'accurate sometimes - a fair fight' },
-  { id: 'hard',   emoji: '😈', label: 'Hard',   cls: 'diff-hard',
+  { id: 'hard',   Icon: LuSkull, label: 'Hard',   cls: 'diff-hard',
     hint: 'accurate most of the time - repositions, grabs crates, finishes kills' },
 ];
+
+// module-level (NOT inside Home) - a component re-created on each render makes
+// React remount its subtree, which was stealing input focus on every keystroke
+const Section = ({ icon: Ico, title, sub, children }) => (
+  <section className="menu-section">
+    <div className="menu-head">
+      <span className="menu-ico"><Ico /></span>
+      <span className="menu-text">
+        <span className="menu-title">{title}</span>
+        <span className="menu-sub">{sub}</span>
+      </span>
+    </div>
+    {children}
+  </section>
+);
 
 export default function Home() {
   const router = useRouter();
   const [code, setCode] = useState('');
-  // 🎚️ Low quality tier flattens the menu chrome too (no .card backdrop blur)
-  const [lowQ, setLowQ] = useState(false);
-  useEffect(() => {
-    const m = loadQualityMode();
-    setLowQ(m === 'low' || (m === 'auto' && guessTier() === 'low'));
-  }, []);
 
   // 🌐 online rooms
   const createRoom = (mode) => () =>
@@ -45,42 +58,38 @@ export default function Home() {
   // 🛠️ dev shortcut - skip everything, straight into a practice game
   const soloDev = () => router.push(`/room/${newRoomId()}?solo=1`);
 
-  const Section = ({ emoji, title, sub, children }) => (
-    <section className="menu-section">
-      <div className="menu-head">
-        <span className="menu-ico">{emoji}</span>
-        <span className="menu-text">
-          <span className="menu-title">{title}</span>
-          <span className="menu-sub">{sub}</span>
-        </span>
-      </div>
-      {children}
-    </section>
-  );
-
   return (
-    <main className="container">
-      <div className={`card hero${lowQ ? ' low-q' : ''}`}>
-        <h1 className="logo">🛡️ B.O.T - battle of tanks</h1>
-        <p className="tagline">
-          Worms-style artillery on destructible terrain - wind, supply drops, special shells.
-          <br />
-          Online rooms, one-screen hot-seat, or a duel vs the CPU. No accounts.
-        </p>
+    <main className="landing">
+      {/* 🖼️ key art: full height, slightly zoomed, right edge fades into the black bg */}
+      <div className="landing-art" aria-hidden="true">
+        <img className="landing-img" src="/landing.png" alt="" />
+        <div className="landing-fade" />
+      </div>
+
+      {/* 🎮 menu column on the right */}
+      <div className="landing-menu">
+        <header className="landing-head">
+          <h1 className="logo"><GiBattleTank className="logo-ico" /> B.O.T - battle of tanks</h1>
+          <p className="tagline">
+            Worms-style artillery on destructible terrain - wind, supply drops, special shells.
+            Online rooms, one-screen hot-seat, or a duel vs the CPU. No accounts.
+          </p>
+        </header>
 
         <nav className="menu" aria-label="game modes">
-          {/* 🌐 MULTIPLAYER */}
-          <Section emoji="🌐" title="Multiplayer" sub="online room - share a link, up to 8 players">
-            <div className="menu-actions">
+          {/* MULTIPLAYER */}
+          <Section icon={LuGlobe} title="Multiplayer" sub="online room - share a link, up to 8 players">
+            <div className="menu-actions stack">
               <button className="btn btn-primary btn-lg" onClick={createRoom()}>
-                🎯 Classic room
+                <LuCrosshair /> Classic room
               </button>
               <button className="btn btn-lg btn-chaos" onClick={createRoom('chaos')}>
-                ⚡ Chaos room
+                <LuZap /> Chaos room
               </button>
             </div>
             <p className="hint" style={{ margin: '0.1rem 0 0' }}>
-              🎯 turn-based artillery &nbsp;·&nbsp; ⚡ 3-minute real-time free-for-all, most damage wins
+              <LuCrosshair className="hint-ico" /> turn-based artillery &nbsp;·&nbsp;
+              <LuZap className="hint-ico" /> 3-minute real-time free-for-all, most damage wins
             </p>
             <div className="divider"><span>or join with a link / code</span></div>
             <form onSubmit={joinByCode} className="join-form">
@@ -92,42 +101,42 @@ export default function Home() {
                 autoComplete="off"
               />
               <button className="btn" type="submit" disabled={code.trim().length < 4}>
-                Join →
+                Join <LuLogIn />
               </button>
             </form>
           </Section>
 
-          {/* 🛋️ HOT SEAT */}
-          <Section emoji="🛋️" title="Hot Seat" sub="one screen, players take turns">
+          {/* HOT SEAT */}
+          <Section icon={LuArmchair} title="Hot Seat" sub="one screen, players take turns">
             <div className="menu-actions">
               {[2, 3, 4].map((n) => (
                 <button key={n} className="btn" style={{ flex: 1 }} onClick={hotSeat(n)}>
-                  🛋️ {n}P
+                  <LuUsers /> {n}P
                 </button>
               ))}
             </div>
           </Section>
 
-          {/* 🤖 VS AI */}
-          <Section emoji="🤖" title="vs AI" sub="turn-based duel against the computer">
+          {/* VS AI */}
+          <Section icon={LuBot} title="vs AI" sub="turn-based duel against the computer">
             <div className="diff-grid">
-              {DIFFS.map((d) => (
+              {DIFFS.map(({ id, Icon, label, cls, hint }) => (
                 <button
-                  key={d.id}
+                  key={id}
                   type="button"
-                  className={`btn diff-btn ${d.cls}`}
-                  onClick={vsAi(d.id)}
-                  title={d.hint}
+                  className={`btn diff-btn ${cls}`}
+                  onClick={vsAi(id)}
+                  title={hint}
                 >
-                  {d.emoji} {d.label}
+                  <Icon /> {label}
                 </button>
               ))}
             </div>
           </Section>
         </nav>
 
-        <button className="btn btn-ghost" style={{ marginTop: '1.1rem' }} onClick={soloDev}>
-          🛠️ solo practice
+        <button className="btn btn-ghost" onClick={soloDev}>
+          <LuWrench /> solo practice
         </button>
       </div>
     </main>

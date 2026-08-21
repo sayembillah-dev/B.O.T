@@ -416,3 +416,419 @@ code {
 
 /* ── 🎚️ Low quality tier: the lobby card loses its blur too ── */
 .low-q .card, .card.low-q { backdrop-filter: none; }
+
+/* ── 🖼️ landing page: full black bg · key art on the left at full height and
+   slightly zoomed, its right side fading smoothly into the black bg ·
+   menu column on the right ── */
+.landing {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: #000;
+  overflow: hidden;
+}
+
+.landing-art { position: absolute; inset: 0; pointer-events: none; }
+.landing-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;        /* full length: always spans the full viewport height */
+  object-position: center;
+  transform: scale(1.12);   /* a bit zoomed in */
+  /* right side of the picture fades out smoothly */
+  -webkit-mask-image: linear-gradient(to right, #000 55%, rgba(0, 0, 0, 0.55) 72%, transparent 90%);
+  mask-image: linear-gradient(to right, #000 55%, rgba(0, 0, 0, 0.55) 72%, transparent 90%);
+}
+/* extra black gradient on top: keeps the blend silky and acts as a
+   fallback on browsers without mask support */
+.landing-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, transparent 45%, rgba(0, 0, 0, 0.5) 70%, #000 94%);
+}
+
+.landing-menu {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  width: min(31rem, 46vw);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center; /* keep top reachable when the column scrolls */
+  gap: 1.15rem;
+  padding: 2rem clamp(1.25rem, 4.5vw, 4rem) 2rem 1rem;
+  animation: landingIn 0.5s ease-out both;
+}
+@keyframes landingIn {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.landing-head .logo { font-size: clamp(1.8rem, 2.3vw, 2.2rem); display: flex; align-items: center; gap: 0.65rem; }
+/* react-icons render as currentColor SVGs; the logo text is transparent (gradient
+   clip), so the icon needs its own color */
+.landing-head .logo-ico { color: var(--accent); flex-shrink: 0; }
+.landing-menu .menu-ico { display: inline-flex; align-items: center; color: var(--accent); }
+.hint-ico { vertical-align: -0.13em; }
+.landing-head .tagline { margin: 0; text-align: left; }
+
+/* menu sections sit straight on black - a touch more presence than the lobby card */
+.landing-menu .menu-section { background: rgba(255, 255, 255, 0.045); }
+
+/* narrow screens: art becomes a top-faded backdrop, menu takes the full width */
+@media (max-width: 860px) {
+  .landing { position: static; min-height: 100vh; }
+  .landing-art { position: fixed; }
+  .landing-img {
+    -webkit-mask-image: linear-gradient(to bottom, #000 26%, transparent 62%);
+    mask-image: linear-gradient(to bottom, #000 26%, transparent 62%);
+  }
+  .landing-fade { background: linear-gradient(to bottom, transparent 18%, #000 62%); }
+  .landing-menu {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 1.25rem;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-menu { animation: none !important; }
+}
+
+/* ── ⚡ neon/cyberpunk menu skin (reference: magenta cut-corner frames) ──
+   scoped to .landing-menu - lobby/game UI keeps the old look */
+.landing-menu { --cy: #ff4bd8; --cy-dim: rgba(255, 75, 216, 0.5); }
+
+.landing-menu .menu-section {
+  background: rgba(12, 4, 20, 0.72);
+  border: 1px solid rgba(255, 75, 216, 0.28);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  box-shadow: inset 0 0 24px rgba(255, 75, 216, 0.05);
+}
+.landing-menu .menu-title { color: var(--cy); letter-spacing: 0.09em; text-transform: uppercase; font-size: 0.8rem; }
+.landing-menu .menu-ico { color: var(--cy); }
+.landing-menu .menu-sub { color: rgba(255, 190, 235, 0.55); }
+.landing-head .logo-ico { color: var(--cy); }
+
+/* stacked full-width actions, like the reference list */
+.landing-menu .menu-actions.stack { flex-direction: column; align-items: stretch; }
+
+/* buttons stay neutral (gray/white) - magenta lives on titles, icons + hover */
+.landing-menu .btn {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0;
+  color: #e8e8ee;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.03);
+}
+.landing-menu .btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.18), inset 0 0 12px rgba(255, 255, 255, 0.06);
+}
+.landing-menu .btn:active:not(:disabled) { transform: translateY(1px); }
+
+/* right-side chevron on the big list buttons (pure CSS, no markup) */
+.landing-menu .menu-actions.stack .btn::after {
+  content: '';
+  margin-left: auto;
+  width: 0.5em;
+  height: 0.5em;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.landing-menu .input {
+  background: rgba(20, 6, 28, 0.65);
+  border: 1px solid var(--cy-dim);
+  border-radius: 0;
+  color: #ffd7f3;
+}
+.landing-menu .input::placeholder { color: rgba(255, 190, 235, 0.35); }
+.landing-menu .input:focus {
+  border-color: var(--cy);
+  box-shadow: 0 0 12px rgba(255, 75, 216, 0.3);
+}
+
+.landing-menu .divider { color: rgba(255, 75, 216, 0.45); }
+.landing-menu .hint { color: rgba(255, 190, 235, 0.5); }
+
+/* same neutral cyberpunk skin for the lobby "Enter room" button (opt-in via .btn-cy) */
+.btn-cy {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0;
+  color: #e8e8ee;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.btn-cy:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.18);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   🛋️ room lobby + name prompt skin (2026-08-22): same look as the landing
+   page - full black bg, key art on the left fading right, cyberpunk
+   cut-corner magenta panels stacked in a right-hand column.
+   Reuses .landing-art / .landing-img / .landing-fade + the landingIn
+   keyframes from the landing page block above.
+   ────────────────────────────────────────────────────────────────────────── */
+.lobby {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: #000;
+  overflow: hidden;
+}
+
+.lobby-panel {
+  --cy: #ff4bd8;
+  --cy-dim: rgba(255, 75, 216, 0.5);
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  width: min(34rem, 52vw);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center; /* keep top reachable when the column scrolls */
+  gap: 0.9rem;
+  padding: 2rem clamp(1.25rem, 4.5vw, 4rem) 2rem 1rem;
+  animation: landingIn 0.5s ease-out both;
+}
+.lobby-panel-narrow { width: min(28rem, 46vw); }
+
+/* cut-corner dark-glass panel with a magenta frame */
+.lobby-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(12, 4, 20, 0.72);
+  border: 1px solid rgba(255, 75, 216, 0.28);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  box-shadow: inset 0 0 24px rgba(255, 75, 216, 0.05);
+}
+
+.lobby-panel .eyebrow { color: var(--cy); margin-bottom: 0.15rem; }
+.lobby-panel .room-code {
+  margin: 0;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 75, 216, 0.35);
+}
+.lobby-panel .room-header { align-items: center; }
+
+/* status pill -> small cut-corner tag (semantic colors kept) */
+.lobby-panel .status {
+  border-radius: 0;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+/* invite-link box */
+.lobby-panel .share-box {
+  margin: 0;
+  background: rgba(20, 6, 28, 0.6);
+  border: 1px solid var(--cy-dim);
+  border-radius: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.lobby-panel .share-box:hover {
+  border-color: var(--cy);
+  background: rgba(255, 75, 216, 0.08);
+  box-shadow: 0 0 12px rgba(255, 75, 216, 0.22);
+}
+.lobby-panel .share-url { color: rgba(255, 190, 235, 0.55); }
+.lobby-panel .share-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--cy);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+/* section titles ("Players" etc.) - magenta uppercase like the landing menu */
+.lobby-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--cy);
+}
+.lobby-title .count { color: rgba(255, 190, 235, 0.55); font-weight: 500; }
+
+/* player tiles */
+.lobby-panel .player {
+  border-radius: 0;
+  border-color: rgba(255, 255, 255, 0.14);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+.lobby-panel .player.me {
+  border-color: rgba(255, 75, 216, 0.55);
+  background: rgba(255, 75, 216, 0.08);
+}
+.lobby-panel .you-badge {
+  border-radius: 0;
+  background: rgba(255, 75, 216, 0.22);
+  border: 1px solid rgba(255, 75, 216, 0.5);
+  color: #ffd7f3;
+  text-transform: uppercase;
+}
+.lobby-panel .host-badge {
+  display: inline-flex;
+  color: #fcd34d;
+  font-size: 0.95rem;
+  top: 0.4rem;
+}
+.lobby-panel .bot-emoji { display: inline-flex; color: rgba(255, 190, 235, 0.8); }
+
+/* mode / rounds pickers */
+.lobby-panel .rounds-picker { justify-content: flex-start; margin-top: 0; }
+.lobby-panel .rounds-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 5.2rem;
+  color: rgba(255, 190, 235, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+.lobby-panel .round-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.22);
+  border-radius: 0;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  color: #c9c9d4;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+.lobby-panel .round-chip:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.lobby-panel .round-chip.active {
+  background: rgba(255, 75, 216, 0.14);
+  border-color: var(--cy);
+  color: #ffd7f3;
+  box-shadow: 0 0 10px rgba(255, 75, 216, 0.25), inset 0 0 10px rgba(255, 75, 216, 0.08);
+}
+
+/* neutral cyberpunk buttons - same recipe as the landing menu */
+.lobby-panel .btn {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0;
+  color: #e8e8ee;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.03);
+}
+.lobby-panel .btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.18), inset 0 0 12px rgba(255, 255, 255, 0.06);
+}
+.lobby-panel .btn:active:not(:disabled) { transform: translateY(1px); }
+
+/* right-side chevron on the big actions (Enter room / Start game) */
+.lobby-panel .btn-lg::after {
+  content: '';
+  margin-left: auto;
+  width: 0.5em;
+  height: 0.5em;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+/* ghost leave button stays quiet */
+.lobby-panel .btn-ghost {
+  margin-top: 0.25rem;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  clip-path: none;
+  color: rgba(255, 190, 235, 0.5);
+}
+.lobby-panel .btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* hints / errors / form bits */
+.lobby-panel .hint { margin: 0; text-align: left; color: rgba(255, 190, 235, 0.5); }
+.lobby-panel .hint-ico { vertical-align: -0.13em; color: var(--cy); }
+.lobby-panel .error { color: #ff8a8a; }
+.lobby-panel .muted { margin: 0; color: rgba(255, 190, 235, 0.45); }
+
+.lobby-panel .input {
+  background: rgba(20, 6, 28, 0.65);
+  border: 1px solid var(--cy-dim);
+  border-radius: 0;
+  color: #ffd7f3;
+}
+.lobby-panel .input::placeholder { color: rgba(255, 190, 235, 0.35); }
+.lobby-panel .input:focus {
+  border-color: var(--cy);
+  box-shadow: 0 0 12px rgba(255, 75, 216, 0.3);
+}
+.lobby-panel .label {
+  color: rgba(255, 190, 235, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+/* narrow screens: art becomes a top-faded backdrop, panel takes full width */
+@media (max-width: 860px) {
+  .lobby { position: static; min-height: 100vh; }
+  .lobby .landing-art { position: fixed; }
+  .lobby .landing-img {
+    -webkit-mask-image: linear-gradient(to bottom, #000 26%, transparent 62%);
+    mask-image: linear-gradient(to bottom, #000 26%, transparent 62%);
+  }
+  .lobby .landing-fade { background: linear-gradient(to bottom, transparent 18%, #000 62%); }
+  .lobby-panel, .lobby-panel-narrow {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 1.25rem;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-panel { animation: none !important; }
+}

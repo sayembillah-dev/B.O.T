@@ -3,8 +3,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket, getClientId } from '@/lib/socket';
-import { loadQualityMode, guessTier } from '@/lib/quality.mjs';
 import Game from '@/components/Game';
+import {
+  LuLogIn, LuCopy, LuCheck, LuCrown, LuCrosshair, LuZap, LuTarget,
+  LuPlay, LuLogOut, LuBot, LuUsers, LuGamepad2, LuMonitor,
+} from 'react-icons/lu';
+
+// 🖼️ same key-art backdrop as the landing page. Module level on purpose -
+//    a component defined inside Room would be re-created on every render
+//    and React would remount the subtree (the input-focus bug of 2026-08-22).
+const Backdrop = () => (
+  <div className="landing-art" aria-hidden="true">
+    <img className="landing-img" src="/landing.png" alt="" />
+    <div className="landing-fade" />
+  </div>
+);
 
 export default function Room({ roomId }) {
   const router = useRouter();
@@ -57,13 +70,6 @@ export default function Room({ roomId }) {
         setJoined(true);
       }
     }
-  }, []);
-
-  // 🎚️ Low quality tier flattens the lobby chrome too (no .card backdrop blur)
-  const [lowQ, setLowQ] = useState(false);
-  useEffect(() => {
-    const m = loadQualityMode();
-    setLowQ(m === 'low' || (m === 'auto' && guessTier() === 'low'));
   }, []);
 
   // 🧪 dev: ?mode=chaos - the host pre-picks the mode before anyone starts
@@ -180,19 +186,22 @@ export default function Room({ roomId }) {
   // ---------- name prompt ----------
   if (!joined) {
     return (
-      <main className="container">
-        <div className={`card${lowQ ? ' low-q' : ''}`}>
-          <p className="eyebrow">you&apos;re joining room</p>
-          <h1 className="room-code">{roomId}</h1>
-          <form onSubmit={submitName} className="stack">
-            <label className="label" htmlFor="name">What should we call you?</label>
-            <input
-              id="name" ref={inputRef} className="input input-lg" placeholder="Your name…"
-              defaultValue="" maxLength={20} required autoFocus autoComplete="off"
-            />
-            {error && <p className="error">{error}</p>}
-            <button className="btn btn-primary btn-lg" type="submit">Enter room →</button>
-          </form>
+      <main className="lobby">
+        <Backdrop />
+        <div className="lobby-panel lobby-panel-narrow">
+          <section className="lobby-card">
+            <p className="eyebrow">you&apos;re joining room</p>
+            <h1 className="room-code">{roomId}</h1>
+            <form onSubmit={submitName} className="stack">
+              <label className="label" htmlFor="name">What should we call you?</label>
+              <input
+                id="name" ref={inputRef} className="input input-lg" placeholder="Your name…"
+                defaultValue="" maxLength={20} required autoFocus autoComplete="off"
+              />
+              {error && <p className="error">{error}</p>}
+              <button className="btn btn-lg" type="submit">Enter room <LuLogIn /></button>
+            </form>
+          </section>
         </div>
       </main>
     );
@@ -208,120 +217,136 @@ export default function Room({ roomId }) {
   //    out) instead of firing a dev payload the server has to reject.
   const devStart = players.length < 2 && (soloRef.current || !!aiDiff);
 
+  const hostName = players.find((p) => p.id === hostId)?.name ?? 'The host';
+
   // ---------- lobby ----------
   return (
-    <main className="container">
-      <div className={`card card-wide${lowQ ? ' low-q' : ''}`}>
-        <div className="room-header">
-          <div>
-            <p className="eyebrow">room</p>
-            <h1 className="room-code">{roomId}</h1>
+    <main className="lobby">
+      <Backdrop />
+      <div className="lobby-panel">
+        {/* room identity + invite link */}
+        <section className="lobby-card">
+          <div className="room-header">
+            <div>
+              <p className="eyebrow">room</p>
+              <h1 className="room-code">{roomId}</h1>
+            </div>
+            <span className={`status status-${status}`}>
+              <span className="dot" />
+              {status === 'online' ? 'live' : status}
+            </span>
           </div>
-          <span className={`status status-${status}`}>
-            <span className="dot" />
-            {status === 'online' ? 'live' : status}
-          </span>
-        </div>
+          <button className="share-box" onClick={copyLink} title="Copy invite link">
+            <span className="share-url">{typeof window !== 'undefined' ? window.location.href : ''}</span>
+            <span className="share-cta">
+              {copied ? <><LuCheck /> copied!</> : <><LuCopy /> copy link</>}
+            </span>
+          </button>
+        </section>
 
-        <button className="share-box" onClick={copyLink} title="Copy invite link">
-          <span className="share-url">{typeof window !== 'undefined' ? window.location.href : ''}</span>
-          <span className="share-cta">{copied ? '✓ copied!' : '📋 copy link'}</span>
-        </button>
-
-        <div className="players-head">
-          <h2>Players <span className="count">{players.length}/{maxPlayers}</span></h2>
-        </div>
-
-        {players.length === 0 ? (
-          <p className="muted">Connecting…</p>
-        ) : (
-          <ul className="players-grid">
-            {players.map((p) => (
-              <li key={p.id} className={`player ${p.id === myId ? 'me' : ''}`}>
-                <span className="player-emoji">{p.emoji}</span>
-                <span className="player-name">{p.name}</span>
-                {p.id === hostId && <span className="host-badge" title="Room master">👑</span>}
-                {p.id === myId && <span className="you-badge">you</span>}
-              </li>
-            ))}
-            {aiDiff && ( // 🤖 the CPU doesn't sit in the lobby - but it's in the game
-              <li className="player">
-                <span className="player-emoji">🤖</span>
-                <span className="player-name">CPU · {aiDiff[0].toUpperCase() + aiDiff.slice(1)}</span>
-                <span className="you-badge">bot</span>
-              </li>
-            )}
-          </ul>
-        )}
+        {/* roster */}
+        <section className="lobby-card">
+          <h2 className="lobby-title">
+            <LuUsers /> Players <span className="count">{players.length}/{maxPlayers}</span>
+          </h2>
+          {players.length === 0 ? (
+            <p className="muted">Connecting…</p>
+          ) : (
+            <ul className="players-grid">
+              {players.map((p) => (
+                <li key={p.id} className={`player ${p.id === myId ? 'me' : ''}`}>
+                  <span className="player-emoji">{p.emoji}</span>
+                  <span className="player-name">{p.name}</span>
+                  {p.id === hostId && <span className="host-badge" title="Room master"><LuCrown /></span>}
+                  {p.id === myId && <span className="you-badge">you</span>}
+                </li>
+              ))}
+              {aiDiff && ( // 🤖 the CPU doesn't sit in the lobby - but it's in the game
+                <li className="player">
+                  <span className="player-emoji bot-emoji"><LuBot /></span>
+                  <span className="player-name">CPU · {aiDiff[0].toUpperCase() + aiDiff.slice(1)}</span>
+                  <span className="you-badge">bot</span>
+                </li>
+              )}
+            </ul>
+          )}
+        </section>
 
         {myId && myId === hostId ? (
           <>
-            <div className="rounds-picker" style={{ marginTop: '1.5rem' }}>
-              <span className="rounds-label">🎮 Mode</span>
-              <button
-                type="button"
-                className={`round-chip ${mode === 'classic' ? 'active' : ''}`}
-                title="Turn-based artillery - aim, charge, fire, next player"
-                onClick={() => getSocket()?.emit('set-mode', 'classic')}
-              >
-                ⚔️ Classic
-              </button>
-              <button
-                type="button"
-                className={`round-chip ${mode === 'chaos' ? 'active' : ''}`}
-                title="Real-time free-for-all - everyone moves at once, infinite shells, 1s reload, 5s respawn, 3-minute clock, most damage wins"
-                onClick={() => getSocket()?.emit('set-mode', 'chaos')}
-              >
-                ⚡ Chaos
-              </button>
-            </div>
-            <div className="rounds-picker" style={{ marginTop: '0.6rem' }}>
-              <span className="rounds-label">🎯 Rounds</span>
-              {[1, 3, 5, 7].map((n) => (
+            {/* match setup (room master only) */}
+            <section className="lobby-card">
+              <div className="rounds-picker">
+                <span className="rounds-label"><LuGamepad2 /> Mode</span>
                 <button
-                  key={n}
                   type="button"
-                  className={`round-chip ${roundsTotal === n ? 'active' : ''}`}
-                  onClick={() => getSocket()?.emit('set-rounds', n)}
+                  className={`round-chip ${mode === 'classic' ? 'active' : ''}`}
+                  title="Turn-based artillery - aim, charge, fire, next player"
+                  onClick={() => getSocket()?.emit('set-mode', 'classic')}
                 >
-                  {n}
+                  <LuCrosshair /> Classic
                 </button>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  className={`round-chip ${mode === 'chaos' ? 'active' : ''}`}
+                  title="Real-time free-for-all - everyone moves at once, infinite shells, 1s reload, 5s respawn, 3-minute clock, most damage wins"
+                  onClick={() => getSocket()?.emit('set-mode', 'chaos')}
+                >
+                  <LuZap /> Chaos
+                </button>
+              </div>
+              <div className="rounds-picker">
+                <span className="rounds-label"><LuTarget /> Rounds</span>
+                {[1, 3, 5, 7].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`round-chip ${roundsTotal === n ? 'active' : ''}`}
+                    onClick={() => getSocket()?.emit('set-rounds', n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </section>
             <button
-              className="btn btn-primary btn-lg"
-              style={{ marginTop: '1.25rem' }}
+              className="btn btn-lg"
               disabled={(players.length < 2 && !devStart) || status !== 'online'}
               onClick={() => getSocket()?.emit('start-game', devStart ? { dev: true, ...(aiDiff ? { ai: aiDiff } : {}) } : undefined)}
             >
-              {mode === 'chaos' ? '⚡ Start chaos' : aiDiff ? '🤖 Start vs CPU' : '🎮 Start game'}
+              {mode === 'chaos' ? <><LuZap /> Start chaos</> : aiDiff ? <><LuBot /> Start vs CPU</> : <><LuPlay /> Start game</>}
             </button>
             <p className="hint">
-              {players.length < 2 && !devStart
-                ? 'Share the link - you need at least 2 players to start.'
-                : aiDiff && devStart
-                  ? `🤖 You vs CPU · ${aiDiff[0].toUpperCase() + aiDiff.slice(1)}${roundsTotal > 1 ? ` - best of ${roundsTotal}` : ''}. Start when ready.`
-                : aiDiff // 🤖 2+ humans in a ?ai room - normal start, the CPU sits it out
-                  ? `Two humans aboard - this starts a normal game (the CPU sits it out).${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
-                : soloRef.current && players.length < 2
-                  ? '🖥️ Solo sandbox - start when ready. It all runs on this screen.'
-                : mode === 'chaos'
-                  ? `⚡ Chaos: everyone moves at once - infinite shells, 1s reload, 5s respawn, fast fuel refill, 3-minute clock. Most damage dealt wins.${roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}`
-                  : roundsTotal > 1
-                    ? `Best of ${roundsTotal} - most round wins takes the match.`
-                    : 'Everyone is in! Start when ready.'}
+              {players.length < 2 && !devStart ? (
+                'Share the link - you need at least 2 players to start.'
+              ) : aiDiff && devStart ? (
+                <><LuBot className="hint-ico" /> You vs CPU · {aiDiff[0].toUpperCase() + aiDiff.slice(1)}{roundsTotal > 1 ? ` - best of ${roundsTotal}` : ''}. Start when ready.</>
+              ) : aiDiff /* 🤖 2+ humans in a ?ai room - normal start, the CPU sits it out */ ? (
+                <>Two humans aboard - this starts a normal game (the CPU sits it out).{roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}</>
+              ) : soloRef.current && players.length < 2 ? (
+                <><LuMonitor className="hint-ico" /> Solo sandbox - start when ready. It all runs on this screen.</>
+              ) : mode === 'chaos' ? (
+                <><LuZap className="hint-ico" /> Chaos: everyone moves at once - infinite shells, 1s reload, 5s respawn, fast fuel refill, 3-minute clock. Most damage dealt wins.{roundsTotal > 1 ? ` Best of ${roundsTotal}.` : ''}</>
+              ) : roundsTotal > 1 ? (
+                `Best of ${roundsTotal} - most round wins takes the match.`
+              ) : (
+                'Everyone is in! Start when ready.'
+              )}
             </p>
           </>
         ) : (
-          <p className="hint" style={{ marginTop: '1.25rem' }}>
-            👑 <strong>{players.find((p) => p.id === hostId)?.name ?? 'The host'}</strong> is the room master
-            {mode === 'chaos' ? ' - ⚡ CHAOS mode' : ''}{roundsTotal > 1 ? ` - best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
+          <p className="hint">
+            <LuCrown className="hint-ico" /> <strong>{hostName}</strong> is the room master
+            {mode === 'chaos' ? <> - <LuZap className="hint-ico" /> CHAOS mode</> : ''}
+            {roundsTotal > 1 ? ` - best of ${roundsTotal} rounds` : ''}. Waiting for them to start the game…
           </p>
         )}
 
-        {error && <p className="error" style={{ marginTop: '0.75rem' }}>{error}</p>}
+        {error && <p className="error">{error}</p>}
 
-        <button className="btn btn-ghost" onClick={() => router.push('/')}>← Leave room</button>
+        <button className="btn btn-ghost" onClick={() => router.push('/')}>
+          <LuLogOut /> Leave room
+        </button>
       </div>
     </main>
   );
