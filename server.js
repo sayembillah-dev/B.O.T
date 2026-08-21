@@ -694,6 +694,23 @@ function leaveCurrentRoom(socket, deliberate = false) {
 }
 
 let io;
+let httpServer; // module-scope so the shutdown handlers can close it
+
+// 🚪 graceful shutdown: PaaS hosts (Render/Railway/systemd) send SIGTERM before
+//    reaping the process on deploys. Close politely - clients see a clean
+//    disconnect (their reconnect grace kicks in) instead of a hard kill mid-shell.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`🚪 ${signal} received - closing connections, shutting down`);
+  try { io?.close(); } catch {}
+  try { httpServer ? httpServer.close(() => process.exit(0)) : process.exit(0); }
+  catch { process.exit(0); }
+  setTimeout(() => process.exit(0), 3000).unref(); // never hang on a stuck socket
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 app.prepare().then(async () => {
   // game libs are pure ESM (shared with the client bundle) - dynamic import
@@ -701,7 +718,7 @@ app.prepare().then(async () => {
   BONUS = await import('./lib/bonus.mjs');
   AI = await import('./lib/ai.mjs'); // 🤖 CPU opponents
 
-  const httpServer = createServer((req, res) => handle(req, res));
+  httpServer = createServer((req, res) => handle(req, res));
 
   // Next dev HMR uses its own websocket on /_next/* - forward those upgrades
   const upgradeHandler = typeof app.getUpgradeHandler === 'function' ? app.getUpgradeHandler() : null;
@@ -964,4 +981,10 @@ app.prepare().then(async () => {
   httpServer.listen(port, hostname, () => {
     console.log(`▲ ready on http://localhost:${port} (bound to ${hostname})`);
   });
+}).catch((err) => {
+  // 💥 startup failure (app.prepare / ESM import) - the keep-alive policy above
+  //    is for RUNTIME faults; a dead bootstrap must exit fast so the host's
+  //    supervisor can restart us instead of sitting alive but never listening.
+  console.error('💥 startup failed:', err);
+  process.exit(1);
 });
