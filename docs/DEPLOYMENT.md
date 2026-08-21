@@ -42,6 +42,11 @@ Server facts, established during provisioning:
   member of group `botgame`) and `botgame` (system account, `nologin`, runs
   the app under systemd).
 
+(`x86_64`/glibc 2.41, and the 2 vCPU / 4.0 GiB / 16 GB sizing, come from the
+pre-flight inspection recorded in §2 "Facts that constrain the design" of
+`docs/superpowers/specs/2026-08-21-artifact-cicd-design.md`, not from the
+Task 3 provisioning report — cited here so this doc's facts stay traceable.)
+
 These are the exact commands that worked, run over SSH as `nifty` (the only
 account that existed on the bare box), with two adaptations noted inline
 where the naive form of a command didn't work.
@@ -179,7 +184,30 @@ granted, so this step has not run. Until it does, the `deploy` job in
 runner to pick it up and **queues forever** on every push to `main`. Deploys
 must be done by hand — see §4 below — until this is complete.
 
-The procedure, when admin access is available:
+**Do not register the runner until the two prerequisites below are done.**
+Registering it first — before the fork-approval setting is applied — leaves
+a window where a fork PR can define its own job targeting
+`runs-on: [self-hosted, bot-game]` and have it execute automatically on this
+LAN box. See §8 for why the `deploy` job's own `if:` guard does not close
+that window.
+
+**Prerequisite (a) — set the fork-approval setting, first, before anything
+else in this step:**
+
+In **Settings → Actions → General → Fork pull request workflows from
+outside collaborators**, set **"Require approval for all outside
+collaborators"** (GitHub's current label for what the spec calls "Require
+approval for all external contributors"). Requires repo admin.
+
+**Prerequisite (b) — create the `production` GitHub Environment**, which §3
+and §8 already assume exists (it's what the `deploy` job in
+`ci-cd.yml` binds to):
+
+```bash
+gh api -X PUT repos/sayembillah-dev/B.O.T/environments/production
+```
+
+Only once both of those are done, proceed with the runner itself:
 
 ```bash
 # on the server, as deploy
@@ -188,11 +216,6 @@ curl -o actions-runner-linux-x64-2.336.0.tar.gz -L \
   https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz
 tar xzf actions-runner-linux-x64-2.336.0.tar.gz
 ```
-
-(the v2.336.0 version pin comes from a project ruling; confirm the exact
-asset filename against the release page at
-`https://github.com/actions/runner/releases/tag/v2.336.0` before running
-this — it is unverified against any report in this project.)
 
 A registration token is required — mint it with a `gh` account that has repo
 admin:
@@ -207,14 +230,15 @@ still as `deploy`:
 
 ```bash
 ./config.sh --url https://github.com/sayembillah-dev/B.O.T \
-  --token <token> --name <runner-name> --labels bot-game --unattended
+  --token <token> --name play --labels bot-game --unattended
 sudo ./svc.sh install deploy
 sudo ./svc.sh start
 ```
 
-The label `bot-game` is what `runs-on: [self-hosted, bot-game]` in the
-workflow targets — it must be exactly this string. Installing the service as
-`deploy` (not root) matches the security model in §7.
+`--name play` matches the host's hostname, per plan. The label `bot-game` is
+what `runs-on: [self-hosted, bot-game]` in the workflow targets — it must be
+exactly this string. Installing the service as `deploy` (not root) matches
+the security model in §8.
 
 ### Step 9 — firewall
 
@@ -240,10 +264,11 @@ external traffic to it anyway.
 
 ### Step 10 — SSH hardening (PENDING — do not run yet)
 
-**Deliberately not done.** See §7 for why, and the exact commands to run once
-the runner (§8) is registered and the `deploy` account setup is otherwise
-finished. Locking down SSH now, before those are confirmed working, risks
-losing terminal access to the container with no other path in.
+**Deliberately not done.** See §8 for why, and the exact commands to run once
+the runner (§2 Step 8) is registered and the `deploy` account setup is
+otherwise finished. Locking down SSH now, before those are confirmed
+working, risks losing terminal access to the container with no other path
+in.
 
 ## 3. How a deploy works
 
@@ -282,7 +307,9 @@ Three jobs, in order:
    - **health gate**: polls `http://127.0.0.1/socket.io/?EIO=4&transport=polling`
      through nginx for up to 30s, looking specifically for an Engine.IO
      handshake body, not just HTTP 200
-   - runs `npm run smoke` from the release directory against the live service
+   - runs `URL=http://127.0.0.1 node scripts/smoke-test.mjs` directly from the
+     release directory against the live service (not via the `npm run smoke`
+     script — reproduce it by hand with that same command and env var)
    - **on any failure** at activation, health, or smoke: repoints the symlink
      back to the previous release, restarts, and exits 1 — this rollback is
      not re-entrant (if the rollback itself fails, the script logs "manual
@@ -448,13 +475,36 @@ manual edit there is silently discarded on the next deploy, including the
 
 ## 8. Security posture
 
-Public-repo mitigations (a self-hosted runner on a public repo can otherwise
-let a fork PR execute attacker-controlled code on the box):
+A self-hosted runner on a **public** repo is the main risk here: for a
+`pull_request` event, GitHub takes the *workflow definition itself* from the
+fork's branch. That means a fork PR is not limited to triggering the
+existing `deploy` job — it can add its own job in its own copy of
+`ci-cd.yml` with `runs-on: [self-hosted, bot-game]`, and that job is not
+constrained by this repo's `deploy` job's `if:` condition at all, because
+it's a different job the fork authored. Unless something stops it upstream
+of the workflow file being read, a fork-authored job like that would execute
+automatically on this LAN box.
 
-1. The `deploy` job never runs on `pull_request` — only `push` to `main`
-   (requires write access) or manual `workflow_dispatch`. Verified
-   empirically: a live `pull_request`-triggered run showed `deploy` as
-   `skipped`.
+**Primary control:** the repo setting **"Require approval for all outside
+collaborators"** (Settings → Actions → General → Fork pull request
+workflows from outside collaborators — this is what the spec calls "Require
+approval for all external contributors"). This is what actually stops a
+fork-authored job from running on the self-hosted runner at all — it gates
+*any* workflow run originating from a fork PR before it starts, regardless
+of what job the fork wrote. **Not yet confirmed set** — repo admin access
+has not been granted (see §2 Step 8). **Do not register the runner (§2 Step
+8) until this is confirmed set** — see the warning at the top of that step.
+
+The following mitigations are real, but they protect the *existing*
+`deploy` job's path specifically, not the runner in general — they do not
+substitute for the fork-approval setting above:
+
+1. The `deploy` job (the one defined in `ci-cd.yml` on `main`) never runs on
+   `pull_request` — only `push` to `main` (requires write access) or manual
+   `workflow_dispatch`. Verified empirically: a live `pull_request`-triggered
+   run showed `deploy` as `skipped`. This guard only constrains *this job as
+   it exists on `main`*; it cannot constrain a different job a fork PR
+   defines in its own workflow file.
 2. `deploy` is bound to the `production` GitHub Environment, which can
    require a reviewer and can be restricted to `main`.
 3. The runner runs as unprivileged `deploy`, never root, with a sudoers grant
@@ -466,14 +516,6 @@ No SSH key is stored in GitHub secrets under this model — the runner
 authenticates outbound to GitHub with its own registration token, not with a
 key checked into the repo or Actions secrets. SSH to the server is only ever
 used from this machine, by hand, for provisioning and manual deploys.
-
-**Repo setting still needed (requires admin, not yet done):**
-"Require approval for all external contributors" for workflow runs from forks
-must be set in **Settings → Actions → General**. This has not been confirmed
-set — repo admin access has not been granted (see §2 Step 8). The `deploy`
-job's `if:` guard already keeps fork PRs off the self-hosted runner on its
-own; this setting is a second, independent layer the spec calls for, and it
-is currently missing.
 
 **Outstanding credential hygiene issues (unresolved, tracked here rather than
 silently fixed):**
