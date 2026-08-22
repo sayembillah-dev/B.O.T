@@ -3047,27 +3047,55 @@ export default function Game({ gs, myId, local = 0 }) {
         ctx.restore();
       }
 
-      // ⚡ chaos: YOU died - centre-screen respawn countdown (damage still counts!)
+      // ⚡ chaos: YOU died - modern respawn card: glass panel, calm light type,
+      //    hero countdown numeral (pops each second) + smooth progress bar.
       if (chaosRef.current && turn.phase !== 'over' && countdownRef.current <= 0) {
         const meDead = tanksRef.current.find((tk) => tk.id === myIdRef.current && tk.dead);
         if (meDead?.deadAtMs) {
-          const back = Math.max(0, CHAOS_RESPAWN - (performance.now() - meDead.deadAtMs) / 1000);
+          const age = (performance.now() - meDead.deadAtMs) / 1000;
+          const back = Math.max(0, CHAOS_RESPAWN - age);
+          const frac = Math.min(1, Math.max(0, 1 - back / CHAOS_RESPAWN)); // 0 → 1 as respawn nears
+          const ease = 1 - Math.pow(1 - Math.min(1, age / 0.22), 3);       // entrance: cubic ease-out
           ctx.save();
+          ctx.globalAlpha = ease;
+          ctx.fillStyle = 'rgba(4,6,10,0.20)';                             // soft focus dim behind the card
+          ctx.fillRect(0, 0, vw, vh);
+          ctx.translate(vw / 2, vh / 2);
+          const settle = 0.94 + 0.06 * ease;                               // subtle settle-in, no bounce
+          ctx.scale(settle, settle);
+          const CW = 252, CH = 132;
+          panel(ctx, -CW / 2, -CH / 2, CW, CH, { qk, fill: 'rgba(8,12,8,0.62)' });
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.font = 'bold 34px system-ui';
-          ctx.lineWidth = 7;
-          ctx.strokeStyle = 'rgba(4,7,4,0.85)';
-          ctx.strokeText('💀 DESTROYED', vw / 2, vh / 2 - 34);
-          ctx.fillStyle = '#ff6b4e';
-          ctx.fillText('💀 DESTROYED', vw / 2, vh / 2 - 34);
-          ctx.font = 'bold 22px system-ui';
-          ctx.strokeText(`respawn in ${back.toFixed(1)}s`, vw / 2, vh / 2 + 6);
-          ctx.fillStyle = HUD.info;
-          ctx.fillText(`respawn in ${back.toFixed(1)}s`, vw / 2, vh / 2 + 6);
-          ctx.font = '600 13px system-ui';
-          ctx.fillStyle = 'rgba(232,236,228,0.75)';
-          ctx.fillText('your damage total still counts - get back in there!', vw / 2, vh / 2 + 34);
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '5px';           // tracked-out caps read modern
+          ctx.font = HUD.font(600, 12.5);
+          ctx.fillStyle = HUD.danger;
+          ctx.fillText('DESTROYED', 2.5, -CH / 2 + 24);                    // +half the track = optically centred
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+          const sec = Math.max(1, Math.ceil(back));
+          const popN = 1 + 0.12 * Math.pow(back % 1, 3);                   // quick pop as each fresh second ticks in
+          ctx.save();
+          ctx.translate(0, -10);
+          ctx.scale(popN, popN);
+          ctx.font = HUD.font(200, 44);                                    // light hero numeral - calm, not shouty
+          ctx.fillStyle = HUD.text;
+          ctx.fillText(String(sec), 0, 0);
+          ctx.restore();
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+          ctx.font = HUD.font(500, 8.5);
+          ctx.fillStyle = 'rgba(232,236,228,0.55)';
+          ctx.fillText('RESPAWNING', 1.5, 12);
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+          const bw = 156, bh = 3.5, byy = 24;                              // smooth respawn progress
+          ctx.fillStyle = 'rgba(255,255,255,0.10)';
+          ctx.beginPath(); ctx.roundRect(-bw / 2, byy, bw, bh, bh / 2); ctx.fill();
+          if (frac > 0.004) {
+            ctx.fillStyle = HUD.info;
+            ctx.beginPath(); ctx.roundRect(-bw / 2, byy, Math.max(bh, bw * frac), bh, bh / 2); ctx.fill();
+          }
+          ctx.font = HUD.font(400, 10.5);
+          ctx.fillStyle = 'rgba(232,236,228,0.62)';
+          ctx.fillText('damage still counts · get back in there', 0, CH / 2 - 15);
           ctx.restore();
         }
       }
