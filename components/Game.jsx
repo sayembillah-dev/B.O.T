@@ -309,6 +309,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const shakeRef = useRef(0);
   const keysRef = useRef(new Set());
   const keyStampRef = useRef(new Map()); // 🐕 held key → last keydown stamp (auto-repeat) - the wedged-key watchdog
+  const jumpBufRef = useRef(0);       // jump press edge -> 0.15s input buffer (sim consumes it with coyote time)
   const feedRef = useRef([]);            // 💀 kill feed: last few { k, v, at } - top-centre, fades after ~5s
   const turnRef = useRef({ num: 1, phase: 'open', settle: 0, activeIdx: 0, time: TURN_TIME }); // 'open'|'shot'|'settle'|'over' - mirrored from server online
   const gsRef = useRef(null);        // latest game-state prop (read inside effects)
@@ -1268,23 +1269,26 @@ export default function Game({ gs, myId, local = 0 }) {
       }
       const active = activeTank();
       const surf = (x) => terrain.surface[Math.max(0, Math.min(terrain.width - 1, Math.round(x)))];
-      const slope = (x) => Math.atan2(surf(x + 8) - surf(x - 8), 16);
+      const slope = (x) => Math.atan2(surf(x + 10) - surf(x - 10), 20); // wide window: per-pixel terrain noise otherwise jitters tilt + forces
       const K = keysRef.current;
 
       // 🐕 wedged-key watchdog: a physically held key auto-repeats keydown
       //    (~every 30ms, always at least the last-pressed one), so if NOTHING
-      //    has repeated for >1.2s every key in the set is a phantom whose
+      //    has repeated for >2.8s every key in the set is a phantom whose
       //    keyup got eaten - flush them all (B2)
       if (K.size) {
         let newest = 0;
         for (const stamp of keyStampRef.current.values()) newest = Math.max(newest, stamp);
-        if (!keyStampRef.current.size || performance.now() - newest > 1200) {
+        if (!keyStampRef.current.size || performance.now() - newest > 2800) {
           K.clear(); keyStampRef.current.clear();
         }
       }
 
       // ── ALL tanks simulate (gravity/footing/knockback); input drives only
       //    the active one - and online, only when it's YOUR tank ──
+      // jump input buffer: edge-set in onKey, decays once per frame here
+      jumpBufRef.current = Math.max(0, jumpBufRef.current - dt);
+
       for (const me of tanksRef.current) {
         if (me.dead) continue;
 
@@ -1468,15 +1472,27 @@ export default function Game({ gs, myId, local = 0 }) {
         const dir = mine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
         me.driving = false; // proves itself below when the engine actually pushes
 
-        // jump - Worms-style escape hatch (active tank, not while charging, costs fuel)
-        if (mine && me.grounded && me.fuel >= FUEL_JUMP && (K.has('w') || K.has('arrowup') || K.has(' '))) {
-          me.grounded = false;
-          me.airVy = -400;
-          me.susVel += 16;
-          me.fuel -= FUEL_JUMP;
-          sfx('jump');
-          fxRef.current.add({ t: 'dirt', x: me.x - 8, y: me.y - 2, vx: -30 - Math.random() * 30, vy: -20, size: 2, life: 0.4 });
-          fxRef.current.add({ t: 'dirt', x: me.x + 8, y: me.y - 2, vx: 30 + Math.random() * 30, vy: -20, size: 2, life: 0.4 });
+        // jump - Worms-style escape hatch: EDGE-triggered via jumpBufRef (set by
+        //    onKey), with 0.12s coyote time so footing flicker on rough ground can
+        //    no longer eat a press. A dry tank now SAYS so instead of a dead key.
+        me.jumpDenyT = Math.max(0, (me.jumpDenyT || 0) - dt);
+        if (mine && (me.grounded || (me.coyoteT || 0) > 0) && jumpBufRef.current > 0) {
+          if (me.fuel >= FUEL_JUMP) {
+            jumpBufRef.current = 0;
+            me.grounded = false;
+            me.coyoteT = 0;
+            me.airVy = -400;
+            me.susVel += 16;
+            me.fuel -= FUEL_JUMP;
+            sfx('jump');
+            fxRef.current.add({ t: 'dirt', x: me.x - 8, y: me.y - 2, vx: -30 - Math.random() * 30, vy: -20, size: 2, life: 0.4 });
+            fxRef.current.add({ t: 'dirt', x: me.x + 8, y: me.y - 2, vx: 30 + Math.random() * 30, vy: -20, size: 2, life: 0.4 });
+          } else if (me.jumpDenyT <= 0) {
+            me.jumpDenyT = 0.9; // one deny blip per press, not per frame
+            jumpBufRef.current = 0;
+            fxRef.current.text(me.x, (me.y ?? surf(me.x)) - 62, 'LOW FUEL', '#ff9b5e');
+            sfx('deny');
+          }
         }
         if (me.grounded) {
           const gyNow = surf(me.x);
@@ -1487,14 +1503,24 @@ export default function Game({ gs, myId, local = 0 }) {
             me.airVy = 0;
           } else {
           me.y = gyNow; // always rest ON the ground
-          const th = slope(me.x);
+          // low-passed slope: raw per-pixel terrain noise made the engine
+          // force, speed cap and body tilt jitter frame-to-frame (12/s ease)
+          me.slopeSm = (me.slopeSm ?? 0) + (slope(me.x) - (me.slopeSm ?? 0)) * Math.min(1, 12 * dt);
+          const th = me.slopeSm;
           // 🔋 engine needs fuel - and after a dry cut it stays cut until 5+
           //    is back (hysteresis kills the per-frame stall/creep cycle at 0, B4)
           me.driving = dir !== 0 && me.fuel > 0 && !me.fuelCut;
           if (me.driving) {
             // driving: engine + gravity-downhill (+sinθ, y-down) − rolling friction
-            me.s += (dir * 520 + GRAV * Math.sin(th) * 0.55 - me.s * 2.2) * dt;
-            me.s = Math.max(-175, Math.min(175, me.s));
+            const uphill = dir * Math.sin(th) < 0; // pushing INTO the rise
+            const steep = Math.min(1, Math.max(0, (Math.abs(th) - 0.55) / 0.75)); // 0 at ~31deg -> 1 at ~74deg
+            // torque boost grows with steepness: a steady crawl up high slopes
+            // (was: surge/stop oscillation around the old 1.0 rad hard-clamp)
+            const engine = 520 + (uphill ? 340 * steep : 0);
+            me.s += (dir * engine + GRAV * Math.sin(th) * 0.55 - me.s * 2.2) * dt;
+            // CONTINUOUS uphill cap 175 -> 46 (was: clamp to 42 past 1.0 rad = jerk)
+            const cap = me.s * Math.sin(th) < 0 ? 175 - 129 * steep : 175;
+            me.s = Math.max(-cap, Math.min(cap, me.s));
           } else {
             // no input → handbrake + static friction: parked, even on slopes
             me.s -= me.s * Math.min(1, 14 * dt);
@@ -1503,8 +1529,6 @@ export default function Game({ gs, myId, local = 0 }) {
           if (Math.abs(me.s) > 1 || dir !== 0) {
             const nx = me.x + me.s * Math.cos(th) * dt;
             const ns = surf(nx);
-            const nth = slope(nx);
-            const uphill = me.s * Math.sin(nth) < 0;
             // 🛡️ other tanks are SOLID - bumper-to-bumper, never through.
             //    🧭 DIRECTIONAL (B3): block only when this step CLOSES the gap -
             //    otherwise a tank you're overlapping handbrakes BOTH directions
@@ -1518,32 +1542,57 @@ export default function Game({ gs, myId, local = 0 }) {
             if (hardBlock) {
               me.s = 0; // blocked: world edge / solid tank - stop dead, don't grind (B3)
             } else {
-              // very steep uphill → slow crawl, never a hard stop (no more stuck)
-              if (Math.abs(nth) > 1.0 && uphill) me.s = Math.sign(me.s) * Math.min(Math.abs(me.s), 42);
               const dyStep = ns - me.y;
               me.x = nx;
-              if (ns > me.y + 7 && Math.abs(me.s) > 40) {
+              // real cliff (>16px drop) at speed -> airborne; smaller dips stay
+              // glued (was >7px: rough ground kept ejecting the tank = stutter)
+              if (ns > me.y + 16 && Math.abs(me.s) > 40) {
                 me.grounded = false; // drove off a cliff
                 me.airVy = me.s * Math.sin(th);
+                me.coyoteT = 0.12;   // brief jump grace after leaving the edge
+                me.stepPrev = null;
               } else {
                 me.y = ns;
-                me.susVel -= Math.max(-14, Math.min(14, dyStep)) * 2.2; // bump jolt
+                // jolt on CHANGES of step height only: a steady climb has a
+                // constant dyStep, so the old per-frame jolt hammered the
+                // suspension the whole way up a slope (visible buzz)
+                me.susVel -= Math.max(-10, Math.min(10, dyStep - (me.stepPrev ?? dyStep))) * 2.2;
+                me.stepPrev = dyStep;
               }
             }
-          }
-          me.rot += (slope(me.x) - me.rot) * Math.min(1, 12 * dt);
+          } else me.stepPrev = null; // parked - re-baseline the bump detector
+          me.rot += (th - me.rot) * Math.min(1, 12 * dt); // tilt chases the SMOOTHED slope
           }
         } else {
           // airborne: gravity + limited air control (active tank only)
+          me.coyoteT = Math.max(0, (me.coyoteT || 0) - dt);
+          me.slopeSm = (me.slopeSm ?? 0) + (0 - (me.slopeSm ?? 0)) * Math.min(1, 6 * dt); // relax toward level
+          me.stepPrev = null;
           me.s = Math.max(-175, Math.min(175, me.s + dir * 130 * dt));
           me.airVy += GRAV * dt;
           me.y += me.airVy * dt;
           const nxA = me.x + me.s * dt;
-          if (nxA >= 26 && nxA <= terrain.width - 26 && surf(nxA) > me.y - 8) me.x = nxA;
-          else me.s *= 0.5;
+          if (nxA >= 26 && nxA <= terrain.width - 26) {
+            const syA = surf(nxA);
+            if (me.y <= syA + 2) {
+              me.x = nxA; // clear air - drift freely
+            } else if (me.airVy > -60 && me.y - syA <= 30) {
+              // falling (or at apex) onto a modest rise - slope shoulder, ledge:
+              // step ONTO it. (was: ground a mere 8px above the tank blocked x
+              // AND halved the speed every frame - jumping toward a hill killed
+              // all sideways motion mid-air)
+              me.x = nxA;
+              me.y = syA;
+              me.grounded = true;
+              me.susVel += Math.min(300, Math.max(0, me.airVy)) * 0.16;
+              me.airVy = 0;
+            } else {
+              me.s *= 0.5; // a genuine dirt wall - kill the push, keep the fall
+            }
+          } else me.s *= 0.5; // world edge
           me.rot += (0 - me.rot) * Math.min(1, 4 * dt);
           const gy = surf(me.x);
-          if (me.y >= gy) {
+          if (!me.grounded && me.y >= gy) {
             me.y = gy;
             me.grounded = true;
             me.susVel += Math.min(300, me.airVy) * 0.16; // landing thump
@@ -2219,7 +2268,13 @@ export default function Game({ gs, myId, local = 0 }) {
         const isActive = t === active;
         const chaosR = chaosRef.current;
         const spot = chaosR ? t.id === myIdRef.current : isActive; // ⚡ chaos: spotlight follows YOUR tank
-        const gy = t.y ?? groundY(t.x);
+        // render-y ease (VISUAL ONLY): physics y snaps to the per-pixel surface
+        // every frame - easing the DRAWN y hides that stair-step jitter. Big gaps
+        // (teleport/respawn) snap instead of gliding across the map.
+        const gyPhys = t.y ?? groundY(t.x);
+        if (t.ry == null || Math.abs(t.ry - gyPhys) > 60) t.ry = gyPhys;
+        else t.ry += (gyPhys - t.ry) * Math.min(1, 26 * dt);
+        const gy = t.ry;
         const sh = isActive ? shakeRef.current : 0;
         const rf = isActive && t.grounded ? Math.min(1, Math.abs(t.s || 0) / 150) : 0; // rumble ∝ speed
         const dx = (sh ? (Math.random() - 0.5) * 5.5 * sh : 0) + (Math.random() - 0.5) * 1.6 * rf;
@@ -3141,7 +3196,12 @@ export default function Game({ gs, myId, local = 0 }) {
           // ⌘/⌃/⌥ held? the browser is about to eat the keyup (macOS suppresses
           // keyup for other keys while ⌘ is down) - drop everything, register nothing
           if (e.metaKey || e.ctrlKey || e.altKey) clearKeys();
-          else { keysRef.current.add(held); keyStampRef.current.set(held, performance.now()); }
+          else {
+            keysRef.current.add(held); keyStampRef.current.set(held, performance.now());
+            // jump is edge-triggered into the 0.15s buffer (auto-repeat ignored) -
+            // a press just before touchdown still jumps; a held key no longer pogos
+            if (!e.repeat && (held === 'w' || held === 'arrowup' || held === ' ')) jumpBufRef.current = 0.15;
+          }
         } else { keysRef.current.delete(held); keyStampRef.current.delete(held); }
       }
       // ⌘/⌃/⌥ itself going down: any keyup from now on may be eaten - flush the set

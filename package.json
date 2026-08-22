@@ -12,6 +12,7 @@
     "start": "node start.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "smoke:rounds": "node scripts/rounds-test.mjs && node scripts/rounds-test-2.mjs",
+    "test:movement": "node scripts/movement-test.mjs",
     "test:ai": "node scripts/ai-accuracy-test.mjs",
     "test:ai-game": "node scripts/ai-game-test.mjs"
   },
