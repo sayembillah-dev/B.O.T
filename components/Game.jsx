@@ -9,6 +9,7 @@ import { FX } from '@/lib/fx.mjs';
 import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
 import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
 import { QualityGovernor, TIERS } from '@/lib/quality.mjs';
+import { loadIcons, hasIcon, drawIcon } from '@/lib/icons.mjs';
 
 /**
  * 🛡️ B.O.T - battle of tanks. Worms-style, side-view destructible terrain, zero sprites.
@@ -371,6 +372,7 @@ export default function Game({ gs, myId, local = 0 }) {
 
   // ── terrain generation (seed from server) ──
   useEffect(() => {
+    loadIcons(); // 🎁 bake the power-up SVGs once (idempotent)
     if (!seed) return;
     let cancelled = false;
     setProgress(0.0001);
@@ -2107,7 +2109,7 @@ export default function Game({ gs, myId, local = 0 }) {
       // ground (pulsing glow box), always visible
       for (const b of bonusRef.current) {
         if (b.taken) continue;
-        // 🎁 mystery crate - contents hidden until pickup or expiry
+        // 🎁 uncovered crate - contents always known, both modes
         const MC = '#ffcf6e';
         const pulse = 0.6 + 0.4 * Math.sin(now * 0.006 + b.bob);
         // ⏳ expiry blink - landed crates flash during their last 5s (local crates
@@ -2143,31 +2145,46 @@ export default function Game({ gs, myId, local = 0 }) {
         }
         const cy = b.landed ? b.y - 14 : b.y;
         ctx.globalAlpha = blink;
-        // wooden crate: warm planks, dark frame, diagonal strap, gold '?' badge
-        ctx.save(); // local space → the cached gradient is position-independent (5b.3)
-        ctx.translate(b.x, cy);
-        ctx.fillStyle = cachedGrad(ctx, 'crate', (c) => {
-          const g = c.createLinearGradient(0, -12, 0, 12);
-          g.addColorStop(0, '#a9713a'); g.addColorStop(0.5, '#8d5a2c'); g.addColorStop(1, '#6f4520');
-          return g;
-        });
-        ctx.beginPath(); ctx.roundRect(-12, -12, 24, 24, 4); ctx.fill();
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(46,28,12,0.9)'; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.stroke();
-        ctx.strokeStyle = 'rgba(46,28,12,0.55)'; ctx.lineWidth = 1; // plank seams + strap
-        ctx.beginPath();
-        ctx.moveTo(b.x - 12, cy - 4); ctx.lineTo(b.x + 12, cy - 4);
-        ctx.moveTo(b.x - 12, cy + 4); ctx.lineTo(b.x + 12, cy + 4);
-        ctx.moveTo(b.x - 10, cy + 10); ctx.lineTo(b.x + 10, cy - 10);
-        ctx.stroke();
-        ctx.fillStyle = MC; // gold badge
-        ctx.beginPath(); ctx.arc(b.x, cy, 6.4, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(46,28,12,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
-        ctx.fillStyle = '#3a2410';
-        ctx.font = 'bold 10px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(chaosRef.current && b.type ? (CRATE_GLYPHS[b.type] ?? '?') : '?', b.x, cy + 3.5);
+        const revealed = !!b.type; // 🎁 uncovered in every mode - the server always sends the type
+        if (revealed) {
+          // 🎁 uncovered - show the power-up picture itself, no crate frame; gentle bob for life
+          const bobY = cy + Math.sin(now * 0.003 + b.bob) * 2;
+          if (!drawIcon(ctx, b.type, b.x, bobY, 28)) { // text power-ups (x2/x3/+10/+15) have no SVG - float the glyph instead
+            ctx.font = 'bold 15px system-ui';
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(4,7,4,0.75)';
+            ctx.strokeText(CRATE_GLYPHS[b.type] ?? '?', b.x, bobY + 5);
+            ctx.fillStyle = MC;
+            ctx.fillText(CRATE_GLYPHS[b.type] ?? '?', b.x, bobY + 5);
+          }
+        } else {
+          // 🎁 mystery crate - wooden crate: warm planks, dark frame, diagonal strap, gold '?' badge
+          ctx.save(); // local space → the cached gradient is position-independent (5b.3)
+          ctx.translate(b.x, cy);
+          ctx.fillStyle = cachedGrad(ctx, 'crate', (c) => {
+            const g = c.createLinearGradient(0, -12, 0, 12);
+            g.addColorStop(0, '#a9713a'); g.addColorStop(0.5, '#8d5a2c'); g.addColorStop(1, '#6f4520');
+            return g;
+          });
+          ctx.beginPath(); ctx.roundRect(-12, -12, 24, 24, 4); ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(46,28,12,0.9)'; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.roundRect(b.x - 12, cy - 12, 24, 24, 4); ctx.stroke();
+          ctx.strokeStyle = 'rgba(46,28,12,0.55)'; ctx.lineWidth = 1; // plank seams + strap
+          ctx.beginPath();
+          ctx.moveTo(b.x - 12, cy - 4); ctx.lineTo(b.x + 12, cy - 4);
+          ctx.moveTo(b.x - 12, cy + 4); ctx.lineTo(b.x + 12, cy + 4);
+          ctx.moveTo(b.x - 10, cy + 10); ctx.lineTo(b.x + 10, cy - 10);
+          ctx.stroke();
+          ctx.fillStyle = MC; // gold badge
+          ctx.beginPath(); ctx.arc(b.x, cy, 6.4, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(46,28,12,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+          ctx.fillStyle = '#3a2410';
+          ctx.font = 'bold 10px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('?', b.x, cy + 3.5);
+        }
         ctx.globalAlpha = 1;
       }
 
@@ -2438,15 +2455,32 @@ export default function Game({ gs, myId, local = 0 }) {
         const shieldLeft = Math.max(0, ((t.shieldUntil ?? 0) - Date.now()) / 1000);
         const flyLeft = Math.max(0, t.flyT || 0);
         if (t.tele || shieldLeft > 0 || flyLeft > 0) {
-          const status = `${t.tele ? '🌀 ' : ''}${shieldLeft > 0 ? `🛡 ${Math.ceil(shieldLeft)}s ` : ''}${flyLeft > 0 ? `🚀 ${Math.ceil(flyLeft)}s` : ''}`.trim();
+          const parts = []; // baked SVG icon when ready, emoji glyph otherwise
+          if (t.tele) parts.push({ icon: 'teleport', glyph: '🌀', text: '' });
+          if (shieldLeft > 0) parts.push({ icon: 'shield', glyph: '🛡', text: `${Math.ceil(shieldLeft)}s` });
+          if (flyLeft > 0) parts.push({ icon: 'fly', glyph: '🚀', text: `${Math.ceil(flyLeft)}s` });
+          const IS = 13, GAP = 3, PAD = 8; // icon px (matches 12px label), icon↔label gap, part spacing
           ctx.font = 'bold 12px system-ui';
-          ctx.textAlign = 'center';
+          ctx.textAlign = 'left';
+          let rowW = 0;
+          for (const p of parts) { // measure pass - the row stays centred as a whole
+            p.useIcon = hasIcon(p.icon);
+            p.label = p.useIcon ? p.text : (p.text ? `${p.glyph} ${p.text}` : p.glyph);
+            p.w = (p.useIcon ? IS + (p.label ? GAP : 0) : 0) + (p.label ? ctx.measureText(p.label).width : 0);
+            rowW += p.w;
+          }
+          rowW += (parts.length - 1) * PAD;
+          const sy = stackY - (chaosR ? 84 : 94);
+          let px = stackX - rowW / 2;
           ctx.globalAlpha = 0.8 + 0.2 * Math.sin(now * 0.006);
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(4,7,4,0.75)';
-          ctx.strokeText(status, stackX, stackY - (chaosR ? 84 : 94));
           ctx.fillStyle = flyLeft > 0 ? '#9be8ff' : shieldLeft > 0 ? '#8fd0ff' : '#cfb3ff';
-          ctx.fillText(status, stackX, stackY - (chaosR ? 84 : 94));
+          for (const p of parts) {
+            if (p.useIcon) { drawIcon(ctx, p.icon, px + IS / 2, sy - 4.5, IS); px += IS + (p.label ? GAP : 0); } // sy-4.5 ≈ text optical centre
+            if (p.label) { ctx.strokeText(p.label, px, sy); ctx.fillText(p.label, px, sy); px += ctx.measureText(p.label).width; }
+            px += PAD;
+          }
           ctx.globalAlpha = 1;
         }
 

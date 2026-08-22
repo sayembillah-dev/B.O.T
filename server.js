@@ -194,9 +194,7 @@ function serializeGame(room, full = false) {
   const g = room.game;
   if (!g) return null;
   const out = full ? { ...g } : (({ blasts, ...rest }) => rest)(g);
-  // 🎁 mystery crates: classic never broadcasts the contents (revealed on
-  //    pickup/expiry) - ⚡ chaos crates are UNCOVERED: type rides along
-  if (out.crates && g.mode !== 'chaos') out.crates = out.crates.map(({ type, ...pub }) => pub);
+  // 🎁 crates are UNCOVERED in every mode - the type always rides along
   out.hostId = room.hostId;               // clients gate host-only UI on this
   out.match = room.match ? { ...room.match } : null; // round/wins scoreboard
   return out;
