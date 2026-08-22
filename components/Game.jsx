@@ -2376,7 +2376,7 @@ export default function Game({ gs, myId, local = 0 }) {
             ctx.restore();
           }
         }
-        drawTank(ctx, t.x + dx + swayX, gy + dy, {
+        if (!t.dead) drawTank(ctx, t.x + dx + swayX, gy + dy, { // 💥 destroyed = body VANISHES instantly - the tankBoom wreck parts ARE the tank now (skull marker takes over after the wreck fades)
           aim: isActive && mineT ? aimRef.current : (t.aim ?? -0.6), // remote barrel follows THEIR stream
           palette: t.palette ?? 0,
           rot: (t.rot || 0) + (Math.random() - 0.5) * 0.022 * rf,
@@ -2509,7 +2509,7 @@ export default function Game({ gs, myId, local = 0 }) {
         // status line above the name - pending teleport and/or shield timer, one tidy row
         const shieldLeft = Math.max(0, ((t.shieldUntil ?? 0) - Date.now()) / 1000);
         const flyLeft = Math.max(0, t.flyT || 0);
-        if (t.tele || shieldLeft > 0 || flyLeft > 0) {
+        if (!t.dead && (t.tele || shieldLeft > 0 || flyLeft > 0)) { // wreck site stays clean - no floating buff chips over a destroyed tank
           const parts = []; // baked SVG icon when ready, emoji glyph otherwise
           if (t.tele) parts.push({ icon: 'teleport', glyph: '🌀', text: '' });
           if (shieldLeft > 0) parts.push({ icon: 'shield', glyph: '🛡', text: `${Math.ceil(shieldLeft)}s` });
@@ -2539,7 +2539,7 @@ export default function Game({ gs, myId, local = 0 }) {
           ctx.globalAlpha = 1;
         }
 
-        if (shieldLeft > 0) { // 🛡️ energy shield - one clean bubble centred on the hull, not another ring
+        if (shieldLeft > 0 && !t.dead) { // 🛡️ energy shield - one clean bubble centred on the hull, not another ring (never around a wreck)
           const shY = stackY - 19;
           ctx.save();
           ctx.save();
