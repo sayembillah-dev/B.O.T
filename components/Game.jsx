@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
-import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims } from '@/lib/terrain.mjs';
+import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims, ssForTier } from '@/lib/terrain.mjs';
 import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
 import { FX } from '@/lib/fx.mjs';
 import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
 import { sfx, setMuted, isMuted } from '@/lib/sfx.mjs';
-import { QualityGovernor, TIERS } from '@/lib/quality.mjs';
+import { QualityGovernor, TIERS, guessTier } from '@/lib/quality.mjs';
 import { loadIcons, hasIcon, drawIcon } from '@/lib/icons.mjs';
 
 /**
@@ -293,6 +293,7 @@ export default function Game({ gs, myId, local = 0 }) {
   const router = useRouter();
   const canvasRef = useRef(null);
   const terrainCanvasRef = useRef(null);
+  const terrainSsRef = useRef(1);     // A5 supersample factor of the baked terrain canvas (1 = classic 1:1)
   const terrainRef = useRef(null);
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 });
   // ⏳ pre-round "3, 2, 1, FIGHT!" - remaining seconds; input/turn-timer freeze while > 0
@@ -422,7 +423,9 @@ export default function Game({ gs, myId, local = 0 }) {
         });
         if (cancelled) return;
         terrainRef.current = terrain;
-        const off = renderTerrainToCanvas(document.createElement('canvas'), terrain);
+        const ss = ssForTier(qualityRef.current?.tier ?? guessTier(), terrain.width); // A5: Low=1x (today's look)
+        terrainSsRef.current = ss;
+        const off = renderTerrainToCanvas(document.createElement('canvas'), terrain, ss);
         if (cancelled) return;
         // late-join / spectator: replay the server's blast log so craters match
         const blasts = local > 0 ? [] : (gsRef.current?.blasts ?? []);
@@ -443,7 +446,7 @@ export default function Game({ gs, myId, local = 0 }) {
               if (cancelled) return;
             }
           }
-          renderTerrainToCanvas(off, terrain); // one full repaint after replay
+          renderTerrainToCanvas(off, terrain, terrainSsRef.current); // one full repaint after replay (same SS lattice)
         }
         terrainCanvasRef.current = off;
         if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ fresh terrain → re-scale the blit cache
@@ -684,7 +687,7 @@ export default function Game({ gs, myId, local = 0 }) {
     if (px <= 60000) { // small blast - repaint instantly, as always
       const c2d = off.getContext('2d');
       for (const rg of regions) {
-        const reg = renderTerrainRegion(terrain, rg.x, rg.y, rg.w, rg.h);
+        const reg = renderTerrainRegion(terrain, rg.x, rg.y, rg.w, rg.h, terrainSsRef.current); // A5 SS lattice
         c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
       }
       if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ re-scale the blit cache
@@ -2031,7 +2034,7 @@ export default function Game({ gs, myId, local = 0 }) {
           const c2d = offC.getContext('2d');
           while (q.length && budget > 0) {
             const band = q.shift();
-            const reg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h);
+            const reg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h, terrainSsRef.current); // A5 SS lattice
             c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
             budget -= reg.w * reg.h;
           }
@@ -2102,17 +2105,17 @@ export default function Game({ gs, myId, local = 0 }) {
       ctx.fillRect(0, 0, cw, chh);
       // ── fixed whole-map view - no zoom, no follow cam; the entire
       //    battlefield is always fully visible ──
-      const scale = Math.min(cw / off.width, chh / off.height) * 0.985;
-      const ox = cw / 2 - (off.width / 2) * scale;
-      const oy = chh / 2 - (off.height / 2) * scale;
+      const scale = Math.min(cw / terrain.width, chh / terrain.height) * 0.985; // A5: world units, not SS canvas px
+      const ox = cw / 2 - (terrain.width / 2) * scale;
+      const oy = chh / 2 - (terrain.height / 2) * scale;
       viewRef.current = { scale, ox, oy };
       // 🖼️ pre-scaled terrain cache (5b): the source bitmap is up to 3360×1260
       //    and high-quality-downscaling it EVERY frame was the biggest single
       //    render cost. Terrain changes only on a blast (dirty flag set by the
       //    repaint sites) - so downscale ONCE into a device-pixel cache and
       //    blit 1:1 per frame.
-      const dw = Math.max(2, Math.round(off.width * scale * dpr));
-      const dh = Math.max(2, Math.round(off.height * scale * dpr));
+      const dw = Math.max(2, Math.round(terrain.width * scale * dpr));
+      const dh = Math.max(2, Math.round(terrain.height * scale * dpr));
       let tv = terrainViewRef.current;
       if (!tv) { tv = terrainViewRef.current = { c: document.createElement('canvas'), w: 0, h: 0, dirty: true }; }
       if (tv.w !== dw || tv.h !== dh) { tv.c.width = dw; tv.c.height = dh; tv.w = dw; tv.h = dh; tv.dirty = true; }
@@ -2125,7 +2128,7 @@ export default function Game({ gs, myId, local = 0 }) {
         tv.dirty = false;
       }
       ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(tv.c, 0, 0, dw, dh, ox, oy, off.width * scale, off.height * scale);
+      ctx.drawImage(tv.c, 0, 0, dw, dh, ox, oy, terrain.width * scale, terrain.height * scale);
 
       ctx.save();
       ctx.translate(ox, oy);
