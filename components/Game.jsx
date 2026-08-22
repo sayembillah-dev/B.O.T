@@ -2249,7 +2249,7 @@ export default function Game({ gs, myId, local = 0 }) {
         // every frame - easing the DRAWN y hides that stair-step jitter. Big gaps
         // (teleport/respawn) snap instead of gliding across the map.
         const gyPhys = t.y ?? groundY(t.x);
-        if (t.ry == null || Math.abs(t.ry - gyPhys) > 60) t.ry = gyPhys;
+        if (t.ry == null || !t.grounded || Math.abs(t.ry - gyPhys) > 60) t.ry = gyPhys; // 🚀 airborne (fly/jump/para): NO ease - the drawn barrel must BE the physics muzzle or shots lie
         else t.ry += (gyPhys - t.ry) * Math.min(1, 26 * dt);
         const gy = t.ry;
         const sh = isActive ? shakeRef.current : 0;
