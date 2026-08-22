@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
-import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims, ssForTier } from '@/lib/terrain.mjs';
+import { generateTerrain, renderTerrainToCanvas, renderTerrainRegion, destroyCircle, cleanDebris, removeFloaters, reflowSky, isSolid, terrainDims, ssForTier, drawProps, propsGone } from '@/lib/terrain.mjs';
 import { drawTank, TANK_PALETTES, TANK } from '@/lib/tank.mjs';
 import { FX } from '@/lib/fx.mjs';
 import { BONUS_DEFS, pickDropType } from '@/lib/bonus.mjs';
@@ -426,6 +426,7 @@ export default function Game({ gs, myId, local = 0 }) {
         const ss = ssForTier(qualityRef.current?.tier ?? guessTier(), terrain.width); // A5: Low=1x (today's look)
         terrainSsRef.current = ss;
         const off = renderTerrainToCanvas(document.createElement('canvas'), terrain, ss);
+        drawProps(off.getContext('2d'), terrain, ss); // A7 seeded props baked on
         if (cancelled) return;
         // late-join / spectator: replay the server's blast log so craters match
         const blasts = local > 0 ? [] : (gsRef.current?.blasts ?? []);
@@ -447,6 +448,7 @@ export default function Game({ gs, myId, local = 0 }) {
             }
           }
           renderTerrainToCanvas(off, terrain, terrainSsRef.current); // one full repaint after replay (same SS lattice)
+          drawProps(off.getContext('2d'), terrain, terrainSsRef.current); // A7: survivors only - burned hosts stay bare
         }
         terrainCanvasRef.current = off;
         if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ fresh terrain → re-scale the blit cache
@@ -690,6 +692,14 @@ export default function Game({ gs, myId, local = 0 }) {
       for (const rg of regions) {
         const reg = renderTerrainRegion(terrain, rg.x, rg.y, rg.w, rg.h, terrainSsRef.current); // A5 SS lattice
         c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
+        // A7 props: erase silhouettes whose host pixel the blast destroyed
+        //    (fresh terrain bytes, same SS lattice), then redraw survivors
+        for (const b of propsGone(terrain, rg)) {
+          const g = renderTerrainRegion(terrain, b.x, b.y, b.w, b.h, terrainSsRef.current);
+          c2d.putImageData(new ImageData(g.data, g.w, g.h), g.x, g.y);
+          drawProps(c2d, terrain, terrainSsRef.current, g);
+        }
+        drawProps(c2d, terrain, terrainSsRef.current, reg);
       }
       if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ re-scale the blit cache
     } else {
@@ -2037,6 +2047,12 @@ export default function Game({ gs, myId, local = 0 }) {
             const band = q.shift();
             const reg = renderTerrainRegion(terrain, band.x, band.y, band.w, band.h, terrainSsRef.current); // A5 SS lattice
             c2d.putImageData(new ImageData(reg.data, reg.w, reg.h), reg.x, reg.y);
+            for (const b of propsGone(terrain, band)) { // A7: erase burned props
+              const g = renderTerrainRegion(terrain, b.x, b.y, b.w, b.h, terrainSsRef.current);
+              c2d.putImageData(new ImageData(g.data, g.w, g.h), g.x, g.y);
+              drawProps(c2d, terrain, terrainSsRef.current, g);
+            }
+            drawProps(c2d, terrain, terrainSsRef.current, reg); // A7: survivors
             budget -= reg.w * reg.h;
           }
           if (terrainViewRef.current) terrainViewRef.current.dirty = true; // 🖼️ bands landed - re-scale the blit cache
