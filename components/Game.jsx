@@ -681,7 +681,8 @@ export default function Game({ gs, myId, local = 0 }) {
     //    ~60k px (☢️ tomahawk ≈ 190k) is sliced into ≤48px bands - crater-centre
     //    first - and paid down over the next frames from the main loop (#14)
     const regions = floaters.map((fl) => ({ x: fl.x, y: fl.y, w: fl.w, h: fl.h }));
-    regions.push({ x: x - r - 16, y: y - r - 16, w: (r + 16) * 2, h: (r + 16) * 2 });
+    const rr = Math.ceil(Math.max(r * 1.35, r + 16)); // A6: repaint must cover the scorch ring (r -> r*1.35)
+    regions.push({ x: x - rr, y: y - rr, w: rr * 2, h: rr * 2 });
     let px = 0;
     for (const rg of regions) px += rg.w * rg.h;
     if (px <= 60000) { // small blast - repaint instantly, as always
