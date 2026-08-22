@@ -162,6 +162,7 @@ async function createGame(room) {
       kills: 0, deaths: 0, // 💀 the headline stat - most kills wins
       deadAt: 0, // ⚡ chaos respawn timer (0 = alive / never died)
       shieldUntil: 0, // 🛡️ chaos shield pickup - invulnerable until this stamp
+      flyUntil: 0, // 🚀 fly pickup - thruster flight until this stamp
       paraUntil: mode === 'chaos' ? Date.now() + PARA_MAX_MS : 0, // 🪂 server-owned chute deadline
     };
   });
@@ -418,6 +419,7 @@ function tickRoom(room) {
           else if (c.type === 'x3') t.buff += 3;
           else if (c.type === 'teleport') t.tele = true; // 🌀 pending - use it this turn or lose it
           else if (c.type === 'shield') t.shieldUntil = now + 10000; // 🛡️ 10s of invulnerability
+          else if (c.type === 'fly') t.flyUntil = now + 7000; // 🚀 7s of thruster flight
           else t.inv[c.type] = (t.inv[c.type] | 0) + 1;
           io.to(room.id).emit('game-event', { kind: 'crate-taken', crateId: c.id, type: c.type, x: c.x, y: c.y, by: t.id });
           dirty = true;
@@ -902,7 +904,7 @@ app.prepare().then(async () => {
       if (process.env.STEER_DEBUG) console.log('tm', JSON.stringify({ n: t.name, x: Math.round(t.x), y: Math.round(t.y), para: t.para === true, t: Date.now() % 100000 }));
       socket.to(room.id).volatile.emit('tank-move', {
         id: t.id, x: t.x, y: t.y, aim: t.aim, s: typeof p?.s === 'number' ? p.s : 0,
-        fuel: t.fuel, para: t.para === true, palette: t.palette, // 🕵️ no power - that's the shooter's secret
+        fuel: t.fuel, para: t.para === true, fly: p?.fly === true, palette: t.palette, // 🕵️ no power - that's the shooter's secret
       });
     });
     // 🌀 teleport: spend a pending teleport to land at x (classic: this turn

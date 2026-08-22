@@ -84,8 +84,14 @@ const CHAOS_COOLDOWN = 1;  // ⚡ chaos reload - seconds between shots (server e
 const CHAOS_RESPAWN = 5;   // ⚡ chaos respawn - seconds dead before you're back
 const PARA_FALL = 230;     // 🪂 parachute descent speed (px/s) - brisk drop-in
 const PARA_DRIFT = 170;    // 🪂 steering speed (px/s) - A/D glides you to a new landing spot
+// 🚀 FLY power-up - 7s of smooth, fast thruster flight (instant launch on pickup)
+const FLY_TIME = 7;        // seconds airborne
+const FLY_VX = 290;        // horizontal cruise (px/s) - much faster than tracks (175)
+const FLY_VY = 265;        // vertical cruise (px/s)
+const FLY_LAUNCH = -380;   // pickup kick: the tank leaps off the ground
+const FLY_CEIL = 26;       // hard ceiling (px from the top edge)
 // ⚡ chaos crates are UNCOVERED - badge shows the contents, not a mystery '?'
-const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️' };
+const CRATE_GLYPHS = { x2: '×2', x3: '×3', cluster: '💥', hp10: '+10', hp15: '+15', guided: '🎯', tomahawk: '🪓', teleport: '🌀', shield: '🛡️', fly: '🚀' };
 const CHAOS_TIME = 180;    // ⚡ chaos match clock (server's gs.dur is the truth)
 // ⏳ pre-round countdown - "3", "2", "1" at 1s each, then "FIGHT!" for a short beat
 const COUNTDOWN_TOTAL = 3.6;
@@ -118,7 +124,7 @@ const WEAPON_KEYS = { 1: 'normal', 2: 'cluster', 3: 'guided', 4: 'tomahawk' };
 // ⌨️ held keys are tracked by PHYSICAL code (e.code), never e.key - macOS
 //    rewrites e.key under ⌥/⇧ (physical D released with ⌥ down reports '∂'),
 //    which used to wedge 'd' in the held set forever (B2)
-const KEY_CODES = { KeyA: 'a', KeyD: 'd', KeyW: 'w', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', ArrowUp: 'arrowup', Space: ' ' };
+const KEY_CODES = { KeyA: 'a', KeyD: 'd', KeyW: 'w', KeyS: 's', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', Space: ' ' };
 
 /** Worms wind ∈ [-1,1], biased toward useful strengths. */
 const rollWind = () => {
@@ -454,6 +460,7 @@ export default function Game({ gs, myId, local = 0 }) {
           return {
             ...p, x, y, s: 0, rot: 0, susOff: 0, susVel: 0,
             wheelRot: 0, grounded: !st?.para, airVy: 0, dustT: 0, // 🪂 chute drops start airborne
+            flyT: 0, flyVy: 0, // 🚀 thruster flight clock + vertical speed
             para: !!st?.para,
             hp: st?.hp ?? 100, fuel: st?.fuel ?? 100, // ⛽ server-owned online - a reload no longer refills the tank
             driving: false, dead: !!st?.dead,
@@ -536,6 +543,7 @@ export default function Game({ gs, myId, local = 0 }) {
       t.kills = st.kills | 0; t.deaths = st.deaths | 0; // 💀 the headline stat
       t.gone = !!st.gone; // 🔌 owner dropped - reclaim grace window is running
       t.shieldUntil = st.shieldUntil ?? 0; // 🛡️ chaos shield bubble
+      if (st.flyUntil) t.flyT = Math.max(t.flyT || 0, (st.flyUntil - Date.now()) / 1000); // 🚀 late join/resync: adopt the server's flight clock
       // 🪂 one-way: touchdown clears it locally - and B6: only re-arm a chute
       //    whose generation hasn't landed yet, or a stale game-state landing in
       //    the ≤12Hz gap before the server learns of touchdown re-opens a stowed
@@ -989,6 +997,10 @@ export default function Game({ gs, myId, local = 0 }) {
       t.netAt = nowMs;
       if (typeof m.aim === 'number') t.netAim = m.aim;
       if (typeof m.s === 'number') t.netS = m.s;
+      if (typeof m.fly === 'boolean') { // 🚀 thruster state rides the stream (backup for the crate-taken event)
+        if (m.fly) t.flyT = Math.max(t.flyT || 0, 0.3);      // owner airborne - keep the jet lit
+        else if ((t.flyT || 0) > 0.3) t.flyT = 0.3;          // flameout/landed - quick fade, not a hard cut
+      }
       if (typeof m.fuel === 'number') t.fuel = m.fuel;      // 👀 rival fuel gauges are public
       // 🕵️ no m.p handling - rival aim power is secret and never rides the stream
       // 🪂 touchdown signal from the owner - a stale in-flight para:true relay
@@ -1027,7 +1039,14 @@ export default function Game({ gs, myId, local = 0 }) {
       const def = e.type ? BONUS_DEFS[e.type] : null;
       if (e.kind === 'crate-taken') {
         fxRef.current.text(e.x, e.y - 18, def ? (def.label.startsWith('+') ? `${def.label} ❤` : def.name) : '', def?.color ?? '#fff');
-        sfx(e.type === 'hp10' || e.type === 'hp15' ? 'heal' : 'pickup');
+        sfx(e.type === 'hp10' || e.type === 'hp15' ? 'heal' : e.type === 'fly' ? 'fly' : 'pickup');
+        if (e.type === 'fly') { // 🚀 7s of thruster flight - the whole room sees the launch
+          const tF = tanksRef.current.find((k) => k.id === e.by);
+          if (tF) {
+            tF.flyT = FLY_TIME; tF.flyVy = FLY_LAUNCH; tF.para = false; tF.grounded = false; tF.airVy = 0;
+            fxRef.current.add({ t: 'ring', x: tF.x, y: (tF.y ?? e.y) + 2, size: 6, grow: 260, life: 0.4, color: 'rgba(155,232,255,0.9)' });
+          }
+        }
         if (e.type === 'teleport') { // 🌀 arm targeting for the owner (this turn only!)
           const t = tanksRef.current.find((k) => k.id === e.by);
           if (t) t.tele = true;
@@ -1074,6 +1093,7 @@ export default function Game({ gs, myId, local = 0 }) {
           t.dead = false; t.hp = 100; t.x = e.x; t.y = e.y;
           t.netX = null; t.netY = null; t.netVx = 0; t.netVy = 0; t.netAt = 0; // drop the death-spot anchors
           t.s = 0; t.airVy = 0; t.grounded = false; t.fuel = 100;
+          t.flyT = 0; t.flyVy = 0; // 🚀 a fresh tank never inherits a burning jet
           t.aim = e.x < (terrainRef.current?.width ?? 1920) / 2 ? -0.6 : -2.54; // mirrors the server's respawn aim
           t.para = true; t.paraDone = false; // 🪂 new chute generation
           fxRef.current.text(e.x, e.y - 56, 'RESPAWN', '#8fd0ff');
@@ -1343,6 +1363,68 @@ export default function Game({ gs, myId, local = 0 }) {
           continue;
         }
 
+        // 🚀 FLY power-up: 7s of thruster flight. The owner steers with
+        //    A/D + W/S (or arrows/space) - smooth exponential easing, no
+        //    gravity while the jet is lit. Remote flyers mirror the owner's
+        //    stream (x AND y). The countdown runs everywhere so the whole
+        //    room sees the same flameout.
+        if ((me.flyT || 0) > 0) {
+          me.flyT = Math.max(0, me.flyT - dt);
+          me.para = false; me.grounded = false; me.driving = false;
+          if (onlineNow && me.id !== myIdRef.current) {
+            const easeF = 1 - Math.exp(-14 * dt);
+            if (me.netX != null) me.x += (me.netX - me.x) * easeF;
+            if (me.netY != null) me.y += (me.netY - me.y) * easeF;
+            me.s = me.netS || 0;
+            me.rot += ((me.s / FLY_VX) * 0.16 - me.rot) * Math.min(1, 8 * dt); // bank into the move
+            if (me.flyT <= 0) { me.airVy = 0; me.flyVy = 0; } // flameout: gravity takes it from here
+          } else {
+            const flyMine = chaosRef.current
+              ? me.id === myIdRef.current && turn.phase !== 'over' && countdownRef.current <= 0
+              : me === active && turn.phase === 'open' && countdownRef.current <= 0
+                && (!onlineNow || me.id === myIdRef.current);
+            const fdir = flyMine ? (K.has('a') || K.has('arrowleft') ? -1 : 0) + (K.has('d') || K.has('arrowright') ? 1 : 0) : 0;
+            const vdir = flyMine ? (K.has('w') || K.has('arrowup') || K.has(' ') ? -1 : 0) + (K.has('s') || K.has('arrowdown') ? 1 : 0) : 0;
+            const easeF = 1 - Math.exp(-7 * dt); // exact exponential - fast response, zero jerk
+            me.s += (fdir * FLY_VX - me.s) * easeF;
+            me.flyVy = (me.flyVy || 0) + (vdir * FLY_VY - (me.flyVy || 0)) * easeF;
+            me.x += me.s * dt;
+            me.y = (me.y ?? surf(me.x)) + me.flyVy * dt;
+            if (me.x < 26 || me.x > terrain.width - 26) { me.x = Math.max(26, Math.min(terrain.width - 26, me.x)); me.s = 0; } // walls
+            if (me.y < FLY_CEIL) { me.y = FLY_CEIL; me.flyVy = Math.max(0, me.flyVy); } // ceiling
+            const gyF = surf(me.x);
+            if (me.y > gyF) { me.y = gyF; me.flyVy = Math.min(0, me.flyVy); } // skim the ground, never through it
+            me.rot += ((me.s / FLY_VX) * 0.16 - me.rot) * Math.min(1, 8 * dt);
+            if (me.flyT <= 0) { // 🚀 flameout - hand vertical speed to gravity, land normally
+              me.airVy = Math.max(-160, Math.min(300, me.flyVy)); me.flyVy = 0;
+              if (me.y >= gyF - 1) { me.grounded = true; me.airVy = 0; me.s *= 0.4; }
+              else sfx('flyend');
+            }
+            if (onlineNow && me.id === myIdRef.current) { // keep streaming mid-flight (the regular emit sits below the continue)
+              netAccRef.current += dt;
+              if (netAccRef.current >= 1 / NET_HZ) {
+                netAccRef.current = 0;
+                getSocket()?.emit('tank-move', {
+                  x: Math.round(me.x * 10) / 10,
+                  y: Math.round((me.y ?? 0) * 10) / 10,
+                  aim: me === active ? aimRef.current : me.aim,
+                  s: Math.round(me.s || 0),
+                  fuel: Math.round(me.fuel ?? 100),
+                  para: false,
+                  fly: me.flyT > 0,
+                });
+              }
+            }
+          }
+          me.wheelRot += (me.s * dt) / 2.7; // wheels free-spin in the air
+          if (me.flyT > 0) { // 🚀 belly thruster jet - everyone sees it burn
+            for (let i = 0; i < fxRef.current.n(2); i++) {
+              fxRef.current.add({ t: 'flame', x: me.x + (Math.random() - 0.5) * 13, y: (me.y ?? 0) + 3, vx: -me.s * 0.12 + (Math.random() - 0.5) * 26, vy: 140 + Math.random() * 90, size: 2.4 + Math.random() * 2.2, life: 0.2 + Math.random() * 0.12 });
+            }
+          }
+          continue;
+        }
+
         // 🌐 remote tank: follow the owner's stream; still falls if the
         // ground vanishes under it (everyone sees consistent craters)
         if (onlineNow && me.id !== myIdRef.current) {
@@ -1516,6 +1598,7 @@ export default function Game({ gs, myId, local = 0 }) {
               y: Math.round((me.y ?? 0) * 10) / 10,
               aim: me === active ? aimRef.current : me.aim,
               s: Math.round(me.s || 0),
+              fly: me.flyT > 0, // 🚀 thruster lit - remotes mirror the jet, skip gravity
               fuel: Math.round(me.fuel ?? 100),                       // 👀 rivals watch your gauge
               // 🕵️ no p - your missile power is YOUR secret (persisted locally only)
               para: me.para === true,                                 // 🪂 chute stowed = touchdown
@@ -1667,6 +1750,11 @@ export default function Game({ gs, myId, local = 0 }) {
               }
               fxRef.current.text(b.x, b.y - 18, def.name, def.color);
               sfx('pickup');
+            } else if (b.type === 'fly') { // 🚀 7s of thruster flight - instant launch off the ground
+              t.flyT = FLY_TIME; t.flyVy = FLY_LAUNCH; t.para = false; t.grounded = false; t.airVy = 0; t.susVel += 12;
+              fxRef.current.text(b.x, b.y - 18, def.name, def.color);
+              fxRef.current.add({ t: 'ring', x: t.x, y: (t.y ?? b.y) + 2, size: 6, grow: 260, life: 0.4, color: 'rgba(155,232,255,0.9)' });
+              sfx('fly');
             } else {
               t.inv[b.type] = (t.inv[b.type] | 0) + 1;
               fxRef.current.text(b.x, b.y - 18, def.name, def.color);
@@ -2224,6 +2312,22 @@ export default function Game({ gs, myId, local = 0 }) {
           wheelRot: t.wheelRot || 0,
         });
 
+        if ((t.flyT || 0) > 0 && !t.dead) { // 🚀 belly thruster - flickering additive jet under the tank
+          const fade = t.flyT < 0.4 ? Math.max(0, t.flyT / 0.4) : 1; // sputter out at flameout
+          const len = (22 + Math.random() * 14) * fade;
+          ctx.save();
+          ctx.translate(t.x + dx + swayX, gy + dy + 2);
+          ctx.rotate((t.rot || 0) * 0.5);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = 'rgba(255,140,50,0.50)';
+          ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.lineTo(0, len); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(255,226,140,0.80)';
+          ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(4, 0); ctx.lineTo(0, len * 0.55); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(255,244,200,0.9)'; // hot nozzle core
+          ctx.beginPath(); ctx.ellipse(0, 1.5, 5, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+
         if (t.para && !t.dead) { // 🪂 canopy + cords over the descending tank
           const pal = TANK_PALETTES[(t.palette ?? 0) % TANK_PALETTES.length];
           ctx.save();
@@ -2332,15 +2436,16 @@ export default function Game({ gs, myId, local = 0 }) {
 
         // status line above the name - pending teleport and/or shield timer, one tidy row
         const shieldLeft = Math.max(0, ((t.shieldUntil ?? 0) - Date.now()) / 1000);
-        if (t.tele || shieldLeft > 0) {
-          const status = `${t.tele ? '🌀 ' : ''}${shieldLeft > 0 ? `🛡 ${Math.ceil(shieldLeft)}s` : ''}`.trim();
+        const flyLeft = Math.max(0, t.flyT || 0);
+        if (t.tele || shieldLeft > 0 || flyLeft > 0) {
+          const status = `${t.tele ? '🌀 ' : ''}${shieldLeft > 0 ? `🛡 ${Math.ceil(shieldLeft)}s ` : ''}${flyLeft > 0 ? `🚀 ${Math.ceil(flyLeft)}s` : ''}`.trim();
           ctx.font = 'bold 12px system-ui';
           ctx.textAlign = 'center';
           ctx.globalAlpha = 0.8 + 0.2 * Math.sin(now * 0.006);
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(4,7,4,0.75)';
           ctx.strokeText(status, stackX, stackY - (chaosR ? 84 : 94));
-          ctx.fillStyle = shieldLeft > 0 ? '#8fd0ff' : '#cfb3ff';
+          ctx.fillStyle = flyLeft > 0 ? '#9be8ff' : shieldLeft > 0 ? '#8fd0ff' : '#cfb3ff';
           ctx.fillText(status, stackX, stackY - (chaosR ? 84 : 94));
           ctx.globalAlpha = 1;
         }
@@ -3117,6 +3222,7 @@ export default function Game({ gs, myId, local = 0 }) {
         <span className={`hud-hints${hintsOpen ? ' open' : ''}`}>
           {ctl(['A', 'D'], 'drive')}
           {ctl(['W'], 'jump')}
+          {ctl(['W', 'S'], 'fly 🚀')}
           {ctl(['⇅'], 'power')}
           {ctl(['🖱️'], 'fire')}
           {ctl(['1–4'], 'weapon')}
