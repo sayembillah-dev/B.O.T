@@ -2240,31 +2240,8 @@ export default function Game({ gs, myId, local = 0 }) {
       // tanks (active one shakes while firing/explosions)
       for (let i = 0; i < tanksRef.current.length; i++) {
         const t = tanksRef.current[i];
-        if (t.dead && now - (t.deadAtMs || 0) >= 2800) { // wreck parts hold full opacity 2s + fade 0.8s first, then: eliminated → ghosted skull where the tank fell (gentle bob + fade)
-          const gyD = t.y ?? groundY(t.x);
-          const bob = Math.sin(now * 0.002 + i * 1.7) * 3;
-          ctx.globalAlpha = 0.4 + 0.12 * Math.sin(now * 0.003 + i);
-          ctx.font = '24px system-ui';
-          ctx.textAlign = 'center';
-          ctx.fillText('💀', t.x, gyD - 26 + bob);
-          ctx.globalAlpha = 1;
-          if (chaosRef.current && turn.phase !== 'over' && t.deadAtMs) { // ⚡ respawn countdown - tidy pill under the skull
-            const back = Math.max(0, CHAOS_RESPAWN - (performance.now() - t.deadAtMs) / 1000);
-            const rLabel = back > 0 ? `⏱ ${back.toFixed(1)}s` : '⏱ …';
-            ctx.font = 'bold 11px system-ui';
-            ctx.textAlign = 'center';
-            const rw = ctx.measureText(rLabel).width;
-            ctx.fillStyle = 'rgba(8,12,8,0.6)';
-            ctx.beginPath(); ctx.roundRect(t.x - rw / 2 - 7, gyD - 15 + bob, rw + 14, 15, 7); ctx.fill();
-            ctx.strokeStyle = 'rgba(143,208,255,0.35)';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-            ctx.fillStyle = '#8fd0ff';
-            ctx.fillText(rLabel, t.x, gyD - 3.5 + bob);
-          }
-          drawNameTag(ctx, t.x, gyD - 42 + bob, t);
-          continue;
-        }
+        if (t.dead) continue; // 💥 destroyed = GONE instantly - body, name tag, hp bar, skull, respawn pill all vanish; the tankBoom wreck parts (fx) are the only trace
+
         const isActive = t === active;
         const chaosR = chaosRef.current;
         const spot = chaosR ? t.id === myIdRef.current : isActive; // ⚡ chaos: spotlight follows YOUR tank
